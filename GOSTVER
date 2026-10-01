@@ -1,0 +1,4 @@
+# GOSTVER — Declaração de Conformidade com o Padrão GOST
+GOST_VERSION="1.1.0"
+GOST_PROFILE_URL="https://codeberg.org/lumenpink/gost-profile-lumen/raw/branch/main/profile.md"
+GOST_LANGUAGES="rust"

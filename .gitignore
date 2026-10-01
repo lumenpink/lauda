@@ -1,0 +1,15 @@
+# Dependências e compilação
+/target/
+/vendor/
+/node_modules/
+/dist/
+/build/
+
+# Caches e arquivos temporários
+.cache/
+*.tmp
+*.log
+.DS_Store
+
+# Metadados de agentes locais
+.antigravity/
