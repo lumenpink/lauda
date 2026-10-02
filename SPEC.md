@@ -211,3 +211,42 @@ aliases = ["lumen@2lp.in", "contato@2lp.in", "postmaster@2lp.in"]
 - [x] Implementação de `InMemoryApiClient` e máquina de estados de navegação (`Screen`, `ViewMode`).
 - [x] Componente raiz Dioxus e entrypoint desktop/mobile compilando com sucesso.
 - [x] Clippy zero warnings e rustfmt verificado.
+
+---
+
+## 8. Distribuição Android & Mecanismo de Auto-Update (Ticket #5)
+
+Para viabilizar um ciclo de desenvolvimento ágil com testes em dispositivos Android reais sem atrito ou burocracia de lojas centralizadas, o **`lauda`** implementa uma arquitetura híbrida de distribuição e atualização automática.
+
+### 8.1 Manifesto de Versão Remota (`version.json`)
+Publicado na raiz do portal estático (`https://lauda.2lp.in/version.json`):
+```json
+{
+  "version": "0.1.0",
+  "min_compatible_version": "0.1.0",
+  "apk_url": "https://lauda.2lp.in/lauda-latest.apk",
+  "release_notes": "Versão inicial de desenvolvimento com visualizador trifásico e redação sem travas.",
+  "published_at": "2026-10-02T08:00:00Z"
+}
+```
+
+### 8.2 Lógica do Verificador Semântico (`domain/update.rs`)
+O cliente móvel consulta o manifesto e realiza a comparação via [Semantic Versioning 2.0.0](https://semver.org/):
+- Se `remote_version > local_version`: o cliente sinaliza `UpdateStatus::Available(UpdateManifest)`.
+- Se a versão local for menor que `min_compatible_version`: sinaliza `UpdateStatus::Required(UpdateManifest)`.
+- Do contrário: `UpdateStatus::UpToDate`.
+
+### 8.3 Métodos de Atualização Suportados
+1. **Rastreamento Automático via Obtainium:**
+   - O aplicativo Obtainium no Android rastreia diretamente as releases do Codeberg (`https://codeberg.org/lumenpink/lauda`) e executa o download e instalação em segundo plano.
+2. **Download Direto na Vitrine Trash Polka:**
+   - Link de download direto apontando para `https://lauda.2lp.in/lauda-latest.apk` e botões de atalho em `site/index.html`.
+3. **In-App Updater:**
+   - O smolclient exibe o aviso com a opção de baixar o novo `.apk` e invocar o instalador de pacotes do sistema via Intent `application/vnd.android.package-archive`.
+
+### 8.4 Critérios de Aceite (Ticket #5)
+- [ ] Especificação do protocolo de atualização consolidada neste `SPEC.md`.
+- [ ] Criação do modelo `UpdateManifest` e lógica semântica `check_update()` testada unitariamente.
+- [ ] Disponibilização de `site/version.json` na vitrine pública.
+- [ ] Inclusão dos links e botões de download do APK no `site/index.html`.
+- [ ] Clippy zero warnings e rustfmt verificado.
