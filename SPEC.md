@@ -113,3 +113,53 @@ O crate de biblioteca `lauda-types` centraliza os modelos serializáveis consumi
 - [x] Testes falhos criados para cada estrutura de dados em `lauda-types`.
 - [x] Implementação de todos os modelos em `lauda-types` passando 100% nos testes.
 - [x] Clippy zero warnings e rustfmt verificado.
+
+---
+
+## 6. Especificação do Daemon HTTP (`lauda-server`) — Ticket #2
+
+O **`lauda-server`** é um serviço leve construído com `axum` e `tokio`, executado no servidor Debian local acessível via Tailscale. Ele atua como gateway de tradução entre o smolclient (HTTP/JSON) e a infraestrutura do servidor (Dovecot via UNIX socket e Postfix via sendmail).
+
+### 6.1 Rotas HTTP REST
+
+| Método | Caminho | Autenticação | Descrição |
+|---|---|---|---|
+| `POST` | `/auth/login` | Não | Recebe `LoginRequest`, valida contra o Dovecot e emite JWT |
+| `GET` | `/mailboxes` | Bearer JWT | Lista as caixas disponíveis (`Vec<MailboxInfo>`) |
+| `GET` | `/messages` | Bearer JWT | Lista envelopes de mensagens (`box`, `page`, `limit`) |
+| `GET` | `/messages/:uid` | Bearer JWT | Retorna mensagem completa (`Message`) com corpos |
+| `POST` | `/compose` | Bearer JWT | Recebe `ComposeForm` e despacha para `/usr/sbin/sendmail` |
+
+### 6.2 Porta de Domínio & In-Memory Fake (`domain/ports.rs`)
+Para assegurar a hermeticidade e velocidade dos testes (GOST Rust §4):
+```rust
+#[async_trait::async_trait]
+pub trait MailBackend: Send + Sync {
+    async fn authenticate(&self, username: &str, password: &str) -> Result<(), BackendError>;
+    async fn list_mailboxes(&self, username: &str) -> Result<Vec<MailboxInfo>, BackendError>;
+    async fn list_messages(&self, username: &str, mailbox: &str) -> Result<Vec<MessageEnvelope>, BackendError>;
+    async fn get_message(&self, username: &str, mailbox: &str, uid: u32) -> Result<Message, BackendError>;
+    async fn send_message(&self, username: &str, form: &ComposeForm) -> Result<(), BackendError>;
+}
+```
+O adapter `InMemoryMailBackend` implementa este trait com dados em memória, permitindo testar todas as rotas axum sem necessidade de instância ativa do Dovecot ou Postfix durante o CI.
+
+### 6.3 Configuração (`/etc/lauda/server.toml` ou fallback local)
+Conforme GOST-13 (XDG):
+```toml
+[server]
+listen = "127.0.0.1:8432"
+jwt_secret = "chave-secreta-para-assinatura-jwt"
+jwt_expiry_hours = 72
+
+[mail]
+imap_socket = "/var/run/dovecot/imap"
+sendmail_bin = "/usr/sbin/sendmail"
+```
+
+### 6.4 Critérios de Aceite (Ticket #2)
+- [ ] Especificação do daemon e rotas consolidada neste `SPEC.md`.
+- [ ] Adição do membro `lauda-server` ao workspace Cargo.
+- [ ] Testes falhos criados cobrindo autenticação, middleware JWT e rotas `/mailboxes`, `/messages`, `/compose`.
+- [ ] Implementação do router `axum`, claims JWT e in-memory backend passando 100% nos testes.
+- [ ] Clippy zero warnings e formatação determinística verificada.
