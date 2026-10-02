@@ -5,7 +5,9 @@ use axum::http::{header, Request, StatusCode};
 use http_body_util::BodyExt;
 use lauda_server::adapters::in_memory::InMemoryMailBackend;
 use lauda_server::app_router;
-use lauda_types::{ComposeForm, LoginRequest, MailboxInfo, Message, MessageEnvelope, TokenResponse};
+use lauda_types::{
+    ComposeForm, LoginRequest, MailboxInfo, Message, MessageEnvelope, TokenResponse,
+};
 use tower::ServiceExt;
 
 const TEST_SECRET: &str = "segredo-super-secreto-de-teste-123456";
@@ -15,24 +17,31 @@ fn setup_test_backend() -> Arc<InMemoryMailBackend> {
 
     // Popula dados para teste
     backend.add_user("lumen", "senha123");
-    backend.add_mailbox("lumen", MailboxInfo {
-        name: "INBOX".to_string(),
-        total_messages: 1,
-        unread_messages: 1,
-    });
-    backend.add_message("lumen", "INBOX", Message {
-        envelope: MessageEnvelope {
-            uid: 1001,
-            subject: "Bem-vindo ao Lauda".to_string(),
-            sender: "sistema@2lp.in".to_string(),
-            date: "2026-10-02T06:00:00Z".to_string(),
-            is_read: false,
-            is_flagged: true,
+    backend.add_mailbox(
+        "lumen",
+        MailboxInfo {
+            name: "INBOX".to_string(),
+            total_messages: 1,
+            unread_messages: 1,
         },
-        txt_auto: Some("# Bem-vindo\nLeitura em texto puro rápida.".to_string()),
-        txt_original: Some("Bem-vindo\nLeitura em texto puro rápida.".to_string()),
-        html_sanitized: Some("<h1>Bem-vindo</h1>".to_string()),
-    });
+    );
+    backend.add_message(
+        "lumen",
+        "INBOX",
+        Message {
+            envelope: MessageEnvelope {
+                uid: 1001,
+                subject: "Bem-vindo ao Lauda".to_string(),
+                sender: "sistema@2lp.in".to_string(),
+                date: "2026-10-02T06:00:00Z".to_string(),
+                is_read: false,
+                is_flagged: true,
+            },
+            txt_auto: Some("# Bem-vindo\nLeitura em texto puro rápida.".to_string()),
+            txt_original: Some("Bem-vindo\nLeitura em texto puro rápida.".to_string()),
+            html_sanitized: Some("<h1>Bem-vindo</h1>".to_string()),
+        },
+    );
 
     backend
 }
@@ -112,7 +121,10 @@ async fn test_login_success_and_protected_flow() {
     let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
     let msg: Message = serde_json::from_slice(&body_bytes).unwrap();
     assert_eq!(msg.envelope.uid, 1001);
-    assert_eq!(msg.txt_auto.as_deref(), Some("# Bem-vindo\nLeitura em texto puro rápida."));
+    assert_eq!(
+        msg.txt_auto.as_deref(),
+        Some("# Bem-vindo\nLeitura em texto puro rápida.")
+    );
 
     // 5. Envio de mensagem /compose
     let compose_body = serde_json::to_string(&ComposeForm {

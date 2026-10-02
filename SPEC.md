@@ -158,8 +158,8 @@ sendmail_bin = "/usr/sbin/sendmail"
 ```
 
 ### 6.4 Critérios de Aceite (Ticket #2)
-- [ ] Especificação do daemon e rotas consolidada neste `SPEC.md`.
-- [ ] Adição do membro `lauda-server` ao workspace Cargo.
-- [ ] Testes falhos criados cobrindo autenticação, middleware JWT e rotas `/mailboxes`, `/messages`, `/compose`.
-- [ ] Implementação do router `axum`, claims JWT e in-memory backend passando 100% nos testes.
-- [ ] Clippy zero warnings e formatação determinística verificada.
+- [x] Especificação do daemon e rotas consolidada neste `SPEC.md`.
+- [x] Adição do membro `lauda-server` ao workspace Cargo.
+- [x] Testes falhos criados cobrindo autenticação, middleware JWT e rotas `/mailboxes`, `/messages`, `/compose`.
+- [x] Implementação do router `axum`, claims JWT e in-memory backend passando 100% nos testes.
+- [x] Clippy zero warnings e formatação determinística verificada.
