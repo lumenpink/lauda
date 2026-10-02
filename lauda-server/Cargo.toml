@@ -1,0 +1,27 @@
+[package]
+name = "lauda-server"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lumen <lumen@2lp.in>"]
+description = "Micro-daemon HTTP gateway e ponte Dovecot/Postfix para o ecossistema Lauda"
+license = "GPL-3.0"
+
+[dependencies]
+lauda-types = { path = "../lauda-types" }
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+jsonwebtoken = "9"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+async-trait = "0.1"
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+[dev-dependencies]
+http-body-util = "0.1"
+
+[lints]
+workspace = true

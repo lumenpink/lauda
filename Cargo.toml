@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "lauda-types",
+    "lauda-server",
 ]
 resolver = "2"
 
