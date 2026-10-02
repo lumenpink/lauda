@@ -250,3 +250,37 @@ O cliente móvel consulta o manifesto e realiza a comparação via [Semantic Ver
 - [x] Disponibilização de `site/version.json` na vitrine pública.
 - [x] Inclusão dos links e botões de download do APK no `site/index.html`.
 - [x] Clippy zero warnings e rustfmt verificado.
+
+---
+
+## 9. Suíte de Testes de Integração Ponta a Ponta (E2E) — Ticket #6
+
+Para validar a pirâmide de testes GOST (§6 da norma técnica), o sistema possui uma suíte de integração hermética conectando o filtro MIME **`urupema`** ao micro-daemon **`lauda-server`** e ao smolclient **`lauda-client`**.
+
+### 9.1 Cenário do Ciclo Completo de Correio
+```text
+[ E-mail Bruto com Scripts e Trackers ]
+                   │
+                   ▼ (stdin)
+          [ urupema::Pipeline ]
+                   │
+                   ▼ (multipart limpo + txt auto)
+        [ lauda-server (HTTP API) ]
+                   │
+                   ▼ (JWT Bearer /messages/:uid)
+     [ lauda-client (Dioxus / Markdown) ]
+                   │
+                   ▼ (POST /compose)
+        [ MTA Sendmail Subprocess ]
+```
+
+1. **Ingestão:** Mensagem RFC 5322 maliciosa contendo `<script>alert('xss')</script>`, pixel 1x1 e tabelas promocionais.
+2. **Higienização:** O `urupema` purifica a mensagem, remove os vetores perigosos e gera a representação `txt auto` em Markdown.
+3. **Ponte de Dados:** A mensagem tratada é disponibilizada para o usuário no backend do servidor.
+4. **Consumo Gráfico:** O cliente móvel Lauda autentica via JWT, lista a caixa de entrada, busca o e-mail higienizado e converte o Markdown em nós visíveis.
+5. **Composição e Resposta:** O smolclient envia uma resposta rápida pelo endpoint `/compose` confirmando a entrega no sink final.
+
+### 9.2 Critérios de Aceite (Ticket #6)
+- [ ] Especificação do fluxo E2E consolidada neste `SPEC.md`.
+- [ ] Implementação de teste E2E hermético cobrindo o ciclo completo no cargo test.
+- [ ] Validação com zero warnings no Clippy e formatação determinística.
