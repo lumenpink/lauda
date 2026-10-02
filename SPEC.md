@@ -281,6 +281,7 @@ Para validar a pirâmide de testes GOST (§6 da norma técnica), o sistema possu
 5. **Composição e Resposta:** O smolclient envia uma resposta rápida pelo endpoint `/compose` confirmando a entrega no sink final.
 
 ### 9.2 Critérios de Aceite (Ticket #6)
-- [ ] Especificação do fluxo E2E consolidada neste `SPEC.md`.
-- [ ] Implementação de teste E2E hermético cobrindo o ciclo completo no cargo test.
-- [ ] Validação com zero warnings no Clippy e formatação determinística.
+- [x] Especificação do fluxo E2E consolidada neste `SPEC.md`.
+- [x] Implementação de teste E2E hermético cobrindo o ciclo completo no cargo test.
+- [x] Validação com zero warnings no Clippy e formatação determinística.
+
