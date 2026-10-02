@@ -245,8 +245,8 @@ O cliente móvel consulta o manifesto e realiza a comparação via [Semantic Ver
    - O smolclient exibe o aviso com a opção de baixar o novo `.apk` e invocar o instalador de pacotes do sistema via Intent `application/vnd.android.package-archive`.
 
 ### 8.4 Critérios de Aceite (Ticket #5)
-- [ ] Especificação do protocolo de atualização consolidada neste `SPEC.md`.
-- [ ] Criação do modelo `UpdateManifest` e lógica semântica `check_update()` testada unitariamente.
-- [ ] Disponibilização de `site/version.json` na vitrine pública.
-- [ ] Inclusão dos links e botões de download do APK no `site/index.html`.
-- [ ] Clippy zero warnings e rustfmt verificado.
+- [x] Especificação do protocolo de atualização consolidada neste `SPEC.md`.
+- [x] Criação do modelo `UpdateManifest` e lógica semântica `check_update()` testada unitariamente.
+- [x] Disponibilização de `site/version.json` na vitrine pública.
+- [x] Inclusão dos links e botões de download do APK no `site/index.html`.
+- [x] Clippy zero warnings e rustfmt verificado.

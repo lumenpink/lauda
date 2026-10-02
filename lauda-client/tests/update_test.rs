@@ -10,7 +10,8 @@ fn test_parse_version_manifest() {
         "published_at": "2026-10-02T08:00:00Z"
     }"#;
 
-    let manifest: UpdateManifest = serde_json::from_str(json_data).expect("Deve desserializar manifesto");
+    let manifest: UpdateManifest =
+        serde_json::from_str(json_data).expect("Deve desserializar manifesto");
     assert_eq!(manifest.version, "0.1.2");
     assert_eq!(manifest.min_compatible_version, "0.1.0");
     assert_eq!(manifest.apk_url, "https://lauda.2lp.in/lauda-latest.apk");
