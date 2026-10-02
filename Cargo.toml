@@ -2,6 +2,7 @@
 members = [
     "lauda-types",
     "lauda-server",
+    "lauda-client",
 ]
 resolver = "2"
 
