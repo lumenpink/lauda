@@ -1,0 +1,91 @@
+use std::collections::HashMap;
+use std::sync::RwLock;
+
+use async_trait::async_trait;
+use lauda_types::{
+    ComposeForm, LoginRequest, MailboxInfo, Message, MessageEnvelope, TokenResponse,
+};
+
+use crate::domain::{ClientError, MailApiClient};
+
+/// Fake em memória para testes do cliente sem necessidade de servidor HTTP rodando.
+#[derive(Debug, Default)]
+pub struct InMemoryApiClient {
+    mailboxes: RwLock<Vec<MailboxInfo>>,
+    messages: RwLock<HashMap<String, Vec<Message>>>, // mailbox -> msgs
+    sent: RwLock<Vec<ComposeForm>>,
+}
+
+impl InMemoryApiClient {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add_mailbox(&self, info: MailboxInfo) {
+        self.mailboxes.write().unwrap().push(info);
+    }
+
+    pub fn add_message(&self, mailbox: &str, message: Message) {
+        self.messages
+            .write()
+            .unwrap()
+            .entry(mailbox.to_string())
+            .or_default()
+            .push(message);
+    }
+
+    pub fn sent_count(&self) -> usize {
+        self.sent.read().unwrap().len()
+    }
+}
+
+#[async_trait]
+impl MailApiClient for InMemoryApiClient {
+    async fn login(&self, req: &LoginRequest) -> Result<TokenResponse, ClientError> {
+        if req.username == "lumen" && req.password == "secret" {
+            Ok(TokenResponse {
+                token: "in_memory_fake_jwt".to_string(),
+                expires_at: 9999999999,
+                username: req.username.clone(),
+            })
+        } else {
+            Err(ClientError::AuthFailed)
+        }
+    }
+
+    async fn list_mailboxes(&self, _token: &str) -> Result<Vec<MailboxInfo>, ClientError> {
+        Ok(self.mailboxes.read().unwrap().clone())
+    }
+
+    async fn list_messages(
+        &self,
+        _token: &str,
+        mailbox: &str,
+    ) -> Result<Vec<MessageEnvelope>, ClientError> {
+        let msgs = self.messages.read().unwrap();
+        if let Some(box_msgs) = msgs.get(mailbox) {
+            return Ok(box_msgs.iter().map(|m| m.envelope.clone()).collect());
+        }
+        Ok(Vec::new())
+    }
+
+    async fn get_message(
+        &self,
+        _token: &str,
+        mailbox: &str,
+        uid: u32,
+    ) -> Result<Message, ClientError> {
+        let msgs = self.messages.read().unwrap();
+        if let Some(box_msgs) = msgs.get(mailbox) {
+            if let Some(msg) = box_msgs.iter().find(|m| m.envelope.uid == uid) {
+                return Ok(msg.clone());
+            }
+        }
+        Err(ClientError::NotFound)
+    }
+
+    async fn send_message(&self, _token: &str, form: &ComposeForm) -> Result<(), ClientError> {
+        self.sent.write().unwrap().push(form.clone());
+        Ok(())
+    }
+}

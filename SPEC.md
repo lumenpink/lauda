@@ -205,9 +205,9 @@ aliases = ["lumen@2lp.in", "contato@2lp.in", "postmaster@2lp.in"]
 ```
 
 ### 7.5 Critérios de Aceite (Ticket #3)
-- [ ] Especificação do cliente consolidada neste `SPEC.md`.
-- [ ] Inclusão do crate `lauda-client` no workspace Cargo.
-- [ ] Parser Markdown utilizando `pulldown-cmark` testado unitariamente.
-- [ ] Implementação de `InMemoryApiClient` e máquina de estados de navegação (`Screen`, `ViewMode`).
-- [ ] Componente raiz Dioxus e entrypoint desktop/mobile compilando com sucesso.
-- [ ] Clippy zero warnings e rustfmt verificado.
+- [x] Especificação do cliente consolidada neste `SPEC.md`.
+- [x] Inclusão do crate `lauda-client` no workspace Cargo.
+- [x] Parser Markdown utilizando `pulldown-cmark` testado unitariamente.
+- [x] Implementação de `InMemoryApiClient` e máquina de estados de navegação (`Screen`, `ViewMode`).
+- [x] Componente raiz Dioxus e entrypoint desktop/mobile compilando com sucesso.
+- [x] Clippy zero warnings e rustfmt verificado.
