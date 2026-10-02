@@ -163,3 +163,51 @@ sendmail_bin = "/usr/sbin/sendmail"
 - [x] Testes falhos criados cobrindo autenticação, middleware JWT e rotas `/mailboxes`, `/messages`, `/compose`.
 - [x] Implementação do router `axum`, claims JWT e in-memory backend passando 100% nos testes.
 - [x] Clippy zero warnings e formatação determinística verificada.
+
+---
+
+## 7. Especificação do Smolclient (`lauda-client`) — Ticket #3
+
+O **`lauda-client`** é o cliente gráfico nativo multiplataforma (Android via NDK e Linux Desktop `x86_64`) construído com **Dioxus 0.6**. Ele consome exclusivamente a API JSON fornecida pelo `lauda-server` e opera como um leitor de texto e compositor rápido e sem atrito.
+
+### 7.1 Visualizador de Mensagens com Alternador Trifásico
+O leitor permite alternar instantaneamente entre três representações da mesma mensagem:
+1. **`txt auto` (Padrão):** O Markdown estruturado gerado pelo Urupema é parseado via `pulldown-cmark` e renderizado em componentes nativos (cabeçalhos destacados, blocos de código com fundo diferenciado, links clicáveis).
+2. **`txt original`:** Texto cru RFC 5322 com espaçamento fixo, quebras de linha estritas e tipografia monoespaçada typewriter.
+3. **`html`:** Visualização tabular em container isolado (sandbox) para e-mails que demandem layout original (ex: extratos, faturas).
+
+### 7.2 Editor de Composição Sem Travas
+- **Campo `From`:** Caixa de texto livre permitindo enviar como qualquer alias autorizado, com suporte a sugestão/autocompletar dos aliases favoritos configurados.
+- **Campos `To`, `Cc` e `Subject`:** Entradas ágeis.
+- **Área de Texto do Corpo:** Fonte monoespaçada de máquina de escrever, sem formatação rica intrusiva.
+
+### 7.3 Porta de Comunicação (`ports::MailApiClient`)
+Abstração da comunicação HTTP para testes unitários headless rápidos:
+```rust
+#[async_trait::async_trait]
+pub trait MailApiClient: Send + Sync {
+    async fn login(&self, req: &LoginRequest) -> Result<TokenResponse, ClientError>;
+    async fn list_mailboxes(&self, token: &str) -> Result<Vec<MailboxInfo>, ClientError>;
+    async fn list_messages(&self, token: &str, mailbox: &str) -> Result<Vec<MessageEnvelope>, ClientError>;
+    async fn get_message(&self, token: &str, mailbox: &str, uid: u32) -> Result<Message, ClientError>;
+    async fn send_message(&self, token: &str, form: &ComposeForm) -> Result<(), ClientError>;
+}
+```
+
+### 7.4 Configuração XDG (`~/.config/lauda/config.toml`)
+```toml
+[server]
+url = "http://100.64.0.1:8432"
+
+[identity]
+default_from = "lumen@2lp.in"
+aliases = ["lumen@2lp.in", "contato@2lp.in", "postmaster@2lp.in"]
+```
+
+### 7.5 Critérios de Aceite (Ticket #3)
+- [ ] Especificação do cliente consolidada neste `SPEC.md`.
+- [ ] Inclusão do crate `lauda-client` no workspace Cargo.
+- [ ] Parser Markdown utilizando `pulldown-cmark` testado unitariamente.
+- [ ] Implementação de `InMemoryApiClient` e máquina de estados de navegação (`Screen`, `ViewMode`).
+- [ ] Componente raiz Dioxus e entrypoint desktop/mobile compilando com sucesso.
+- [ ] Clippy zero warnings e rustfmt verificado.
