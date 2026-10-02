@@ -1,7 +1,7 @@
 # LAUDA — Especificação do Smolclient & Micro-Daemon de Correio
 
 **Versão da Norma:** GOST `1.0.0`  
-**Status:** `DRAFT` (Branch: `feat/1-data-contracts`)  
+**Status:** `CONCLUDED` (Branch: `feat/1-data-contracts`)  
 **Licença:** GPL-3.0 (com satélites `LICENSE-MEDIA` CC-BY-SA-4.0 e `LICENSE-LOGO` CC-BY-ND-4.0)  
 **Ticket de Referência:** `#1`
 
@@ -108,8 +108,8 @@ O crate de biblioteca `lauda-types` centraliza os modelos serializáveis consumi
 
 ## 5. Critérios de Aceite (Ticket #1)
 
-- [ ] Especificação prévia consolidada neste `SPEC.md`.
-- [ ] Configuração do `Cargo.toml` raiz do workspace apontando para `lauda-types`.
-- [ ] Testes falhos criados para cada estrutura de dados em `lauda-types`.
-- [ ] Implementação de todos os modelos em `lauda-types` passando 100% nos testes.
-- [ ] Clippy zero warnings e rustfmt verificado.
+- [x] Especificação prévia consolidada neste `SPEC.md`.
+- [x] Configuração do `Cargo.toml` raiz do workspace apontando para `lauda-types`.
+- [x] Testes falhos criados para cada estrutura de dados em `lauda-types`.
+- [x] Implementação de todos os modelos em `lauda-types` passando 100% nos testes.
+- [x] Clippy zero warnings e rustfmt verificado.

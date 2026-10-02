@@ -96,8 +96,5 @@ fn test_view_mode_serialization() {
         serde_json::to_string(&ViewMode::TxtOriginal).unwrap(),
         "\"txt_original\""
     );
-    assert_eq!(
-        serde_json::to_string(&ViewMode::Html).unwrap(),
-        "\"html\""
-    );
+    assert_eq!(serde_json::to_string(&ViewMode::Html).unwrap(), "\"html\"");
 }
