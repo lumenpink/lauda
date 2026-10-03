@@ -365,5 +365,43 @@ Para validar a integridade de ponta a ponta do ecossistema de e-mail soberano no
 - [x] Execução hermética sem dependência de serviços externos no CI (`cargo test`).
 - [x] Clippy zero warnings e rustfmt verificado.
 
+---
+
+## 11. Suíte Exaustiva de Resiliência e Simulação de Erros (Ticket #8)
+
+Para consolidar o ecossistema Soberano com robustez de nível de produção e tolerância a falhas, o repositório **`lauda`** implementa uma bateria de testes de resiliência e simulação de erros cobrindo cenários anômalos e ataques maliciosos em todos os elos do fluxo.
+
+### 11.1 Cenários e Vetores de Teste
+
+1. **Autocrypt & OpenPGP Profundo (`ishcondidim`):**
+   - **Rotação de Chaves:** Atualização segura de chave pública quando um contato publica novo par com timestamp mais recente (`msg_date > effective_date`).
+   - **Defesa Anti-Replay:** Rejeição de substituição de chaves em mensagens antigas entregues fora de ordem (`msg_date < effective_date`), preservando a chave mais recente.
+   - **Múltiplos Remetentes/Aliases:** Gestão isolada e independente de chaves Ed25519/X25519 para múltiplos endereços locais gerenciados (`lumen@2lp.in`, `contato@2lp.in`, `postmaster@2lp.in`).
+   - **Decifragem Pré-Maildir com Metadados:** Decifragem com injeção do banner no corpo e de metadados nos cabeçalhos RFC 5322 (`X-Ishcondidim-Decrypted: 1`, `X-Autocrypt-Verified: valid`).
+   - **Neutralização Anti-Spoofing:** Detecção de banners falsos em mensagens de texto claro e neutralização de tentativas de phishing.
+   - **Tratamento de Payloads Corrompidos:** Captura graciosa de Base64 inválido, atributos faltantes e OpenPGP ciphertext adulterado sem ocorrência de pânico no serviço.
+
+2. **Papéli & Envelopamento Resiliente (`papeli`):**
+   - **HTML Imperfeito:** Tolerância a tags não fechadas, caracteres especiais e fragmentos DOM quebrados restaurados pelo sanitizador sem falha no parser MJML.
+   - **Fallback de Temas Desconhecidos:** Uso de tema inexistente no assunto recorre automaticamente ao template padrão seguro.
+   - **Preservação de Anexos e CIDs:** Garantia de integridade binária para arquivos anexados e imagens inline durante a reformulação do corpo.
+
+3. **Urupema & Prevenção de Evasão (`urupema`):**
+   - **Vetores Evasivos de XSS:** Bloqueio de tags `<SCRIPT>`, `<iframe src="...">`, atributos `onload=`, `onerror=` e esquemas `javascript:`.
+   - **Pixels de Rastreamento:** Eliminação de imagens 1x1 e rastreadores invisíveis.
+   - **Prevenção Estrita de Loops:** Mensagens marcadas com `X-Urupema-Processed: 1` contornam o processamento sem loop infinito.
+
+4. **Lauda Gateway & Smolclient (`lauda-server` / `lauda-client`):**
+   - **Rejeição de Tokens Forjados:** Rejeição imediata (`401 Unauthorized`) para tokens com assinatura inválida, segredo errado ou expirados.
+   - **Fidelidade da Visualização Trifásica:** Comportamento confiável na alternância entre `txt auto`, `txt original` e `html`.
+
+### 11.2 Critérios de Aceite (Ticket #8)
+- [x] Especificação da suíte de resiliência e simulação de erros consolidada neste `SPEC.md`.
+- [x] Implementação de `lauda-server/tests/e2e_resilience_test.rs` cobrindo todos os cenários de erro e borda.
+- [x] Execução hermética sem dependências externas no CI (`cargo test`).
+- [x] Zero warnings no Clippy e formatação determinística verificada.
+
+
+
 
 
