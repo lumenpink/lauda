@@ -21,9 +21,16 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 
 [dev-dependencies]
+base64 = "0.22"
+chrono = "0.4"
 http-body-util = "0.1"
+ishcondidim = { path = "../../ishcondidim" }
 lauda-client = { path = "../lauda-client" }
+minijinja = "2"
+papeli = { path = "../../papeli" }
+tempfile = "3.10"
 urupema = { path = "../../urupema" }
+
 
 [lints]
 workspace = true

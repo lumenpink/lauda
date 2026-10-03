@@ -280,8 +280,90 @@ Para validar a pirâmide de testes GOST (§6 da norma técnica), o sistema possu
 4. **Consumo Gráfico:** O cliente móvel Lauda autentica via JWT, lista a caixa de entrada, busca o e-mail higienizado e converte o Markdown em nós visíveis.
 5. **Composição e Resposta:** O smolclient envia uma resposta rápida pelo endpoint `/compose` confirmando a entrega no sink final.
 
-### 9.2 Critérios de Aceite (Ticket #6)
-- [x] Especificação do fluxo E2E consolidada neste `SPEC.md`.
-- [x] Implementação de teste E2E hermético cobrindo o ciclo completo no cargo test.
-- [x] Validação com zero warnings no Clippy e formatação determinística.
+
+---
+
+## 10. Suíte E2E da Cadeia Completa de Correio Soberano — Ticket #7
+
+Para validar a integridade de ponta a ponta do ecossistema de e-mail soberano no ambiente de CI e em homologação, o repositório **`lauda`** concentra uma suíte exaustiva de testes de integração ponta a ponta conectando todos os elos da infraestrutura:
+
+```text
+               [ lauda-client (Dioxus / HttpApiClient) ]
+                               │
+                               ▼ (HTTP REST / JWT)
+                 [ lauda-server (API Gateway) ]
+                               │
+                               ▼ (POST /compose)
+ ┌───────────────────────────────────────────────────────────────┐
+ │                   CADEIA DE SAÍDA (OUTBOUND)                  │
+ │                                                               │
+ │  1. Papéli Milter:                                            │
+ │     ├─ Remetente gerenciado: envelopa em MJML + assinatura   │
+ │     │   (suporte aos papéis de carta dinâmicos anos 80)       │
+ │     └─ Remetente não gerenciado: BYPASS total (intocado)      │
+ │                                                               │
+ │  2. Ishcondidim Milter:                                       │
+ │     ├─ Remetente gerenciado: gera par Ed25519/X25519 e        │
+ │     │   injeta cabeçalho Autocrypt                            │
+ │     ├─ Remetente não gerenciado: BYPASS total (intocado)      │
+ │     ├─ Peer com chave conhecida: CIFRA em PGP/MIME (RFC 3156) │
+ │     └─ Peer sem chave: envia em texto claro                   │
+ └───────────────────────────────┬───────────────────────────────┘
+                                 │
+                                 ▼ (Entrega MTA / Rede)
+ ┌───────────────────────────────────────────────────────────────┐
+ │                  CADEIA DE ENTRADA (INBOUND)                  │
+ │                                                               │
+ │  3. Ishcondidim Inbound:                                      │
+ │     ├─ Mensagem PGP/MIME: DECIFRA com chave local e injeta    │
+ │     │   banner com Palavra Secreta de Validação               │
+ │     ├─ Anti-Spoofing: neutraliza banners forjados em texto    │
+ │     ├─ Aprendizado de Pares: absorve chave pública do peer    │
+ │     └─ Anti-Lockout: detecta resposta sem Autocrypt e         │
+ │         rebaixa com segurança para texto claro                │
+ │                                                               │
+ │  4. Urupema Post-Queue Filter:                                │
+ │     ├─ Higienização de HTML (scripts, trackers e pixels)      │
+ │     ├─ Geração determinística de txt auto em Markdown         │
+ │     └─ Prevenção de loop com X-Urupema-Processed: 1          │
+ └───────────────────────────────┬───────────────────────────────┘
+                                 │
+                                 ▼
+                     [ Armazenamento / Maildir ]
+                                 │
+                                 ▼ (GET /messages/:uid)
+               [ lauda-client (Visualizador Trifásico) ]
+                 ├─ txt auto: Markdown limpo renderizado
+                 ├─ txt original: Texto cru e cabeçalhos
+                 └─ html: HTML com layout Papéli e selo Autocrypt
+```
+
+### 10.1 Casos de Teste Cobertos
+
+1. **Papéli (Papel de carta & Assinaturas Inteligentes):**
+   - **Envelopamento:** E-mail de remetente gerenciado é envelopado no papel de parede responsivo MJML (ex: tema anos 80) com assinatura corporativa.
+   - **Bypass / Fora da lista:** E-mail de remetente não configurado na lista é ignorado e mantido 100% inalterado.
+   - **Compactação de Histórico:** Citações em respostas (`<blockquote>`) têm assinaturas antigas compactadas.
+
+2. **Ishcondidim (Autocrypt Level 1 & OpenPGP):**
+   - **Key Bootstrap:** Primeiro envio de usuário gerenciado gera par Ed25519/X25519 e injeta cabeçalho `Autocrypt`.
+   - **Bypass / Fora da lista:** Remetente não gerenciado não recebe cabeçalho Autocrypt e não altera keystore.
+   - **Descoberta de Pares:** Recebimento de cabeçalho `Autocrypt` armazena chave pública do contato externo.
+   - **Criptografia Oportunística:** Envio para peer com chave conhecida transforma a mensagem em `multipart/encrypted`.
+   - **Decifragem Inbound:** Mensagem criptografada é decifrada com chave local e recebe banner com Palavra Secreta.
+   - **Anti-Spoofing:** Tentativas de spam simulando o banner do Ishcondidim em texto claro são desarmadas.
+   - **Anti-Lockout:** Resposta do peer sem cabeçalho Autocrypt rebaixa oportunisticamente para texto claro.
+
+3. **Urupema + Lauda Client:**
+   - Higienização e geração de `txt auto` estruturado em Markdown a partir do layout envelopado.
+   - Consumo pelo smolclient Lauda com alternador trifásico (`txt auto`, `txt original`, `html`).
+   - Composição e envio sem travas via API REST `/compose`.
+
+### 10.2 Critérios de Aceite (Ticket #7)
+- [x] Especificação da cadeia completa documentada neste `SPEC.md`.
+- [x] Adição das crates irmãs no workspace de testes e implementação dos cenários exaustivos em `e2e_full_chain_test.rs`.
+- [x] Execução hermética sem dependência de serviços externos no CI (`cargo test`).
+- [x] Clippy zero warnings e rustfmt verificado.
+
+
 
