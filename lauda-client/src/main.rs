@@ -1,14 +1,14 @@
 use lauda_client::App;
 
 fn main() {
-    #[cfg(feature = "desktop")]
+    #[cfg(any(feature = "desktop", feature = "mobile"))]
     {
         dioxus::launch(App);
     }
 
-    #[cfg(not(feature = "desktop"))]
+    #[cfg(not(any(feature = "desktop", feature = "mobile")))]
     {
-        println!("Lauda Smolclient — compile com --features desktop para interface de janela.");
+        println!("Lauda Smolclient — compile com --features desktop ou --features mobile.");
         let _ = App;
     }
 }

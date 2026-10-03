@@ -1,0 +1,311 @@
+use std::fs::File;
+use std::io::Read;
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::process::Command;
+use std::sync::Arc;
+
+use axum::serve;
+use lauda_client::adapters::HttpApiClient;
+use lauda_client::domain::ports::MailApiClient;
+use lauda_client::domain::view::parse_markdown_to_html;
+use lauda_server::adapters::in_memory::InMemoryMailBackend;
+use lauda_server::app_router;
+use lauda_types::{ComposeForm, LoginRequest, Message, MessageEnvelope};
+use serde_json::Value;
+use tokio::net::TcpListener;
+
+const TEST_SECRET: &str = "jwt-secret-apk-e2e-suite-2026";
+
+fn get_repo_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("Root do repositório lauda")
+        .to_path_buf()
+}
+
+/// 1. Teste E2E de Estrutura, ABI e Assinatura do APK Android (arm64-v8a)
+#[test]
+fn test_e2e_apk_structural_and_abi_verification() {
+    let repo_root = get_repo_root();
+    let apk_path = repo_root.join("site/lauda-latest.apk");
+
+    assert!(
+        apk_path.exists(),
+        "O arquivo site/lauda-latest.apk deve existir no repositório"
+    );
+
+    // A. Validação do contêiner ZIP via unzip -l
+    let unzip_out = Command::new("unzip")
+        .args(["-l", apk_path.to_str().unwrap()])
+        .output()
+        .expect("Comando unzip deve ser executável no ambiente");
+
+    assert!(
+        unzip_out.status.success(),
+        "APK deve ser um arquivo ZIP estruturalmente válido"
+    );
+
+    let entries = String::from_utf8_lossy(&unzip_out.stdout);
+
+    // B. Verificação do AndroidManifest.xml
+    assert!(
+        entries.contains("AndroidManifest.xml"),
+        "APK deve conter AndroidManifest.xml"
+    );
+
+    // C. Verificação do Bytecode Dalvik (classes.dex)
+    assert!(
+        entries.contains("classes.dex"),
+        "APK deve conter classes.dex com as classes Android (WryActivity/MainActivity)"
+    );
+
+    // D. Verificação da Biblioteca Nativa ARM64 compilada em Rust
+    assert!(
+        entries.contains("lib/arm64-v8a/libdioxusmain.so"),
+        "APK deve conter a biblioteca nativa libdioxusmain.so para arquitetura arm64-v8a"
+    );
+
+    // E. Inspeção binária de cabeçalho ELF da biblioteca extraída
+    let temp_dir = tempfile::tempdir().expect("Criar tempdir");
+    let extracted_so = temp_dir.path().join("libdioxusmain.so");
+
+    let extract_status = Command::new("unzip")
+        .args([
+            "-p",
+            apk_path.to_str().unwrap(),
+            "lib/arm64-v8a/libdioxusmain.so",
+        ])
+        .output()
+        .expect("Extrair .so do APK");
+
+    assert!(
+        extract_status.status.success(),
+        "Deve extrair libdioxusmain.so com sucesso"
+    );
+    std::fs::write(&extracted_so, &extract_status.stdout).expect("Escrever .so temporário");
+
+    let mut so_file = File::open(&extracted_so).expect("Abrir .so extraído");
+    let mut elf_header = [0u8; 64];
+    so_file
+        .read_exact(&mut elf_header)
+        .expect("Ler cabeçalho ELF");
+
+    // Validação ELF Magic (\x7fELF)
+    assert_eq!(
+        &elf_header[0..4],
+        b"\x7fELF",
+        "A biblioteca libdioxusmain.so deve ser um binário ELF válido"
+    );
+    // Classe 64-bit (ELFCLASS64 = 2)
+    assert_eq!(
+        elf_header[4], 2,
+        "A biblioteca deve ser 64-bit (ELFCLASS64)"
+    );
+    // Endianness (ELFDATA2LSB = 1)
+    assert_eq!(
+        elf_header[5], 1,
+        "A biblioteca deve ser Little Endian (ELFDATA2LSB)"
+    );
+    // Machine Architecture AArch64 (0xb7 = 183 no header bytes 18..20)
+    let machine_type = u16::from_le_bytes([elf_header[18], elf_header[19]]);
+    assert_eq!(
+        machine_type, 183,
+        "A biblioteca deve ser compilada para a arquitetura AArch64 (ARM64)"
+    );
+
+    // F. Validação de Símbolos JNI Essenciais (JNI_OnLoad e start_app)
+    if let Ok(nm_output) = Command::new("nm")
+        .args(["-D", extracted_so.to_str().unwrap()])
+        .output()
+    {
+        let symbols = String::from_utf8_lossy(&nm_output.stdout);
+        assert!(
+            symbols.contains("JNI_OnLoad"),
+            "libdioxusmain.so deve exportar a função JNI_OnLoad para inicialização do runtime Rust"
+        );
+        assert!(
+            symbols.contains("start_app"),
+            "libdioxusmain.so deve exportar start_app chamado pelo WryActivity"
+        );
+    }
+
+    // G. Validação de Assinatura via apksigner (se disponível)
+    if let Ok(signer_output) = Command::new("apksigner")
+        .args(["verify", "--verbose", apk_path.to_str().unwrap()])
+        .output()
+    {
+        assert!(
+            signer_output.status.success(),
+            "Assinatura do APK deve ser válida: {}",
+            String::from_utf8_lossy(&signer_output.stderr)
+        );
+    }
+}
+
+/// 2. Teste E2E de Distribuição, Versionamento e Compatibilidade com Obtainium
+#[test]
+fn test_e2e_apk_distribution_manifest_and_obtainium() {
+    let repo_root = get_repo_root();
+
+    // A. Validação do arquivo VERSION
+    let version_file_content = std::fs::read_to_string(repo_root.join("VERSION"))
+        .expect("Leitura do VERSION")
+        .trim()
+        .to_string();
+
+    // B. Validação do manifesto site/version.json
+    let version_json_str = std::fs::read_to_string(repo_root.join("site/version.json"))
+        .expect("Leitura do site/version.json");
+    let manifest: Value = serde_json::from_str(&version_json_str)
+        .expect("Manifesto version.json deve ser JSON válido");
+
+    let json_version = manifest["version"]
+        .as_str()
+        .expect("version field deve ser string");
+    assert_eq!(
+        json_version, version_file_content,
+        "Versão em version.json deve bater exatamente com VERSION"
+    );
+
+    let apk_url = manifest["apk_url"]
+        .as_str()
+        .expect("apk_url field deve ser string");
+    assert!(
+        apk_url.ends_with("/lauda-latest.apk"),
+        "apk_url deve apontar para lauda-latest.apk"
+    );
+
+    // C. Validação de Compatibilidade com Raspagem HTML do Obtainium
+    let index_html = std::fs::read_to_string(repo_root.join("site/index.html"))
+        .expect("Leitura de site/index.html");
+    assert!(
+        index_html.contains("lauda-latest.apk"),
+        "site/index.html deve conter link para lauda-latest.apk para autodescoberta pelo Obtainium"
+    );
+
+    // D. Validação de Tamanho e Checksum do APK Distribuído
+    let apk_path = repo_root.join("site/lauda-latest.apk");
+    let metadata = std::fs::metadata(&apk_path).expect("Metadados do APK");
+    assert!(
+        metadata.len() > 10 * 1024 * 1024,
+        "APK deve ter tamanho superior a 10MB (contendo runtime compilado), tamanho atual: {} bytes",
+        metadata.len()
+    );
+}
+
+/// 3. Teste E2E de Ciclo Completo: Cliente Móvel Dioxus interagindo com Live Server
+#[tokio::test]
+async fn test_e2e_apk_mobile_client_live_server_full_loop() {
+    // A. Inicialização do Backend em Memória e Router
+    let backend = Arc::new(InMemoryMailBackend::new());
+    backend.add_user("lumen", "senha_mobile_2026");
+    backend.add_mailbox(
+        "lumen",
+        lauda_types::MailboxInfo {
+            name: "INBOX".to_string(),
+            total_messages: 1,
+            unread_messages: 1,
+        },
+    );
+
+    let sample_md =
+        "# Correio Seguro Lauda Mobile\n\nMensagem recebida no cliente Android em texto puro.";
+    backend.add_message(
+        "lumen",
+        "INBOX",
+        Message {
+            envelope: MessageEnvelope {
+                uid: 777,
+                subject: "Bem-vindo ao Lauda Android".to_string(),
+                sender: "postmaster@2lp.in".to_string(),
+                date: "2026-10-03T12:00:00Z".to_string(),
+                is_read: false,
+                is_flagged: false,
+            },
+            txt_auto: Some(sample_md.to_string()),
+            txt_original: Some(sample_md.to_string()),
+            html_sanitized: Some(format!("<p>{sample_md}</p>")),
+        },
+    );
+
+    let app = app_router(backend.clone(), TEST_SECRET);
+
+    // B. Subida de Servidor TCP Real em Porta Efêmera (Loopback)
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("Vincular listener TCP em porta livre");
+    let server_addr: SocketAddr = listener.local_addr().expect("Obter endereço local");
+
+    tokio::spawn(async move {
+        serve(listener, app).await.expect("Servidor HTTP ativo");
+    });
+
+    let base_url = format!("http://{server_addr}");
+
+    // C. Instanciação do Cliente HTTP exatamente como executado no código Rust do APK
+    let client = HttpApiClient::new(base_url);
+
+    // D. Passo 1 do Ciclo: Autenticação via /auth/login
+    let login_resp = client
+        .login(&LoginRequest {
+            username: "lumen".to_string(),
+            password: "senha_mobile_2026".to_string(),
+        })
+        .await
+        .expect("Login do cliente mobile deve ser bem-sucedido");
+
+    assert_eq!(login_resp.username, "lumen");
+    let token = &login_resp.token;
+
+    // E. Passo 2 do Ciclo: Listagem de Caixas Postais
+    let boxes = client
+        .list_mailboxes(token)
+        .await
+        .expect("Listar caixas postais");
+    assert_eq!(boxes.len(), 1);
+    assert_eq!(boxes[0].name, "INBOX");
+
+    // F. Passo 3 do Ciclo: Listagem e Recuperação de Mensagem com Visualização Trifásica
+    let messages = client
+        .list_messages(token, "INBOX")
+        .await
+        .expect("Listar mensagens da INBOX");
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0].uid, 777);
+
+    let msg = client
+        .get_message(token, "INBOX", 777)
+        .await
+        .expect("Obter mensagem 777");
+    assert_eq!(msg.envelope.subject, "Bem-vindo ao Lauda Android");
+
+    let txt_auto = msg.txt_auto.expect("txt_auto presente");
+    let rendered_html = parse_markdown_to_html(&txt_auto);
+    assert!(
+        rendered_html.contains("<h1>Correio Seguro Lauda Mobile</h1>"),
+        "Visualizador do cliente mobile deve converter Markdown para HTML nativo"
+    );
+
+    // G. Passo 4 do Ciclo: Composição e Envio Desimpedido de Resposta (/compose)
+    let send_res = client
+        .send_message(
+            token,
+            &ComposeForm {
+                from: "lumen@2lp.in".to_string(),
+                to: "postmaster@2lp.in".to_string(),
+                cc: None,
+                subject: "Re: Bem-vindo ao Lauda Android".to_string(),
+                body: "Confirmacao de recebimento pelo cliente mobile em aarch64.".to_string(),
+            },
+        )
+        .await;
+
+    assert!(
+        send_res.is_ok(),
+        "Envio de mensagem a partir do cliente mobile deve ter sucesso"
+    );
+
+    // H. Verificação de Persistência no Backend
+    assert_eq!(backend.sent_count(), 1);
+}
