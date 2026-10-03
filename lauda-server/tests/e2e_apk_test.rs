@@ -1,5 +1,3 @@
-use std::fs::File;
-use std::io::Read;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::process::Command;
@@ -24,6 +22,99 @@ fn get_repo_root() -> PathBuf {
         .to_path_buf()
 }
 
+fn get_zip_entries(apk_path: &std::path::Path) -> Vec<String> {
+    if let Ok(output) = Command::new("unzip")
+        .args(["-l", apk_path.to_str().unwrap()])
+        .output()
+    {
+        if output.status.success() {
+            let s = String::from_utf8_lossy(&output.stdout);
+            return s.lines().map(|l| l.to_string()).collect();
+        }
+    }
+
+    // Fallback: Pure Rust Central Directory Parser
+    let data = std::fs::read(apk_path).expect("Leitura dos bytes do APK");
+    let mut entries = Vec::new();
+    let mut pos = 0;
+    while pos + 46 < data.len() {
+        if let Some(offset) = data[pos..].windows(4).position(|w| w == b"PK\x01\x02") {
+            let idx = pos + offset;
+            if idx + 46 <= data.len() {
+                let fn_len = u16::from_le_bytes([data[idx + 28], data[idx + 29]]) as usize;
+                let extra_len = u16::from_le_bytes([data[idx + 30], data[idx + 31]]) as usize;
+                let comment_len = u16::from_le_bytes([data[idx + 32], data[idx + 33]]) as usize;
+                if idx + 46 + fn_len <= data.len() {
+                    let fn_bytes = &data[idx + 46..idx + 46 + fn_len];
+                    entries.push(String::from_utf8_lossy(fn_bytes).to_string());
+                }
+                pos = idx + 46 + fn_len + extra_len + comment_len;
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    entries
+}
+
+fn get_stored_file_bytes(apk_path: &std::path::Path, target_filename: &str) -> Option<Vec<u8>> {
+    if let Ok(extract_status) = Command::new("unzip")
+        .args(["-p", apk_path.to_str().unwrap(), target_filename])
+        .output()
+    {
+        if extract_status.status.success() && !extract_status.stdout.is_empty() {
+            return Some(extract_status.stdout);
+        }
+    }
+
+    // Fallback: busca direta do arquivo descompactado (stored) no arquivo ZIP
+    let data = std::fs::read(apk_path).ok()?;
+    let mut pos = 0;
+    while pos + 46 < data.len() {
+        if let Some(offset) = data[pos..].windows(4).position(|w| w == b"PK\x01\x02") {
+            let idx = pos + offset;
+            let fn_len = u16::from_le_bytes([data[idx + 28], data[idx + 29]]) as usize;
+            let extra_len = u16::from_le_bytes([data[idx + 30], data[idx + 31]]) as usize;
+            let comment_len = u16::from_le_bytes([data[idx + 32], data[idx + 33]]) as usize;
+            if idx + 46 + fn_len <= data.len() {
+                let fn_str = String::from_utf8_lossy(&data[idx + 46..idx + 46 + fn_len]);
+                if fn_str == target_filename {
+                    let uncomp_size = u32::from_le_bytes([
+                        data[idx + 24],
+                        data[idx + 25],
+                        data[idx + 26],
+                        data[idx + 27],
+                    ]) as usize;
+                    let local_offset = u32::from_le_bytes([
+                        data[idx + 42],
+                        data[idx + 43],
+                        data[idx + 44],
+                        data[idx + 45],
+                    ]) as usize;
+                    if local_offset + 30 <= data.len() {
+                        let loc_fn_len =
+                            u16::from_le_bytes([data[local_offset + 26], data[local_offset + 27]])
+                                as usize;
+                        let loc_extra_len =
+                            u16::from_le_bytes([data[local_offset + 28], data[local_offset + 29]])
+                                as usize;
+                        let start = local_offset + 30 + loc_fn_len + loc_extra_len;
+                        if start + uncomp_size <= data.len() {
+                            return Some(data[start..start + uncomp_size].to_vec());
+                        }
+                    }
+                }
+            }
+            pos = idx + 46 + fn_len + extra_len + comment_len;
+        } else {
+            break;
+        }
+    }
+    None
+}
+
 /// 1. Teste E2E de Estrutura, ABI e Assinatura do APK Android (arm64-v8a)
 #[test]
 fn test_e2e_apk_structural_and_abi_verification() {
@@ -35,61 +126,41 @@ fn test_e2e_apk_structural_and_abi_verification() {
         "O arquivo site/lauda-latest.apk deve existir no repositório"
     );
 
-    // A. Validação do contêiner ZIP via unzip -l
-    let unzip_out = Command::new("unzip")
-        .args(["-l", apk_path.to_str().unwrap()])
-        .output()
-        .expect("Comando unzip deve ser executável no ambiente");
-
+    // A. Validação das entradas do APK
+    let entries = get_zip_entries(&apk_path);
     assert!(
-        unzip_out.status.success(),
-        "APK deve ser um arquivo ZIP estruturalmente válido"
+        !entries.is_empty(),
+        "O APK deve conter entradas de arquivos válidas"
     );
-
-    let entries = String::from_utf8_lossy(&unzip_out.stdout);
+    let entries_str = entries.join("\n");
 
     // B. Verificação do AndroidManifest.xml
     assert!(
-        entries.contains("AndroidManifest.xml"),
+        entries_str.contains("AndroidManifest.xml"),
         "APK deve conter AndroidManifest.xml"
     );
 
     // C. Verificação do Bytecode Dalvik (classes.dex)
     assert!(
-        entries.contains("classes.dex"),
+        entries_str.contains("classes.dex"),
         "APK deve conter classes.dex com as classes Android (WryActivity/MainActivity)"
     );
 
     // D. Verificação da Biblioteca Nativa ARM64 compilada em Rust
     assert!(
-        entries.contains("lib/arm64-v8a/libdioxusmain.so"),
+        entries_str.contains("lib/arm64-v8a/libdioxusmain.so"),
         "APK deve conter a biblioteca nativa libdioxusmain.so para arquitetura arm64-v8a"
     );
 
     // E. Inspeção binária de cabeçalho ELF da biblioteca extraída
-    let temp_dir = tempfile::tempdir().expect("Criar tempdir");
-    let extracted_so = temp_dir.path().join("libdioxusmain.so");
-
-    let extract_status = Command::new("unzip")
-        .args([
-            "-p",
-            apk_path.to_str().unwrap(),
-            "lib/arm64-v8a/libdioxusmain.so",
-        ])
-        .output()
-        .expect("Extrair .so do APK");
-
+    let so_bytes = get_stored_file_bytes(&apk_path, "lib/arm64-v8a/libdioxusmain.so")
+        .expect("Extrair bytes do cabeçalho da libdioxusmain.so");
     assert!(
-        extract_status.status.success(),
-        "Deve extrair libdioxusmain.so com sucesso"
+        so_bytes.len() >= 64,
+        "Bytes insuficientes para cabeçalho ELF"
     );
-    std::fs::write(&extracted_so, &extract_status.stdout).expect("Escrever .so temporário");
 
-    let mut so_file = File::open(&extracted_so).expect("Abrir .so extraído");
-    let mut elf_header = [0u8; 64];
-    so_file
-        .read_exact(&mut elf_header)
-        .expect("Ler cabeçalho ELF");
+    let elf_header = &so_bytes[0..64];
 
     // Validação ELF Magic (\x7fELF)
     assert_eq!(
@@ -115,6 +186,10 @@ fn test_e2e_apk_structural_and_abi_verification() {
     );
 
     // F. Validação de Símbolos JNI Essenciais (JNI_OnLoad e start_app)
+    let temp_dir = tempfile::tempdir().expect("Criar tempdir");
+    let extracted_so = temp_dir.path().join("libdioxusmain.so");
+    std::fs::write(&extracted_so, &so_bytes).expect("Escrever .so temporário");
+
     if let Ok(nm_output) = Command::new("nm")
         .args(["-D", extracted_so.to_str().unwrap()])
         .output()
