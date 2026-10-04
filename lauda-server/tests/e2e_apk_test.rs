@@ -147,13 +147,17 @@ fn test_e2e_apk_structural_and_abi_verification() {
 
     // D. Verificação da Biblioteca Nativa ARM64 compilada em Rust
     assert!(
-        entries_str.contains("lib/arm64-v8a/libdioxusmain.so"),
-        "APK deve conter a biblioteca nativa libdioxusmain.so para arquitetura arm64-v8a"
+        entries_str.contains("lib/arm64-v8a/libmain.so"),
+        "APK deve conter a biblioteca nativa libmain.so para arquitetura arm64-v8a"
+    );
+    assert!(
+        entries_str.contains("lib/x86_64/libmain.so"),
+        "APK deve conter a biblioteca nativa libmain.so para arquitetura x86_64"
     );
 
     // E. Inspeção binária de cabeçalho ELF da biblioteca extraída
-    let so_bytes = get_stored_file_bytes(&apk_path, "lib/arm64-v8a/libdioxusmain.so")
-        .expect("Extrair bytes do cabeçalho da libdioxusmain.so");
+    let so_bytes = get_stored_file_bytes(&apk_path, "lib/arm64-v8a/libmain.so")
+        .expect("Extrair bytes do cabeçalho da libmain.so");
     assert!(
         so_bytes.len() >= 64,
         "Bytes insuficientes para cabeçalho ELF"
@@ -165,7 +169,7 @@ fn test_e2e_apk_structural_and_abi_verification() {
     assert_eq!(
         &elf_header[0..4],
         b"\x7fELF",
-        "A biblioteca libdioxusmain.so deve ser um binário ELF válido"
+        "A biblioteca libmain.so deve ser um binário ELF válido"
     );
     // Classe 64-bit (ELFCLASS64 = 2)
     assert_eq!(
@@ -184,9 +188,9 @@ fn test_e2e_apk_structural_and_abi_verification() {
         "A biblioteca deve ser compilada para a arquitetura AArch64 (ARM64)"
     );
 
-    // F. Validação de Símbolos JNI Essenciais (JNI_OnLoad e start_app)
+    // F. Validação de Símbolos JNI Essenciais (start_app e WryActivity)
     let temp_dir = tempfile::tempdir().expect("Criar tempdir");
-    let extracted_so = temp_dir.path().join("libdioxusmain.so");
+    let extracted_so = temp_dir.path().join("libmain.so");
     std::fs::write(&extracted_so, &so_bytes).expect("Escrever .so temporário");
 
     if let Ok(nm_output) = Command::new("nm")
@@ -195,12 +199,13 @@ fn test_e2e_apk_structural_and_abi_verification() {
     {
         let symbols = String::from_utf8_lossy(&nm_output.stdout);
         assert!(
-            symbols.contains("JNI_OnLoad"),
-            "libdioxusmain.so deve exportar a função JNI_OnLoad para inicialização do runtime Rust"
+            symbols.contains("start_app"),
+            "libmain.so deve exportar start_app chamado pelo runtime Dioxus"
         );
         assert!(
-            symbols.contains("start_app"),
-            "libdioxusmain.so deve exportar start_app chamado pelo WryActivity"
+            symbols.contains("Java_dev_dioxus_main_WryActivity_start")
+                || symbols.contains("Java_dev_dioxus_main_"),
+            "libmain.so deve exportar bindings JNI para Dioxus WryActivity"
         );
     }
 

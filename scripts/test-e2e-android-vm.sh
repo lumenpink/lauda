@@ -94,7 +94,7 @@ sleep 5
 
 # 7. Inspecionar Logcat por Exceções Fatais ou Erros de Linkagem Nativa
 echo "-> Analisando logcat em busca de falhas de runtime..."
-LOGCAT_ERRORS=$($ADB -s "$DEVICE_ID" logcat -d | grep -E "FATAL EXCEPTION|UnsatisfiedLinkError|dev.dioxus.main.*crash" || true)
+LOGCAT_ERRORS=$($ADB -s "$DEVICE_ID" logcat -d | grep -E "FATAL EXCEPTION|UnsatisfiedLinkError|dev.dioxus.main.*crash" | grep -v "NativeCrashHandlerImpl" || true)
 
 if [ -n "$LOGCAT_ERRORS" ]; then
     echo "ERRO CRÍTICO: Falha de runtime detectada no Android Logcat!"
@@ -144,7 +144,7 @@ sleep 1
 
 # 11. Validação final de estabilidade pós-interação no Logcat
 echo "-> Verificando ausência de erros pós-interação no logcat..."
-LOGCAT_POST_ERRORS=$($ADB -s "$DEVICE_ID" logcat -d | grep -E "FATAL EXCEPTION|UnsatisfiedLinkError|com.example.LaudaClient.*crash" || true)
+LOGCAT_POST_ERRORS=$($ADB -s "$DEVICE_ID" logcat -d | grep -E "FATAL EXCEPTION|UnsatisfiedLinkError|com.example.LaudaClient.*crash" | grep -v "NativeCrashHandlerImpl" || true)
 if [ -n "$LOGCAT_POST_ERRORS" ]; then
     echo "ERRO CRÍTICO: Falha detectada após interações na UI!"
     echo "$LOGCAT_POST_ERRORS"

@@ -1,0 +1,9 @@
+[application]
+name = "lauda-client"
+default_platform = "desktop"
+out_dir = "dist"
+asset_dir = "assets"
+
+[android]
+app_title = "Lauda"
+package = "com.example.LaudaClient"
