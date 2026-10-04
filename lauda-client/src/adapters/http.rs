@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use lauda_types::{
     ComposeForm, LoginRequest, MailboxInfo, Message, MessageEnvelope, TokenResponse,
 };
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 use reqwest::{Client, StatusCode};
 
 use crate::domain::ports::{ClientError, MailApiClient};

@@ -1,6 +1,6 @@
 use lauda_client::adapters::in_memory::InMemoryApiClient;
 use lauda_client::domain::ports::MailApiClient;
-use lauda_client::domain::view::{filter_aliases, parse_markdown_to_html, ViewMode};
+use lauda_client::domain::view::{ViewMode, filter_aliases, parse_markdown_to_html};
 use lauda_types::{ComposeForm, LoginRequest, MailboxInfo, Message, MessageEnvelope};
 
 #[test]

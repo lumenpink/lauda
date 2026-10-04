@@ -1,5 +1,5 @@
 pub use lauda_types::ViewMode;
-use pulldown_cmark::{html, Options, Parser};
+use pulldown_cmark::{Options, Parser, html};
 
 /// Converte Markdown ("txt auto") em representação HTML higienizada para visualização gráfica.
 pub fn parse_markdown_to_html(markdown: &str) -> String {

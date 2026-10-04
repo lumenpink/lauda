@@ -26,11 +26,10 @@ fn get_zip_entries(apk_path: &std::path::Path) -> Vec<String> {
     if let Ok(output) = Command::new("unzip")
         .args(["-l", apk_path.to_str().unwrap()])
         .output()
+        && output.status.success()
     {
-        if output.status.success() {
-            let s = String::from_utf8_lossy(&output.stdout);
-            return s.lines().map(|l| l.to_string()).collect();
-        }
+        let s = String::from_utf8_lossy(&output.stdout);
+        return s.lines().map(|l| l.to_string()).collect();
     }
 
     // Fallback: Pure Rust Central Directory Parser
@@ -63,10 +62,10 @@ fn get_stored_file_bytes(apk_path: &std::path::Path, target_filename: &str) -> O
     if let Ok(extract_status) = Command::new("unzip")
         .args(["-p", apk_path.to_str().unwrap(), target_filename])
         .output()
+        && extract_status.status.success()
+        && !extract_status.stdout.is_empty()
     {
-        if extract_status.status.success() && !extract_status.stdout.is_empty() {
-            return Some(extract_status.stdout);
-        }
+        return Some(extract_status.stdout);
     }
 
     // Fallback: busca direta do arquivo descompactado (stored) no arquivo ZIP

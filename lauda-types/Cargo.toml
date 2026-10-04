@@ -1,7 +1,7 @@
 [package]
 name = "lauda-types"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Lumen <lumen@2lp.in>"]
 description = "Modelos e contratos de dados serializáveis para o ecossistema Lauda"
 license = "GPL-3.0"

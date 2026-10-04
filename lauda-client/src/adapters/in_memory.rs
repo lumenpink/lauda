@@ -76,10 +76,10 @@ impl MailApiClient for InMemoryApiClient {
         uid: u32,
     ) -> Result<Message, ClientError> {
         let msgs = self.messages.read().unwrap();
-        if let Some(box_msgs) = msgs.get(mailbox) {
-            if let Some(msg) = box_msgs.iter().find(|m| m.envelope.uid == uid) {
-                return Ok(msg.clone());
-            }
+        if let Some(box_msgs) = msgs.get(mailbox)
+            && let Some(msg) = box_msgs.iter().find(|m| m.envelope.uid == uid)
+        {
+            return Ok(msg.clone());
         }
         Err(ClientError::NotFound)
     }

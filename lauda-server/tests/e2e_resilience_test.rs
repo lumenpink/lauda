@@ -6,14 +6,14 @@ use ishcondidim::crypto::{
     decrypt_message, generate_autocrypt_keypair, public_key_to_binary, sign_and_encrypt,
 };
 use ishcondidim::keystore::KeyStore;
-use jsonwebtoken::{encode, EncodingKey, Header};
+use jsonwebtoken::{EncodingKey, Header, encode};
 use lauda_client::adapters::HttpApiClient;
 use lauda_client::domain::ports::{ClientError, MailApiClient};
 use lauda_server::adapters::in_memory::InMemoryMailBackend;
 use lauda_server::app_router;
 use lauda_types::LoginRequest;
 use papeli::sanitizer::sanitize_html;
-use papeli::templates::{canonical_theme_name, extract_theme_tag, TemplateEngine};
+use papeli::templates::{TemplateEngine, canonical_theme_name, extract_theme_tag};
 use serde::{Deserialize, Serialize};
 use urupema::adapters::InMemorySink;
 use urupema::application::Pipeline;

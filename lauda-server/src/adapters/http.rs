@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use axum::extract::{FromRequestParts, Path, Query, State};
-use axum::http::request::Parts;
 use axum::http::StatusCode;
+use axum::http::request::Parts;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lauda_types::{

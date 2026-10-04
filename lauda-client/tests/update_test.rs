@@ -1,4 +1,4 @@
-use lauda_client::domain::update::{check_update, UpdateManifest, UpdateStatus};
+use lauda_client::domain::update::{UpdateManifest, UpdateStatus, check_update};
 
 #[test]
 fn test_parse_version_manifest() {

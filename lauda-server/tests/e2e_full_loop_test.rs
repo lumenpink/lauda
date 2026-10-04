@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::body::Body;
-use axum::http::{header, Request, StatusCode};
+use axum::http::{Request, StatusCode, header};
 use http_body_util::BodyExt;
 use lauda_client::domain::view::parse_markdown_to_html;
 use lauda_server::adapters::in_memory::InMemoryMailBackend;

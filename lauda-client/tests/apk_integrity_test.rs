@@ -5,11 +5,10 @@ fn get_zip_entries(apk_path: &Path) -> Vec<String> {
     if let Ok(output) = Command::new("unzip")
         .args(["-l", apk_path.to_str().unwrap()])
         .output()
+        && output.status.success()
     {
-        if output.status.success() {
-            let s = String::from_utf8_lossy(&output.stdout);
-            return s.lines().map(|l| l.to_string()).collect();
-        }
+        let s = String::from_utf8_lossy(&output.stdout);
+        return s.lines().map(|l| l.to_string()).collect();
     }
 
     // Fallback: Pure Rust Central Directory Parser (funciona sem unzip)

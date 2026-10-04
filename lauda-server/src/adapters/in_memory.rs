@@ -73,10 +73,10 @@ impl MailBackend for InMemoryMailBackend {
         mailbox: &str,
     ) -> Result<Vec<MessageEnvelope>, BackendError> {
         let msgs = self.messages.read().unwrap();
-        if let Some(user_boxes) = msgs.get(username) {
-            if let Some(box_msgs) = user_boxes.get(mailbox) {
-                return Ok(box_msgs.iter().map(|m| m.envelope.clone()).collect());
-            }
+        if let Some(user_boxes) = msgs.get(username)
+            && let Some(box_msgs) = user_boxes.get(mailbox)
+        {
+            return Ok(box_msgs.iter().map(|m| m.envelope.clone()).collect());
         }
         Ok(Vec::new())
     }
@@ -88,12 +88,11 @@ impl MailBackend for InMemoryMailBackend {
         uid: u32,
     ) -> Result<Message, BackendError> {
         let msgs = self.messages.read().unwrap();
-        if let Some(user_boxes) = msgs.get(username) {
-            if let Some(box_msgs) = user_boxes.get(mailbox) {
-                if let Some(msg) = box_msgs.iter().find(|m| m.envelope.uid == uid) {
-                    return Ok(msg.clone());
-                }
-            }
+        if let Some(user_boxes) = msgs.get(username)
+            && let Some(box_msgs) = user_boxes.get(mailbox)
+            && let Some(msg) = box_msgs.iter().find(|m| m.envelope.uid == uid)
+        {
+            return Ok(msg.clone());
         }
         Err(BackendError::NotFound(format!(
             "Mensagem UID {uid} não encontrada"
