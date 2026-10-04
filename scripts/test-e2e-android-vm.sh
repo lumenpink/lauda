@@ -7,8 +7,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 APK_PATH="$REPO_ROOT/site/lauda-latest.apk"
-PACKAGE_NAME="dev.dioxus.main"
-ACTIVITY_NAME="dev.dioxus.main/.MainActivity"
+PACKAGE_NAME="com.example.LaudaClient"
+ACTIVITY_NAME="com.example.LaudaClient/dev.dioxus.main.MainActivity"
 
 # Localizar ADB
 if command -v adb >/dev/null 2>&1; then
@@ -117,15 +117,44 @@ if [ -f "$REPO_ROOT/target/e2e-android/uidump.xml" ]; then
     fi
 fi
 
-# 9. Capturar screenshot de evidência
+# 9. Capturar screenshot inicial (TxtAuto)
 SCREENSHOT_PATH="$REPO_ROOT/target/e2e-android/screenshot.png"
 $ADB -s "$DEVICE_ID" shell screencap -p /data/local/tmp/screenshot.png
 $ADB -s "$DEVICE_ID" pull /data/local/tmp/screenshot.png "$SCREENSHOT_PATH" >/dev/null 2>&1
-echo "✅ Screenshot capturado em: $SCREENSHOT_PATH"
+echo "✅ Screenshot inicial (TxtAuto) capturado em: $SCREENSHOT_PATH"
 
-# 10. Fechar aplicação graciosamente
+# 10. Teste Interativo de Alternância de Visão (TxtOriginal e Html)
+echo "-> Testando interação: alternando para TXT ORIGINAL..."
+$ADB -s "$DEVICE_ID" shell input tap 680 305
+sleep 1
+$ADB -s "$DEVICE_ID" shell screencap -p /data/local/tmp/screenshot_txt_original.png
+$ADB -s "$DEVICE_ID" pull /data/local/tmp/screenshot_txt_original.png "$REPO_ROOT/target/e2e-android/screenshot_txt_original.png" >/dev/null 2>&1
+echo "✅ Alternância para TXT ORIGINAL capturada em: $REPO_ROOT/target/e2e-android/screenshot_txt_original.png"
+
+echo "-> Testando interação: alternando para HTML..."
+$ADB -s "$DEVICE_ID" shell input tap 915 305
+sleep 1
+$ADB -s "$DEVICE_ID" shell screencap -p /data/local/tmp/screenshot_html.png
+$ADB -s "$DEVICE_ID" pull /data/local/tmp/screenshot_html.png "$REPO_ROOT/target/e2e-android/screenshot_html.png" >/dev/null 2>&1
+echo "✅ Alternância para HTML capturada em: $REPO_ROOT/target/e2e-android/screenshot_html.png"
+
+echo "-> Testando interação: retornando para TXT AUTO..."
+$ADB -s "$DEVICE_ID" shell input tap 460 305
+sleep 1
+
+# 11. Validação final de estabilidade pós-interação no Logcat
+echo "-> Verificando ausência de erros pós-interação no logcat..."
+LOGCAT_POST_ERRORS=$($ADB -s "$DEVICE_ID" logcat -d | grep -E "FATAL EXCEPTION|UnsatisfiedLinkError|com.example.LaudaClient.*crash" || true)
+if [ -n "$LOGCAT_POST_ERRORS" ]; then
+    echo "ERRO CRÍTICO: Falha detectada após interações na UI!"
+    echo "$LOGCAT_POST_ERRORS"
+    exit 1
+fi
+echo "✅ Nenhuma falha após cliques e alternância de modos de visualização."
+
+# 12. Fechar aplicação graciosamente
 $ADB -s "$DEVICE_ID" shell am force-stop "$PACKAGE_NAME"
 echo ""
 echo "================================================================="
-echo "🎉 TESTE E2E ANDROID CONCLUÍDO COM SUCESSO!"
+echo "🎉 TESTE E2E ANDROID INTERATIVO CONCLUÍDO COM SUCESSO!"
 echo "================================================================="
