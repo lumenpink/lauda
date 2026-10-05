@@ -88,6 +88,26 @@ if old_block in content:
 "
 fi
 
+# Injetar network_security_config permitindo cleartext HTTP em rede local/Tailscale
+NETSEC_XML="$REPO_ROOT/target/dx/lauda-client/release/android/app/app/src/main/res/xml/network_security_config.xml"
+echo "-> Habilitando cleartext HTTP para rede local/Tailscale em $NETSEC_XML..."
+mkdir -p "$(dirname "$NETSEC_XML")"
+cat <<EOF > "$NETSEC_XML"
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
+EOF
+
+MANIFEST_XML="$REPO_ROOT/target/dx/lauda-client/release/android/app/app/src/main/AndroidManifest.xml"
+if [ -f "$MANIFEST_XML" ] && ! grep -q "usesCleartextTraffic" "$MANIFEST_XML"; then
+    sed -i 's/<application /<application android:usesCleartextTraffic="true" /g' "$MANIFEST_XML"
+fi
+
 # 5. Montar APK comprimido via Gradle
 echo "-> Montando APK via Gradle (assembleDebug)..."
 cd "$REPO_ROOT/target/dx/lauda-client/release/android/app"
@@ -124,6 +144,23 @@ npx wrangler r2 object put "$BUCKET_NAME/$REMOTE_KEY" \
     --remote
 
 echo "✅ Upload do lauda-nightly.apk concluído com sucesso no R2."
+
+echo "-> Sincronizando lauda-latest.apk no R2..."
+npx wrangler r2 object put "$BUCKET_NAME/lauda-latest.apk" \
+    --file="$NIGHTLY_APK_PATH" \
+    --content-type="application/vnd.android.package-archive" \
+    --remote
+
+CURRENT_VERSION="$(cat "$REPO_ROOT/VERSION" | tr -d '[:space:]')"
+TAG_NAME="v$CURRENT_VERSION"
+if command -v tea >/dev/null 2>&1; then
+    echo "-> Sincronizando asset APK na release Codeberg ($TAG_NAME)..."
+    tea release assets delete "$TAG_NAME" "lauda-${CURRENT_VERSION}.apk" >/dev/null 2>&1 || true
+    VERSIONED_APK="/tmp/lauda-${CURRENT_VERSION}.apk"
+    cp "$NIGHTLY_APK_PATH" "$VERSIONED_APK"
+    tea release assets create "$TAG_NAME" "$VERSIONED_APK" >/dev/null 2>&1 || true
+    rm -f "$VERSIONED_APK"
+fi
 
 # 9. Deploy do Worker e Assets
 echo "-> Fazendo deploy do Worker e Static Assets (lauda.2lp.in)..."

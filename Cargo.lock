@@ -3300,6 +3300,7 @@ dependencies = [
  "jsonwebtoken",
  "lauda-client",
  "lauda-types",
+ "mail-parser 0.11.9",
  "minijinja",
  "papeli",
  "serde",

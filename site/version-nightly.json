@@ -1,7 +1,7 @@
 {
-  "version": "0.2.0-nightly.20261005.be0c205",
+  "version": "0.2.0-nightly.20261005.73d5a5e",
   "min_compatible_version": "0.1.0",
   "apk_url": "https://lauda.2lp.in/lauda-nightly.apk",
-  "release_notes": "Build contínua experimental do Lauda Smolclient (commit be0c205).",
-  "published_at": "2026-10-05T19:42:49Z"
+  "release_notes": "Build contínua experimental do Lauda Smolclient (commit 73d5a5e).",
+  "published_at": "2026-10-05T22:01:50Z"
 }
