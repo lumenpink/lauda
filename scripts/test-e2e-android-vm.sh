@@ -163,22 +163,26 @@ $ADB -s "$DEVICE_ID" shell screencap -p /data/local/tmp/screenshot_reader.png
 $ADB -s "$DEVICE_ID" pull /data/local/tmp/screenshot_reader.png "$SCREENSHOT_READER" >/dev/null 2>&1
 echo "✅ Leitor (TxtAuto) capturado em: $SCREENSHOT_READER"
 
-# 12. Teste Interativo: Alternância Trifocal no Leitor
-echo "-> Testando interação: alternando para TXT ORIGINAL..."
-$ADB -s "$DEVICE_ID" shell input tap 490 720
+# 12. Teste Interativo: Alternância Trifocal Cíclica no Leitor (Botão Único)
+echo "-> Testando interação: alternando para HTML (1º toque no botão rotativo)..."
+$ADB -s "$DEVICE_ID" shell input tap 850 590
+sleep 1
+SCREENSHOT_HTML="$REPO_ROOT/target/e2e-android/screenshot_reader_html.png"
+$ADB -s "$DEVICE_ID" shell screencap -p /data/local/tmp/screenshot_html.png
+$ADB -s "$DEVICE_ID" pull /data/local/tmp/screenshot_html.png "$SCREENSHOT_HTML" >/dev/null 2>&1
+echo "✅ HTML capturado em: $SCREENSHOT_HTML"
+
+echo "-> Testando interação: alternando para ORIGINAL (2º toque no botão rotativo)..."
+$ADB -s "$DEVICE_ID" shell input tap 850 590
 sleep 1
 SCREENSHOT_TXT_ORIGINAL="$REPO_ROOT/target/e2e-android/screenshot_reader_original.png"
 $ADB -s "$DEVICE_ID" shell screencap -p /data/local/tmp/screenshot_txt_original.png
 $ADB -s "$DEVICE_ID" pull /data/local/tmp/screenshot_txt_original.png "$SCREENSHOT_TXT_ORIGINAL" >/dev/null 2>&1
 echo "✅ TXT ORIGINAL capturado em: $SCREENSHOT_TXT_ORIGINAL"
 
-echo "-> Testando interação: alternando para HTML..."
-$ADB -s "$DEVICE_ID" shell input tap 730 720
+echo "-> Testando interação: retornando para TXT AUTO (3º toque no botão rotativo)..."
+$ADB -s "$DEVICE_ID" shell input tap 850 590
 sleep 1
-SCREENSHOT_HTML="$REPO_ROOT/target/e2e-android/screenshot_reader_html.png"
-$ADB -s "$DEVICE_ID" shell screencap -p /data/local/tmp/screenshot_html.png
-$ADB -s "$DEVICE_ID" pull /data/local/tmp/screenshot_html.png "$SCREENSHOT_HTML" >/dev/null 2>&1
-echo "✅ HTML capturado em: $SCREENSHOT_HTML"
 
 # 13. Teste Interativo: Abrir Compositor via RESPONDER
 echo "-> Testando interação: clicando em RESPONDER..."

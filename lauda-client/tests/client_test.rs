@@ -18,12 +18,18 @@ fn test_markdown_parser_conversion() {
 fn test_view_mode_switching() {
     let mut mode = ViewMode::TxtAuto;
     assert_eq!(mode, ViewMode::TxtAuto);
+    assert_eq!(mode.label(), "TXT AUTO ⟳");
 
-    mode = ViewMode::TxtOriginal;
-    assert_eq!(mode, ViewMode::TxtOriginal);
-
-    mode = ViewMode::Html;
+    mode = mode.next();
     assert_eq!(mode, ViewMode::Html);
+    assert_eq!(mode.label(), "HTML ⟳");
+
+    mode = mode.next();
+    assert_eq!(mode, ViewMode::TxtOriginal);
+    assert_eq!(mode.label(), "ORIGINAL ⟳");
+
+    mode = mode.next();
+    assert_eq!(mode, ViewMode::TxtAuto);
 }
 
 #[test]

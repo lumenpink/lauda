@@ -13,6 +13,26 @@ pub enum ViewMode {
     Html,
 }
 
+impl ViewMode {
+    /// Alterna para o próximo modo no ciclo: TxtAuto -> Html -> TxtOriginal -> TxtAuto.
+    pub fn next(&self) -> Self {
+        match self {
+            Self::TxtAuto => Self::Html,
+            Self::Html => Self::TxtOriginal,
+            Self::TxtOriginal => Self::TxtAuto,
+        }
+    }
+
+    /// Rótulo conciso com glifo rotativo para botões compactos Trash Polka.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::TxtAuto => "TXT AUTO ⟳",
+            Self::Html => "HTML ⟳",
+            Self::TxtOriginal => "ORIGINAL ⟳",
+        }
+    }
+}
+
 /// Metadados resumidos de uma mensagem para listagens de caixa de entrada.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MessageEnvelope {

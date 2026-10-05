@@ -98,3 +98,14 @@ fn test_view_mode_serialization() {
     );
     assert_eq!(serde_json::to_string(&ViewMode::Html).unwrap(), "\"html\"");
 }
+
+#[test]
+fn test_view_mode_cycle() {
+    assert_eq!(ViewMode::TxtAuto.next(), ViewMode::Html);
+    assert_eq!(ViewMode::Html.next(), ViewMode::TxtOriginal);
+    assert_eq!(ViewMode::TxtOriginal.next(), ViewMode::TxtAuto);
+
+    assert_eq!(ViewMode::TxtAuto.label(), "TXT AUTO ⟳");
+    assert_eq!(ViewMode::Html.label(), "HTML ⟳");
+    assert_eq!(ViewMode::TxtOriginal.label(), "ORIGINAL ⟳");
+}

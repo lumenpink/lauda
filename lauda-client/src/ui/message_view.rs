@@ -65,24 +65,14 @@ pub fn MessageView(
                     }
                 }
 
-                // Alternador Trifocal
-                div {
-                    style: "display: flex; gap: 0.4rem;",
-                    button {
-                        style: if *current_view_mode.read() == ViewMode::TxtAuto { "background: #0a0a0a; color: #fff; padding: 0.4rem 0.8rem; border: none; font-weight: bold; cursor: pointer;" } else { "background: #fff; color: #0a0a0a; padding: 0.4rem 0.8rem; border: 1px solid #0a0a0a; cursor: pointer;" },
-                        onclick: move |_| current_view_mode.set(ViewMode::TxtAuto),
-                        "TXT AUTO"
-                    }
-                    button {
-                        style: if *current_view_mode.read() == ViewMode::TxtOriginal { "background: #0a0a0a; color: #fff; padding: 0.4rem 0.8rem; border: none; font-weight: bold; cursor: pointer;" } else { "background: #fff; color: #0a0a0a; padding: 0.4rem 0.8rem; border: 1px solid #0a0a0a; cursor: pointer;" },
-                        onclick: move |_| current_view_mode.set(ViewMode::TxtOriginal),
-                        "TXT ORIGINAL"
-                    }
-                    button {
-                        style: if *current_view_mode.read() == ViewMode::Html { "background: #0a0a0a; color: #fff; padding: 0.4rem 0.8rem; border: none; font-weight: bold; cursor: pointer;" } else { "background: #fff; color: #0a0a0a; padding: 0.4rem 0.8rem; border: 1px solid #0a0a0a; cursor: pointer;" },
-                        onclick: move |_| current_view_mode.set(ViewMode::Html),
-                        "HTML"
-                    }
+                // Alternador Trifocal no Leitor (Botão Único Rotativo)
+                button {
+                    style: "background: #0a0a0a; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #dc143c; white-space: nowrap;",
+                    onclick: move |_| {
+                        let next_mode = current_view_mode.read().next();
+                        current_view_mode.set(next_mode);
+                    },
+                    "{current_view_mode.read().label()}"
                 }
             }
 
