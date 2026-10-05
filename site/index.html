@@ -226,29 +226,47 @@
     <div class="card" style="margin-top: 2rem; border: 3px solid var(--crimson); background: #fdfaf6;">
       <h3 style="color: var(--crimson);">DOWNLOAD ANDROID (APK & AUTO-UPDATE)</h3>
       <p style="margin-bottom: 1rem;">Obtenha o cliente compilado diretamente para seu celular com ciclo de desenvolvimento ágil:</p>
-      <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
-        <a href="https://lauda.2lp.in/lauda-latest.apk" style="background: var(--crimson); color: var(--paper); padding: 0.6rem 1.2rem; text-decoration: none; font-weight: bold; text-transform: uppercase;">
+      <div style="display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center; margin-bottom: 1.2rem;">
+        <a href="https://lauda.2lp.in/lauda-0.2.0.apk" style="background: var(--crimson); color: var(--paper); padding: 0.6rem 1.2rem; text-decoration: none; font-weight: bold; text-transform: uppercase;">
           ⬇ BAIXAR APK DIRETO (v0.2.0)
+        </a>
+        <a href="https://lauda.2lp.in/lauda-latest.apk" style="padding: 0.6rem 1rem; border: 1px solid var(--ink); text-decoration: none; font-weight: bold;">
+          LINK UNIVERSAL (LATEST)
         </a>
         <a href="https://lauda.2lp.in/version.json" style="padding: 0.6rem 1rem; border: 1px solid var(--ink); text-decoration: none;">
           MANIFESTO VERSION.JSON
         </a>
-        <span style="font-size: 0.85rem; font-style: italic;">Compatível com rastreadores <strong>Obtainium</strong></span>
+      </div>
+
+      <div style="border-top: 1px dashed var(--ink); padding-top: 0.8rem; margin-top: 0.8rem; font-size: 0.9rem;">
+        <strong style="color: var(--crimson-dark); text-transform: uppercase;">🔄 Rastreamento no Obtainium:</strong>
+        <ul style="margin: 0.5rem 0 0 1.2rem; line-height: 1.6;">
+          <li><strong>Método 1 (Recomendado / Nativo):</strong> No Obtainium, adicione a URL do repositório:
+            <br><code>https://codeberg.org/lumenpink/lauda</code>
+            <br><span style="font-size: 0.82rem; color: #555;">O Obtainium reconhece nativamente como Codeberg/Forgejo e lista as releases diretamente sem scraping.</span>
+          </li>
+          <li style="margin-top: 0.4rem;"><strong>Método 2 (Via Webpage Direta):</strong> Adicione a URL da vitrine:
+            <br><code>https://lauda.2lp.in</code>
+            <br><span style="font-size: 0.82rem; color: #555;">Totalmente compatível com streaming R2 e HTTP Range (206) para cálculo de hash.</span>
+          </li>
+        </ul>
       </div>
     </div>
 
     <div class="card" style="margin-top: 1.5rem; border: 2px dashed var(--ink); background: #f7f3eb;">
       <h3 style="color: var(--ink);">CANAL NIGHTLY (BLEEDING EDGE)</h3>
       <p style="margin-bottom: 1rem;">Builds experimentais contínuas compiladas diretamente a partir do branch principal (HEAD):</p>
-      <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+      <div style="display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem;">
         <a href="https://lauda.2lp.in/lauda-nightly.apk" style="background: var(--ink); color: #fff; padding: 0.5rem 1rem; text-decoration: none; font-weight: bold; text-transform: uppercase;">
           ⬇ BAIXAR APK NIGHTLY
         </a>
         <a href="https://lauda.2lp.in/version-nightly.json" style="padding: 0.5rem 0.8rem; border: 1px solid var(--ink); text-decoration: none;">
           MANIFESTO VERSION-NIGHTLY.JSON
         </a>
-        <span style="font-size: 0.85rem; font-style: italic;">Rastreável no Obtainium via Codeberg pre-releases</span>
       </div>
+      <p style="font-size: 0.85rem; font-style: italic; color: #444;">
+        Para rastrear o Nightly no Obtainium via Codeberg, basta marcar a opção <strong>"Include prereleases"</strong> na configuração do app.
+      </p>
     </div>
 
     <footer>

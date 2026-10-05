@@ -154,6 +154,7 @@ Build diária de ponta baseada no commit \`$GIT_HASH\`.
 Para rastrear o canal Nightly no Obtainium:
 * URL: \`https://codeberg.org/lumenpink/lauda\` (com a opção 'Include prereleases' ativada)
 * Ou via Webpage: \`https://lauda.2lp.in/version-nightly.json\`" \
+        --asset "$NIGHTLY_APK_PATH" \
         --prerelease || echo "Aviso: Criação da release no Codeberg falhou ou já atualizada."
 fi
 

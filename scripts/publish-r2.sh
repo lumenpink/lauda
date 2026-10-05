@@ -36,7 +36,20 @@ echo "✅ Upload do APK concluído com sucesso no Cloudflare R2."
 echo "-> Fazendo deploy do Worker e Static Assets (lauda.2lp.in)..."
 npx wrangler deploy
 
+# 3. Anexar APK à release do Codeberg para autodescoberta pelo Obtainium
+CURRENT_VERSION="$(cat "$REPO_ROOT/VERSION" | tr -d '[:space:]')"
+TAG_NAME="v$CURRENT_VERSION"
+if command -v tea >/dev/null 2>&1; then
+    echo "-> Sincronizando asset APK na release Codeberg ($TAG_NAME)..."
+    VERSIONED_APK="/tmp/lauda-${CURRENT_VERSION}.apk"
+    cp "$APK_PATH" "$VERSIONED_APK"
+    tea release assets create "$TAG_NAME" "$VERSIONED_APK" >/dev/null 2>&1 || true
+    rm -f "$VERSIONED_APK"
+    echo "✅ Release $TAG_NAME no Codeberg possui asset APK compatível com Obtainium."
+fi
+
 echo ""
 echo "================================================================="
 echo "🎉 Publicação concluída com sucesso em https://lauda.2lp.in!"
 echo "================================================================="
+
