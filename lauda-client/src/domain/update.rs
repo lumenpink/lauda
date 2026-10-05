@@ -48,3 +48,14 @@ fn parse_semver_triplet(version: &str) -> (u32, u32, u32) {
     let patch = parts.next().and_then(|p| p.parse().ok()).unwrap_or(0);
     (major, minor, patch)
 }
+
+/// Consulta o manifesto de versão remoto no servidor ou CDN público.
+pub async fn fetch_remote_manifest(url: &str) -> Result<UpdateManifest, String> {
+    let client = reqwest::Client::builder()
+        .build()
+        .map_err(|e| e.to_string())?;
+    let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
+    resp.json::<UpdateManifest>()
+        .await
+        .map_err(|e| e.to_string())
+}

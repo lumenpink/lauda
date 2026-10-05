@@ -35,6 +35,8 @@ pub fn App() -> Element {
     let active_message = use_signal(|| None::<Message>);
     let mut current_view_mode = use_signal(|| ViewMode::TxtAuto);
 
+    let mut update_notice = use_signal(|| None::<crate::domain::update::UpdateManifest>);
+
     // Carregamento inicial assíncrono se houver sessão gravada
     use_effect(move || {
         let sess = session.read().clone();
@@ -49,6 +51,21 @@ pub fn App() -> Element {
                 }
             });
         }
+    });
+
+    // Verificação de atualização assíncrona
+    use_effect(move || {
+        spawn(async move {
+            if let Ok(manifest) =
+                crate::domain::update::fetch_remote_manifest("https://lauda.2lp.in/version.json")
+                    .await
+                && let crate::domain::update::UpdateStatus::Available(m)
+                | crate::domain::update::UpdateStatus::Required(m) =
+                    crate::domain::update::check_update(env!("CARGO_PKG_VERSION"), &manifest)
+            {
+                update_notice.set(Some(m));
+            }
+        });
     });
 
     let active_token_exists = session.read().token.is_some();
@@ -85,6 +102,20 @@ pub fn App() -> Element {
                         current_view_mode.set(next_mode);
                     },
                     "{current_view_mode.read().label()}"
+                }
+            }
+
+            // Banner Trash Polka de Atualização Disponível
+            if let Some(manifest) = update_notice.read().clone() {
+                div {
+                    style: "background: #dc143c; color: #fff; padding: 0.6rem 1rem; margin-bottom: 1.2rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; font-weight: bold; border: 2px solid #0a0a0a; box-shadow: 3px 3px 0 #0a0a0a; flex-wrap: wrap; gap: 0.5rem;",
+                    span { "NOVA VERSÃO DISPONÍVEL: v{manifest.version}" }
+                    a {
+                        href: "{manifest.apk_url}",
+                        target: "_blank",
+                        style: "background: #fff; color: #0a0a0a; padding: 0.3rem 0.7rem; text-decoration: none; font-size: 0.8rem; font-weight: bold; border: 1px solid #0a0a0a; white-space: nowrap;",
+                        "ATUALIZAR APK"
+                    }
                 }
             }
 

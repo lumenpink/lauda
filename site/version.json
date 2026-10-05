@@ -1,7 +1,7 @@
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "min_compatible_version": "0.1.0",
   "apk_url": "https://lauda.2lp.in/lauda-latest.apk",
-  "release_notes": "Versão inicial de desenvolvimento com visualizador trifásico e redação sem travas.",
-  "published_at": "2026-10-02T08:00:00Z"
+  "release_notes": "Interface móvel completa do smolclient com login, caixa de entrada, leitor trifocal rotativo e compositor.",
+  "published_at": "2026-10-05T15:45:00Z"
 }

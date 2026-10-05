@@ -3273,7 +3273,7 @@ dependencies = [
 
 [[package]]
 name = "lauda-client"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "dioxus",
@@ -3289,7 +3289,7 @@ dependencies = [
 
 [[package]]
 name = "lauda-server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -3316,7 +3316,7 @@ dependencies = [
 
 [[package]]
 name = "lauda-types"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
