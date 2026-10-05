@@ -11,6 +11,11 @@
 *.log
 .DS_Store
 
-# Metadados de agentes locais
+# Metadados de agentes locais e wrangler
 .antigravity/
 .wrangler/
+
+# Artefatos Android e Sessões Locais
+*.apk
+site/*.apk
+session.json

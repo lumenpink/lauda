@@ -1,0 +1,178 @@
+use dioxus::prelude::*;
+use lauda_types::{ComposeForm, MessageEnvelope};
+
+use crate::adapters::HttpApiClient;
+use crate::domain::ports::MailApiClient;
+use crate::domain::session::SessionConfig;
+use crate::ui::state::Screen;
+
+#[component]
+pub fn ComposeView(
+    screen: Signal<Screen>,
+    session: Signal<SessionConfig>,
+    reply_to: Option<String>,
+    reply_subject: Option<String>,
+    current_mailbox: Signal<String>,
+    messages: Signal<Vec<MessageEnvelope>>,
+) -> Element {
+    let sess = session.read().clone();
+    let sender_address = if sess.username.contains('@') {
+        sess.username.clone()
+    } else {
+        format!("{}@2lp.in", sess.username)
+    };
+
+    let mut from_input = use_signal(|| sender_address);
+    let mut to_input = use_signal(|| reply_to.unwrap_or_default());
+    let mut cc_input = use_signal(String::new);
+    let mut subject_input = use_signal(|| reply_subject.unwrap_or_default());
+    let mut body_input = use_signal(String::new);
+
+    let mut is_sending = use_signal(|| false);
+    let mut error_msg = use_signal(|| None::<String>);
+
+    let handle_send = move |_| {
+        let to = to_input.read().trim().to_string();
+        let subject = subject_input.read().trim().to_string();
+        let from = from_input.read().trim().to_string();
+        let cc_val = cc_input.read().trim().to_string();
+        let cc = if cc_val.is_empty() {
+            None
+        } else {
+            Some(cc_val)
+        };
+        let body = body_input.read().clone();
+
+        if to.is_empty() {
+            error_msg.set(Some("Destinatário (Para) é obrigatório.".to_string()));
+            return;
+        }
+
+        if subject.is_empty() {
+            error_msg.set(Some("Assunto é obrigatório.".to_string()));
+            return;
+        }
+
+        let sess_snapshot = session.read().clone();
+        if let Some(token) = sess_snapshot.token {
+            is_sending.set(true);
+            error_msg.set(None);
+
+            spawn(async move {
+                let client = HttpApiClient::new(sess_snapshot.server_url.clone());
+                let form = ComposeForm {
+                    from,
+                    to,
+                    cc,
+                    subject,
+                    body,
+                };
+
+                match client.send_message(&token, &form).await {
+                    Ok(_) => {
+                        is_sending.set(false);
+                        // Atualizar lista da caixa postal
+                        let box_name = current_mailbox.read().clone();
+                        if let Ok(msgs) = client.list_messages(&token, &box_name).await {
+                            messages.set(msgs);
+                        }
+                        screen.set(Screen::Inbox);
+                    }
+                    Err(err) => {
+                        is_sending.set(false);
+                        error_msg.set(Some(format!("Falha ao enviar mensagem: {}", err)));
+                    }
+                }
+            });
+        }
+    };
+
+    rsx! {
+        div {
+            style: "border: 2px solid #0a0a0a; background: #fff; padding: 1.5rem; box-shadow: 6px 6px 0 #0a0a0a; display: flex; flex-direction: column; gap: 1rem; max-width: 680px; margin: 0 auto;",
+
+            // Barra de Navegação do Compositor
+            div {
+                style: "display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0a0a0a; padding-bottom: 0.8rem;",
+                div {
+                    span {
+                        style: "background: #dc143c; color: #fff; padding: 0.2rem 0.5rem; font-weight: bold; font-size: 0.8rem;",
+                        "REDAÇÃO RÁPIDA"
+                    }
+                    h2 {
+                        style: "font-size: 1.3rem; margin: 0.3rem 0 0 0; color: #0a0a0a;",
+                        "NOVA MENSAGEM"
+                    }
+                }
+                div {
+                    style: "display: flex; gap: 0.5rem;",
+                    button {
+                        style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer;",
+                        onclick: move |_| screen.set(Screen::Inbox),
+                        "← CANCELAR"
+                    }
+                    button {
+                        style: if *is_sending.read() { "background: #666; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: not-allowed;" } else { "background: #dc143c; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;" },
+                        disabled: *is_sending.read(),
+                        onclick: handle_send,
+                        if *is_sending.read() { "ENVIANDO..." } else { "ENVIAR ✉" }
+                    }
+                }
+            }
+
+            if let Some(err) = error_msg.read().as_ref() {
+                div {
+                    style: "border: 2px solid #dc143c; background: #ffebee; color: #b71c1c; padding: 0.6rem; font-weight: bold; font-size: 0.85rem;",
+                    "⚠ {err}"
+                }
+            }
+
+            div {
+                style: "display: flex; flex-direction: column; gap: 0.8rem;",
+                div {
+                    label { style: "display: block; font-weight: bold; font-size: 0.8rem; margin-bottom: 0.2rem;", "DE:" }
+                    input {
+                        style: "width: 100%; box-sizing: border-box; padding: 0.5rem; border: 1px solid #0a0a0a; font-family: monospace;",
+                        value: "{from_input}",
+                        oninput: move |evt| from_input.set(evt.value()),
+                    }
+                }
+                div {
+                    label { style: "display: block; font-weight: bold; font-size: 0.8rem; margin-bottom: 0.2rem;", "PARA:" }
+                    input {
+                        style: "width: 100%; box-sizing: border-box; padding: 0.5rem; border: 2px solid #0a0a0a; font-family: monospace;",
+                        value: "{to_input}",
+                        oninput: move |evt| to_input.set(evt.value()),
+                        placeholder: "destinatario@dominio.com",
+                    }
+                }
+                div {
+                    label { style: "display: block; font-weight: bold; font-size: 0.8rem; margin-bottom: 0.2rem;", "CC (OPCIONAL):" }
+                    input {
+                        style: "width: 100%; box-sizing: border-box; padding: 0.5rem; border: 1px solid #0a0a0a; font-family: monospace;",
+                        value: "{cc_input}",
+                        oninput: move |evt| cc_input.set(evt.value()),
+                    }
+                }
+                div {
+                    label { style: "display: block; font-weight: bold; font-size: 0.8rem; margin-bottom: 0.2rem;", "ASSUNTO:" }
+                    input {
+                        style: "width: 100%; box-sizing: border-box; padding: 0.5rem; border: 2px solid #0a0a0a; font-family: monospace;",
+                        value: "{subject_input}",
+                        oninput: move |evt| subject_input.set(evt.value()),
+                        placeholder: "Assunto da mensagem",
+                    }
+                }
+                div {
+                    label { style: "display: block; font-weight: bold; font-size: 0.8rem; margin-bottom: 0.2rem;", "MENSAGEM (TEXTO PURO / MARKDOWN):" }
+                    textarea {
+                        style: "width: 100%; box-sizing: border-box; padding: 0.6rem; border: 2px solid #0a0a0a; font-family: monospace; min-height: 180px; font-size: 0.95rem; line-height: 1.4;",
+                        value: "{body_input}",
+                        oninput: move |evt| body_input.set(evt.value()),
+                        placeholder: "Escreva sua mensagem aqui...",
+                    }
+                }
+            }
+        }
+    }
+}

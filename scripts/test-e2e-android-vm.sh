@@ -117,32 +117,88 @@ if [ -f "$REPO_ROOT/target/e2e-android/uidump.xml" ]; then
     fi
 fi
 
-# 9. Capturar screenshot inicial (TxtAuto)
-SCREENSHOT_PATH="$REPO_ROOT/target/e2e-android/screenshot.png"
-$ADB -s "$DEVICE_ID" shell screencap -p /data/local/tmp/screenshot.png
-$ADB -s "$DEVICE_ID" pull /data/local/tmp/screenshot.png "$SCREENSHOT_PATH" >/dev/null 2>&1
-echo "✅ Screenshot inicial (TxtAuto) capturado em: $SCREENSHOT_PATH"
+# 9. Provisionar sessão autenticada conectada ao Lauda Server
+echo "-> Verificando conectividade com lauda-server..."
+SERVER_PID=""
+if ! curl -s http://127.0.0.1:8432/mailboxes >/dev/null 2>&1; then
+    echo "Iniciando lauda-server em background na porta 8432..."
+    LAUDA_LISTEN_ADDR="0.0.0.0:8432" cargo run -p lauda-server >/dev/null 2>&1 &
+    SERVER_PID=$!
+    sleep 3
+fi
 
-# 10. Teste Interativo de Alternância de Visão (TxtOriginal e Html)
+LOGIN_RESP=$(curl -s -X POST http://127.0.0.1:8432/auth/login -H "Content-Type: application/json" -d '{"username":"lumen","password":"senha123"}')
+TOKEN=$(echo "$LOGIN_RESP" | grep -o '"token":"[^"]*' | cut -d'"' -f4)
+
+if [ -n "$TOKEN" ]; then
+    echo "✅ Token JWT obtido do servidor local com sucesso."
+    SESSION_TMP="/tmp/lauda_e2e_session.json"
+    cat <<EOF > "$SESSION_TMP"
+{
+  "server_url": "http://10.0.2.2:8432",
+  "username": "lumen",
+  "token": "$TOKEN"
+}
+EOF
+    $ADB -s "$DEVICE_ID" push "$SESSION_TMP" /data/data/com.example.LaudaClient/files/session.json >/dev/null 2>&1 || true
+    # Reiniciar aplicação com sessão injetada
+    $ADB -s "$DEVICE_ID" shell am force-stop "$PACKAGE_NAME"
+    sleep 1
+    $ADB -s "$DEVICE_ID" shell am start -W -n "$ACTIVITY_NAME" >/dev/null 2>&1
+    sleep 5
+fi
+
+# 10. Capturar tela do Inbox
+SCREENSHOT_INBOX="$REPO_ROOT/target/e2e-android/screenshot_inbox.png"
+$ADB -s "$DEVICE_ID" shell screencap -p /data/local/tmp/screenshot_inbox.png
+$ADB -s "$DEVICE_ID" pull /data/local/tmp/screenshot_inbox.png "$SCREENSHOT_INBOX" >/dev/null 2>&1
+echo "✅ Inbox capturado em: $SCREENSHOT_INBOX"
+
+# 11. Teste Interativo: Abrir Mensagem (Leitor)
+echo "-> Testando interação: abrindo mensagem (UID 101)..."
+$ADB -s "$DEVICE_ID" shell input tap 400 950
+sleep 2
+SCREENSHOT_READER="$REPO_ROOT/target/e2e-android/screenshot_reader_auto.png"
+$ADB -s "$DEVICE_ID" shell screencap -p /data/local/tmp/screenshot_reader.png
+$ADB -s "$DEVICE_ID" pull /data/local/tmp/screenshot_reader.png "$SCREENSHOT_READER" >/dev/null 2>&1
+echo "✅ Leitor (TxtAuto) capturado em: $SCREENSHOT_READER"
+
+# 12. Teste Interativo: Alternância Trifocal no Leitor
 echo "-> Testando interação: alternando para TXT ORIGINAL..."
-$ADB -s "$DEVICE_ID" shell input tap 680 305
+$ADB -s "$DEVICE_ID" shell input tap 490 720
 sleep 1
+SCREENSHOT_TXT_ORIGINAL="$REPO_ROOT/target/e2e-android/screenshot_reader_original.png"
 $ADB -s "$DEVICE_ID" shell screencap -p /data/local/tmp/screenshot_txt_original.png
-$ADB -s "$DEVICE_ID" pull /data/local/tmp/screenshot_txt_original.png "$REPO_ROOT/target/e2e-android/screenshot_txt_original.png" >/dev/null 2>&1
-echo "✅ Alternância para TXT ORIGINAL capturada em: $REPO_ROOT/target/e2e-android/screenshot_txt_original.png"
+$ADB -s "$DEVICE_ID" pull /data/local/tmp/screenshot_txt_original.png "$SCREENSHOT_TXT_ORIGINAL" >/dev/null 2>&1
+echo "✅ TXT ORIGINAL capturado em: $SCREENSHOT_TXT_ORIGINAL"
 
 echo "-> Testando interação: alternando para HTML..."
-$ADB -s "$DEVICE_ID" shell input tap 915 305
+$ADB -s "$DEVICE_ID" shell input tap 730 720
 sleep 1
+SCREENSHOT_HTML="$REPO_ROOT/target/e2e-android/screenshot_reader_html.png"
 $ADB -s "$DEVICE_ID" shell screencap -p /data/local/tmp/screenshot_html.png
-$ADB -s "$DEVICE_ID" pull /data/local/tmp/screenshot_html.png "$REPO_ROOT/target/e2e-android/screenshot_html.png" >/dev/null 2>&1
-echo "✅ Alternância para HTML capturada em: $REPO_ROOT/target/e2e-android/screenshot_html.png"
+$ADB -s "$DEVICE_ID" pull /data/local/tmp/screenshot_html.png "$SCREENSHOT_HTML" >/dev/null 2>&1
+echo "✅ HTML capturado em: $SCREENSHOT_HTML"
 
-echo "-> Testando interação: retornando para TXT AUTO..."
-$ADB -s "$DEVICE_ID" shell input tap 460 305
-sleep 1
+# 13. Teste Interativo: Abrir Compositor via RESPONDER
+echo "-> Testando interação: clicando em RESPONDER..."
+$ADB -s "$DEVICE_ID" shell input tap 500 590
+sleep 2
+SCREENSHOT_COMPOSE="$REPO_ROOT/target/e2e-android/screenshot_compose.png"
+$ADB -s "$DEVICE_ID" shell screencap -p /data/local/tmp/screenshot_compose.png
+$ADB -s "$DEVICE_ID" pull /data/local/tmp/screenshot_compose.png "$SCREENSHOT_COMPOSE" >/dev/null 2>&1
+echo "✅ Compositor capturado em: $SCREENSHOT_COMPOSE"
 
-# 11. Validação final de estabilidade pós-interação no Logcat
+# 14. Teste Interativo: Disparar Envio
+echo "-> Testando interação: clicando em ENVIAR ✉..."
+$ADB -s "$DEVICE_ID" shell input tap 780 600
+sleep 2
+SCREENSHOT_RESTORED="$REPO_ROOT/target/e2e-android/screenshot_inbox_restored.png"
+$ADB -s "$DEVICE_ID" shell screencap -p /data/local/tmp/screenshot_inbox_restored.png
+$ADB -s "$DEVICE_ID" pull /data/local/tmp/screenshot_inbox_restored.png "$SCREENSHOT_RESTORED" >/dev/null 2>&1
+echo "✅ Retorno ao Inbox após envio capturado em: $SCREENSHOT_RESTORED"
+
+# 15. Validação final de estabilidade pós-interação no Logcat
 echo "-> Verificando ausência de erros pós-interação no logcat..."
 LOGCAT_POST_ERRORS=$($ADB -s "$DEVICE_ID" logcat -d | grep -E "FATAL EXCEPTION|UnsatisfiedLinkError|com.example.LaudaClient.*crash" | grep -v "NativeCrashHandlerImpl" || true)
 if [ -n "$LOGCAT_POST_ERRORS" ]; then
@@ -152,8 +208,13 @@ if [ -n "$LOGCAT_POST_ERRORS" ]; then
 fi
 echo "✅ Nenhuma falha após cliques e alternância de modos de visualização."
 
-# 12. Fechar aplicação graciosamente
+# 16. Fechar aplicação graciosamente
 $ADB -s "$DEVICE_ID" shell am force-stop "$PACKAGE_NAME"
+
+if [ -n "$SERVER_PID" ]; then
+    kill "$SERVER_PID" 2>/dev/null || true
+fi
+
 echo ""
 echo "================================================================="
 echo "🎉 TESTE E2E ANDROID INTERATIVO CONCLUÍDO COM SUCESSO!"

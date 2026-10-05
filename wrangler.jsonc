@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "lauda",
+  "main": "worker/index.js",
   "compatibility_date": "2024-09-23",
   "routes": [
     {
@@ -9,6 +10,13 @@
     }
   ],
   "assets": {
-    "directory": "./site"
-  }
+    "directory": "./site",
+    "binding": "ASSETS"
+  },
+  "r2_buckets": [
+    {
+      "binding": "LAUDA_BUCKET",
+      "bucket_name": "lauda-downloads"
+    }
+  ]
 }
