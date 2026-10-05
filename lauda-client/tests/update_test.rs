@@ -61,3 +61,20 @@ fn test_check_update_up_to_date() {
     let status_ahead = check_update("0.2.0", &manifest);
     assert_eq!(status_ahead, UpdateStatus::UpToDate);
 }
+
+#[test]
+fn test_check_update_nightly_channel() {
+    let manifest = UpdateManifest {
+        version: "0.2.1-nightly.20261005".to_string(),
+        min_compatible_version: "0.1.0".to_string(),
+        apk_url: "https://lauda.2lp.in/lauda-nightly.apk".to_string(),
+        release_notes: "Build experimental nightly".to_string(),
+        published_at: "2026-10-05T19:35:00Z".to_string(),
+    };
+
+    let status = check_update("0.2.0", &manifest);
+    assert!(matches!(status, UpdateStatus::Available(_)));
+
+    let status_up_to_date = check_update("0.2.1", &manifest);
+    assert_eq!(status_up_to_date, UpdateStatus::UpToDate);
+}
