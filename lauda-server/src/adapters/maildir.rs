@@ -41,13 +41,19 @@ impl MaildirBackend {
                 if custom.exists() {
                     custom
                 } else {
-                    return Err(BackendError::NotFound(format!("Caixa postal '{}' não encontrada", mailbox)));
+                    return Err(BackendError::NotFound(format!(
+                        "Caixa postal '{}' não encontrada",
+                        mailbox
+                    )));
                 }
             }
         };
 
         if !dir.exists() {
-            return Err(BackendError::NotFound(format!("Diretório da caixa postal não existe: {:?}", dir)));
+            return Err(BackendError::NotFound(format!(
+                "Diretório da caixa postal não existe: {:?}",
+                dir
+            )));
         }
 
         Ok(dir)
@@ -58,20 +64,52 @@ impl MaildirBackend {
         let mut uid_to_prefix = HashMap::new();
         let uidlist_file = dir.join("dovecot-uidlist");
 
+        let mut max_uid = 1000u32;
         if let Ok(content) = std::fs::read_to_string(uidlist_file) {
             for line in content.lines() {
-                let parts: Vec<&str> = line.trim().split_whitespace().collect();
-                if parts.len() >= 2 {
-                    if let Ok(uid) = parts[0].parse::<u32>() {
-                        let prefix = parts[1].trim_start_matches(':');
-                        if !prefix.is_empty() {
-                            prefix_to_uid.insert(prefix.to_string(), uid);
-                            uid_to_prefix.insert(uid, prefix.to_string());
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2
+                    && let Ok(uid) = parts[0].parse::<u32>()
+                {
+                    let prefix = parts[1].trim_start_matches(':');
+                    if !prefix.is_empty() {
+                        prefix_to_uid.insert(prefix.to_string(), uid);
+                        uid_to_prefix.insert(uid, prefix.to_string());
+                        if uid > max_uid {
+                            max_uid = uid;
                         }
                     }
                 }
             }
         }
+
+        // Para arquivos sem entrada no dovecot-uidlist, garanta mapeamento consistente
+        let mut unmapped = Vec::new();
+        for sub in &["cur", "new"] {
+            if let Ok(entries) = std::fs::read_dir(dir.join(sub)) {
+                for entry in entries.flatten() {
+                    let filename = entry.file_name().to_string_lossy().to_string();
+                    if filename.starts_with('.') {
+                        continue;
+                    }
+                    let prefix = filename
+                        .split(":2,")
+                        .next()
+                        .unwrap_or(&filename)
+                        .to_string();
+                    if !prefix_to_uid.contains_key(&prefix) && !unmapped.contains(&prefix) {
+                        unmapped.push(prefix);
+                    }
+                }
+            }
+        }
+        unmapped.sort();
+        for prefix in unmapped {
+            max_uid += 1;
+            prefix_to_uid.insert(prefix.clone(), max_uid);
+            uid_to_prefix.insert(max_uid, prefix);
+        }
+
         (prefix_to_uid, uid_to_prefix)
     }
 
@@ -107,16 +145,119 @@ impl MaildirBackend {
             }
         }
     }
+
+    fn find_message_file(&self, dir: &Path, uid: u32) -> Option<(PathBuf, String, bool, bool)> {
+        let (prefix_to_uid, uid_to_prefix) = self.load_uid_maps(dir);
+        let target_prefix = uid_to_prefix.get(&uid);
+
+        for sub in &["cur", "new"] {
+            let sub_path = dir.join(sub);
+            if let Ok(entries) = std::fs::read_dir(sub_path) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    let filename = entry.file_name().to_string_lossy().to_string();
+                    let prefix = filename.split(":2,").next().unwrap_or(&filename);
+
+                    let matched = if let Some(target) = target_prefix {
+                        prefix == target
+                    } else if let Some(&file_uid) = prefix_to_uid.get(prefix) {
+                        file_uid == uid
+                    } else {
+                        false
+                    };
+
+                    if matched {
+                        let is_read = filename.contains(":2,S") || filename.contains(",S");
+                        let is_flagged = filename.contains('F');
+                        return Some((path, filename, is_read, is_flagged));
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn dispatch_sendmail(raw_email: &str) -> Result<(), String> {
+        if let Ok(custom_cmd) = std::env::var("LAUDA_SENDMAIL_CMD") {
+            let mut child = std::process::Command::new("sh")
+                .arg("-c")
+                .arg(&custom_cmd)
+                .stdin(std::process::Stdio::piped())
+                .spawn()
+                .map_err(|e| format!("Erro ao iniciar comando configurado: {}", e))?;
+            if let Some(mut stdin) = child.stdin.take() {
+                use std::io::Write;
+                stdin
+                    .write_all(raw_email.as_bytes())
+                    .map_err(|e| e.to_string())?;
+            }
+            let status = child.wait().map_err(|e| e.to_string())?;
+            if !status.success() {
+                return Err(format!("Comando retornou erro: {:?}", status.code()));
+            }
+            return Ok(());
+        }
+
+        // Tentar via docker exec no container mailserver se ativo
+        let docker_check = std::process::Command::new("docker")
+            .args(["ps", "-q", "-f", "name=mailserver"])
+            .output();
+
+        if let Ok(output) = docker_check {
+            let out_str = String::from_utf8_lossy(&output.stdout);
+            if !out_str.trim().is_empty() {
+                let mut child = std::process::Command::new("docker")
+                    .args(["exec", "-i", "mailserver", "/usr/sbin/sendmail", "-t", "-i"])
+                    .stdin(std::process::Stdio::piped())
+                    .spawn()
+                    .map_err(|e| format!("Erro ao executar docker exec mailserver: {}", e))?;
+                if let Some(mut stdin) = child.stdin.take() {
+                    use std::io::Write;
+                    stdin
+                        .write_all(raw_email.as_bytes())
+                        .map_err(|e| e.to_string())?;
+                }
+                let status = child.wait().map_err(|e| e.to_string())?;
+                if status.success() {
+                    return Ok(());
+                }
+            }
+        }
+
+        // Fallback: /usr/sbin/sendmail no host se existir
+        if std::path::Path::new("/usr/sbin/sendmail").exists() {
+            let mut child = std::process::Command::new("/usr/sbin/sendmail")
+                .args(["-t", "-i"])
+                .stdin(std::process::Stdio::piped())
+                .spawn()
+                .map_err(|e| format!("Erro ao executar /usr/sbin/sendmail: {}", e))?;
+            if let Some(mut stdin) = child.stdin.take() {
+                use std::io::Write;
+                stdin
+                    .write_all(raw_email.as_bytes())
+                    .map_err(|e| e.to_string())?;
+            }
+            let status = child.wait().map_err(|e| e.to_string())?;
+            if status.success() {
+                return Ok(());
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[async_trait]
 impl MailBackend for MaildirBackend {
     async fn authenticate(&self, username: &str, password: &str) -> Result<(), BackendError> {
-        let lock = self.users.read().map_err(|e| BackendError::Internal(e.to_string()))?;
-        if let Some(expected_pass) = lock.get(username) {
-            if expected_pass == password {
-                return Ok(());
-            }
+        let lock = self
+            .users
+            .read()
+            .map_err(|e| BackendError::Internal(e.to_string()))?;
+        if let Some(expected_pass) = lock.get(username)
+            && expected_pass == password
+        {
+            return Ok(());
         }
         Err(BackendError::AuthFailed)
     }
@@ -148,7 +289,8 @@ impl MailBackend for MaildirBackend {
                             continue;
                         }
                         total += 1;
-                        if *sub == "new" || (!filename.contains(":2,S") && !filename.contains(",S")) {
+                        if *sub == "new" || (!filename.contains(":2,S") && !filename.contains(",S"))
+                        {
                             unread += 1;
                         }
                     }
@@ -198,36 +340,39 @@ impl MailBackend for MaildirBackend {
                     let is_read = filename.contains(":2,S") || filename.contains(",S");
                     let is_flagged = filename.contains('F');
 
-                    if let Ok(bytes) = std::fs::read(&path) {
-                        if let Some(parsed) = MessageParser::default().parse_headers(&bytes) {
-                            let subject = parsed.subject().unwrap_or("(Sem assunto)").to_string();
-                            let sender = parsed.from().map(Self::format_address).unwrap_or_else(|| "Desconhecido".to_string());
-                            let date = parsed.date().map(|d| d.to_rfc3339()).unwrap_or_else(|| {
-                                if let Ok(metadata) = entry.metadata() {
-                                    if let Ok(modified) = metadata.modified() {
-                                        let datetime: chrono::DateTime<chrono::Utc> = modified.into();
-                                        return datetime.to_rfc3339();
-                                    }
-                                }
-                                "2026-10-05T00:00:00Z".to_string()
-                            });
+                    if let Ok(bytes) = std::fs::read(&path)
+                        && let Some(parsed) = MessageParser::default().parse_headers(&bytes)
+                    {
+                        let subject = parsed.subject().unwrap_or("(Sem assunto)").to_string();
+                        let sender = parsed
+                            .from()
+                            .map(Self::format_address)
+                            .unwrap_or_else(|| "Desconhecido".to_string());
+                        let date = parsed.date().map(|d| d.to_rfc3339()).unwrap_or_else(|| {
+                            if let Ok(metadata) = entry.metadata()
+                                && let Ok(modified) = metadata.modified()
+                            {
+                                let datetime: chrono::DateTime<chrono::Utc> = modified.into();
+                                return datetime.to_rfc3339();
+                            }
+                            "2026-10-05T00:00:00Z".to_string()
+                        });
 
-                            envelopes.push(MessageEnvelope {
-                                uid,
-                                subject,
-                                sender,
-                                date,
-                                is_read,
-                                is_flagged,
-                            });
-                        }
+                        envelopes.push(MessageEnvelope {
+                            uid,
+                            subject,
+                            sender,
+                            date,
+                            is_read,
+                            is_flagged,
+                        });
                     }
                 }
             }
         }
 
         // Ordenar do mais novo para o mais antigo (UID decrescente)
-        envelopes.sort_by(|a, b| b.uid.cmp(&a.uid));
+        envelopes.sort_by_key(|a| std::cmp::Reverse(a.uid));
 
         Ok(envelopes)
     }
@@ -239,56 +384,28 @@ impl MailBackend for MaildirBackend {
         uid: u32,
     ) -> Result<Message, BackendError> {
         let dir = self.resolve_mailbox_dir(mailbox)?;
-        let (prefix_to_uid, uid_to_prefix) = self.load_uid_maps(&dir);
-
-        let target_prefix = uid_to_prefix.get(&uid);
-
-        // Encontrar o arquivo correspondente ao UID ou prefixo
-        let mut target_file = None;
-        let mut is_read = false;
-        let mut is_flagged = false;
-
-        for sub in &["cur", "new"] {
-            let sub_path = dir.join(sub);
-            if let Ok(entries) = std::fs::read_dir(sub_path) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    let filename = entry.file_name().to_string_lossy().to_string();
-                    let prefix = filename.split(":2,").next().unwrap_or(&filename);
-
-                    let matched = if let Some(target) = target_prefix {
-                        prefix == target
-                    } else if let Some(&file_uid) = prefix_to_uid.get(prefix) {
-                        file_uid == uid
-                    } else {
-                        false
-                    };
-
-                    if matched {
-                        is_read = filename.contains(":2,S") || filename.contains(",S");
-                        is_flagged = filename.contains('F');
-                        target_file = Some(path);
-                        break;
-                    }
-                }
-            }
-            if target_file.is_some() {
-                break;
-            }
-        }
-
-        let file_path = target_file.ok_or_else(|| {
-            BackendError::NotFound(format!("Mensagem UID {} não encontrada na caixa {}", uid, mailbox))
-        })?;
+        let (file_path, _, is_read, is_flagged) =
+            self.find_message_file(&dir, uid).ok_or_else(|| {
+                BackendError::NotFound(format!(
+                    "Mensagem UID {} não encontrada na caixa {}",
+                    uid, mailbox
+                ))
+            })?;
 
         let bytes = std::fs::read(&file_path).map_err(|e| BackendError::Internal(e.to_string()))?;
-        let parsed = MessageParser::default()
-            .parse(&bytes)
-            .ok_or_else(|| BackendError::Internal("Falha ao analisar mensagem RFC 5322".to_string()))?;
+        let parsed = MessageParser::default().parse(&bytes).ok_or_else(|| {
+            BackendError::Internal("Falha ao analisar mensagem RFC 5322".to_string())
+        })?;
 
         let subject = parsed.subject().unwrap_or("(Sem assunto)").to_string();
-        let sender = parsed.from().map(Self::format_address).unwrap_or_else(|| "Desconhecido".to_string());
-        let date = parsed.date().map(|d| d.to_rfc3339()).unwrap_or_else(|| "2026-10-05T00:00:00Z".to_string());
+        let sender = parsed
+            .from()
+            .map(Self::format_address)
+            .unwrap_or_else(|| "Desconhecido".to_string());
+        let date = parsed
+            .date()
+            .map(|d| d.to_rfc3339())
+            .unwrap_or_else(|| "2026-10-05T00:00:00Z".to_string());
 
         let envelope = MessageEnvelope {
             uid,
@@ -302,7 +419,6 @@ impl MailBackend for MaildirBackend {
         let txt_original = parsed.body_text(0).map(|s| s.to_string());
         let html_sanitized = parsed.body_html(0).map(|s| s.to_string());
 
-        // Se houver texto puro, use-o para o txt_auto; caso contrário, faça fallback para html
         let txt_auto = txt_original.clone().or_else(|| {
             html_sanitized.as_ref().map(|html| {
                 html.replace("<br>", "\n")
@@ -323,19 +439,98 @@ impl MailBackend for MaildirBackend {
 
     async fn send_message(&self, _username: &str, form: &ComposeForm) -> Result<(), BackendError> {
         let sent_dir = self.base_dir.join(".Sent").join("cur");
-        if sent_dir.exists() {
-            let timestamp = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-            let filename = format!("{}.M_out.lauda:2,S", timestamp);
-            let raw_email = format!(
-                "From: {}\nTo: {}\nSubject: {}\nDate: {}\nContent-Type: text/plain; charset=utf-8\n\n{}",
-                form.from, form.to, form.subject, chrono::Utc::now().to_rfc3339(), form.body
-            );
-            let _ = std::fs::write(sent_dir.join(filename), raw_email);
+        let _ = std::fs::create_dir_all(&sent_dir);
+
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let pid = std::process::id();
+        let msg_id = format!("<{}.{}@2lp.in>", timestamp, pid);
+        let raw_email = format!(
+            "From: {}\nTo: {}\nSubject: {}\nDate: {}\nMessage-ID: {}\nContent-Type: text/plain; charset=utf-8\n\n{}\n",
+            form.from,
+            form.to,
+            form.subject,
+            chrono::Utc::now().to_rfc2822(),
+            msg_id,
+            form.body
+        );
+
+        let filename = format!("{}.M{}P{}.lauda:2,S", timestamp, timestamp % 1000, pid);
+        let _ = std::fs::write(sent_dir.join(filename), &raw_email);
+
+        if let Err(e) = Self::dispatch_sendmail(&raw_email) {
+            tracing::warn!("Aviso ao despachar e-mail via sendmail: {}", e);
         }
 
+        Ok(())
+    }
+
+    async fn mark_message_read(
+        &self,
+        _username: &str,
+        mailbox: &str,
+        uid: u32,
+        read: bool,
+    ) -> Result<(), BackendError> {
+        let dir = self.resolve_mailbox_dir(mailbox)?;
+        let (file_path, filename, current_read, _) =
+            self.find_message_file(&dir, uid).ok_or_else(|| {
+                BackendError::NotFound(format!(
+                    "Mensagem UID {} não encontrada na caixa {}",
+                    uid, mailbox
+                ))
+            })?;
+
+        if current_read == read {
+            return Ok(());
+        }
+
+        let parts: Vec<&str> = filename.split(":2,").collect();
+        let base_name = parts[0];
+        let current_flags = if parts.len() > 1 { parts[1] } else { "" };
+
+        let mut flags_chars: Vec<char> = current_flags.chars().filter(|&c| c != 'S').collect();
+        if read {
+            flags_chars.push('S');
+        }
+        flags_chars.sort();
+        flags_chars.dedup();
+        let new_flags: String = flags_chars.into_iter().collect();
+
+        let new_filename = format!("{}:2,{}", base_name, new_flags);
+        let target_dir = dir.join("cur");
+        let new_path = target_dir.join(new_filename);
+
+        std::fs::rename(&file_path, &new_path)
+            .map_err(|e| BackendError::Internal(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn delete_message(
+        &self,
+        _username: &str,
+        mailbox: &str,
+        uid: u32,
+    ) -> Result<(), BackendError> {
+        let dir = self.resolve_mailbox_dir(mailbox)?;
+        let (file_path, filename, _, _) = self.find_message_file(&dir, uid).ok_or_else(|| {
+            BackendError::NotFound(format!(
+                "Mensagem UID {} não encontrada na caixa {}",
+                uid, mailbox
+            ))
+        })?;
+
+        if mailbox.eq_ignore_ascii_case("Trash") {
+            std::fs::remove_file(&file_path).map_err(|e| BackendError::Internal(e.to_string()))?;
+        } else {
+            let trash_dir = self.base_dir.join(".Trash").join("cur");
+            let _ = std::fs::create_dir_all(&trash_dir);
+            let target_path = trash_dir.join(&filename);
+            std::fs::rename(&file_path, &target_path)
+                .map_err(|e| BackendError::Internal(e.to_string()))?;
+        }
         Ok(())
     }
 }

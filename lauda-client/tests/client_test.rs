@@ -113,4 +113,16 @@ async fn test_in_memory_api_client() {
 
     assert!(result.is_ok());
     assert_eq!(client.sent_count(), 1);
+
+    // 5. Mark Read
+    let mark_res = client.mark_read(token, "INBOX", 101, true).await;
+    assert!(mark_res.is_ok());
+    let updated = client.get_message(token, "INBOX", 101).await.unwrap();
+    assert!(updated.envelope.is_read);
+
+    // 6. Delete Message
+    let del_res = client.delete_message(token, "INBOX", 101).await;
+    assert!(del_res.is_ok());
+    let list_after = client.list_messages(token, "INBOX").await.unwrap();
+    assert!(list_after.is_empty());
 }

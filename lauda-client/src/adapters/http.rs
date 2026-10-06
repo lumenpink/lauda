@@ -159,4 +159,62 @@ impl MailApiClient for HttpApiClient {
             ))),
         }
     }
+
+    async fn mark_read(
+        &self,
+        token: &str,
+        mailbox: &str,
+        uid: u32,
+        read: bool,
+    ) -> Result<(), ClientError> {
+        let url = format!(
+            "{}/messages/{}/read?box={}&read={}",
+            self.base_url, uid, mailbox, read
+        );
+        let headers = Self::auth_headers(token)?;
+        let resp = self
+            .client
+            .patch(&url)
+            .headers(headers)
+            .send()
+            .await
+            .map_err(|e| ClientError::Network(e.to_string()))?;
+
+        match resp.status() {
+            StatusCode::OK | StatusCode::NO_CONTENT => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(ClientError::AuthFailed),
+            StatusCode::NOT_FOUND => Err(ClientError::NotFound),
+            status => Err(ClientError::Network(format!(
+                "Erro ao alterar status de leitura: {}",
+                status
+            ))),
+        }
+    }
+
+    async fn delete_message(
+        &self,
+        token: &str,
+        mailbox: &str,
+        uid: u32,
+    ) -> Result<(), ClientError> {
+        let url = format!("{}/messages/{}?box={}", self.base_url, uid, mailbox);
+        let headers = Self::auth_headers(token)?;
+        let resp = self
+            .client
+            .delete(&url)
+            .headers(headers)
+            .send()
+            .await
+            .map_err(|e| ClientError::Network(e.to_string()))?;
+
+        match resp.status() {
+            StatusCode::OK | StatusCode::NO_CONTENT => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(ClientError::AuthFailed),
+            StatusCode::NOT_FOUND => Err(ClientError::NotFound),
+            status => Err(ClientError::Network(format!(
+                "Erro ao excluir mensagem: {}",
+                status
+            ))),
+        }
+    }
 }

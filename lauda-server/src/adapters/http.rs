@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::extract::{FromRequestParts, Path, Query, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
-use axum::routing::{get, post};
+use axum::routing::{get, patch, post};
 use axum::{Json, Router};
 use lauda_types::{
     ComposeForm, LoginRequest, MailboxInfo, Message, MessageEnvelope, TokenResponse,
@@ -48,6 +48,12 @@ impl FromRequestParts<AppState> for AuthUser {
 #[derive(Debug, Deserialize)]
 pub struct MessagesQuery {
     pub r#box: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MarkReadQuery {
+    pub r#box: Option<String>,
+    pub read: Option<bool>,
 }
 
 async fn login_handler(
@@ -119,6 +125,43 @@ async fn get_message_handler(
     Ok(Json(msg))
 }
 
+async fn mark_read_handler(
+    State(state): State<AppState>,
+    AuthUser(username): AuthUser,
+    Path(uid): Path<u32>,
+    Query(query): Query<MarkReadQuery>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mailbox = query.r#box.as_deref().unwrap_or("INBOX");
+    let read = query.read.unwrap_or(true);
+    state
+        .backend
+        .mark_message_read(&username, mailbox, uid, read)
+        .await
+        .map_err(|e| match e {
+            BackendError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
+            other => (StatusCode::INTERNAL_SERVER_ERROR, other.to_string()),
+        })?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn delete_message_handler(
+    State(state): State<AppState>,
+    AuthUser(username): AuthUser,
+    Path(uid): Path<u32>,
+    Query(query): Query<MessagesQuery>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mailbox = query.r#box.as_deref().unwrap_or("INBOX");
+    state
+        .backend
+        .delete_message(&username, mailbox, uid)
+        .await
+        .map_err(|e| match e {
+            BackendError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
+            other => (StatusCode::INTERNAL_SERVER_ERROR, other.to_string()),
+        })?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 async fn compose_handler(
     State(state): State<AppState>,
     AuthUser(username): AuthUser,
@@ -142,7 +185,14 @@ pub fn app_router(backend: Arc<dyn MailBackend>, jwt_secret: impl Into<String>) 
         .route("/auth/login", post(login_handler))
         .route("/mailboxes", get(list_mailboxes_handler))
         .route("/messages", get(list_messages_handler))
-        .route("/messages/{uid}", get(get_message_handler))
+        .route(
+            "/messages/{uid}",
+            get(get_message_handler).delete(delete_message_handler),
+        )
+        .route(
+            "/messages/{uid}/read",
+            patch(mark_read_handler).post(mark_read_handler),
+        )
         .route("/compose", post(compose_handler))
         .with_state(state)
 }

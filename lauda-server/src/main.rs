@@ -13,7 +13,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::var("LAUDA_LISTEN_ADDR").unwrap_or_else(|_| "127.0.0.1:8432".to_string());
 
     let maildir_env = std::env::var("LAUDA_MAILDIR_PATH").ok();
-    let default_maildir = std::path::PathBuf::from("/home/lumen/stacks/mail/data/dms/mail-data/lumen.pink/hi");
+    let default_maildir =
+        std::path::PathBuf::from("/home/lumen/stacks/mail/data/dms/mail-data/lumen.pink/hi");
     let maildir_path = maildir_env.map(std::path::PathBuf::from).or_else(|| {
         if default_maildir.exists() {
             Some(default_maildir)
@@ -22,7 +23,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let backend: Arc<dyn lauda_server::domain::ports::MailBackend> = if let Some(path) = maildir_path {
+    let backend: Arc<dyn lauda_server::domain::ports::MailBackend> = if let Some(path) =
+        maildir_path
+    {
         tracing::info!("lauda-server: inicializando MaildirBackend em {:?}", path);
         let m = Arc::new(lauda_server::adapters::MaildirBackend::new(path));
         m.add_user("lumen", "senha123");

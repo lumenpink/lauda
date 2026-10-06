@@ -3,6 +3,6 @@
   "min_compatible_version": "0.1.0",
   "apk_url": "https://lauda.2lp.in/lauda-latest.apk",
   "versioned_apk_url": "https://lauda.2lp.in/lauda-0.2.0.apk",
-  "release_notes": "Interface móvel completa do smolclient com login, caixa de entrada, leitor trifocal rotativo e compositor.",
-  "published_at": "2026-10-05T15:45:00Z"
+  "release_notes": "Versão 0.2.0: Backend Maildir nativo, envio real via Postfix, suporte a múltiplas pastas, busca rápida e ações de leitura/exclusão.",
+  "published_at": "2026-10-05T21:52:00Z"
 }

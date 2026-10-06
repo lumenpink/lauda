@@ -33,4 +33,13 @@ pub trait MailApiClient: Send + Sync {
         uid: u32,
     ) -> Result<Message, ClientError>;
     async fn send_message(&self, token: &str, form: &ComposeForm) -> Result<(), ClientError>;
+    async fn mark_read(
+        &self,
+        token: &str,
+        mailbox: &str,
+        uid: u32,
+        read: bool,
+    ) -> Result<(), ClientError>;
+    async fn delete_message(&self, token: &str, mailbox: &str, uid: u32)
+    -> Result<(), ClientError>;
 }

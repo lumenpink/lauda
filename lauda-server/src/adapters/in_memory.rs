@@ -106,4 +106,46 @@ impl MailBackend for InMemoryMailBackend {
             .push((username.to_string(), form.clone()));
         Ok(())
     }
+
+    async fn mark_message_read(
+        &self,
+        username: &str,
+        mailbox: &str,
+        uid: u32,
+        read: bool,
+    ) -> Result<(), BackendError> {
+        let mut msgs = self.messages.write().unwrap();
+        if let Some(user_boxes) = msgs.get_mut(username)
+            && let Some(box_msgs) = user_boxes.get_mut(mailbox)
+            && let Some(msg) = box_msgs.iter_mut().find(|m| m.envelope.uid == uid)
+        {
+            msg.envelope.is_read = read;
+            return Ok(());
+        }
+        Err(BackendError::NotFound(format!(
+            "Mensagem UID {uid} não encontrada"
+        )))
+    }
+
+    async fn delete_message(
+        &self,
+        username: &str,
+        mailbox: &str,
+        uid: u32,
+    ) -> Result<(), BackendError> {
+        let mut msgs = self.messages.write().unwrap();
+        if let Some(user_boxes) = msgs.get_mut(username)
+            && let Some(box_msgs) = user_boxes.get_mut(mailbox)
+            && let Some(pos) = box_msgs.iter().position(|m| m.envelope.uid == uid)
+        {
+            let msg = box_msgs.remove(pos);
+            if mailbox != "Trash" {
+                user_boxes.entry("Trash".to_string()).or_default().push(msg);
+            }
+            return Ok(());
+        }
+        Err(BackendError::NotFound(format!(
+            "Mensagem UID {uid} não encontrada"
+        )))
+    }
 }

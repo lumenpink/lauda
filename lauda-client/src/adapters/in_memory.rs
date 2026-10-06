@@ -88,4 +88,40 @@ impl MailApiClient for InMemoryApiClient {
         self.sent.write().unwrap().push(form.clone());
         Ok(())
     }
+
+    async fn mark_read(
+        &self,
+        _token: &str,
+        mailbox: &str,
+        uid: u32,
+        read: bool,
+    ) -> Result<(), ClientError> {
+        let mut msgs = self.messages.write().unwrap();
+        if let Some(box_msgs) = msgs.get_mut(mailbox)
+            && let Some(msg) = box_msgs.iter_mut().find(|m| m.envelope.uid == uid)
+        {
+            msg.envelope.is_read = read;
+            return Ok(());
+        }
+        Err(ClientError::NotFound)
+    }
+
+    async fn delete_message(
+        &self,
+        _token: &str,
+        mailbox: &str,
+        uid: u32,
+    ) -> Result<(), ClientError> {
+        let mut msgs = self.messages.write().unwrap();
+        if let Some(box_msgs) = msgs.get_mut(mailbox)
+            && let Some(pos) = box_msgs.iter().position(|m| m.envelope.uid == uid)
+        {
+            let msg = box_msgs.remove(pos);
+            if mailbox != "Trash" {
+                msgs.entry("Trash".to_string()).or_default().push(msg);
+            }
+            return Ok(());
+        }
+        Err(ClientError::NotFound)
+    }
 }

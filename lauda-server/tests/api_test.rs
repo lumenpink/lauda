@@ -147,6 +147,54 @@ async fn test_login_success_and_protected_flow() {
     let response = app.clone().oneshot(req).await.unwrap();
     assert_eq!(response.status(), StatusCode::CREATED);
     assert_eq!(backend.sent_count(), 1);
+
+    // 6. Marcar como lida /messages/1001/read
+    let req = Request::builder()
+        .method("PATCH")
+        .uri("/messages/1001/read?box=INBOX&read=true")
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+
+    // Verificar se mensagem agora é lida
+    let req = Request::builder()
+        .method("GET")
+        .uri("/messages/1001?box=INBOX")
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+    let msg: Message = serde_json::from_slice(&body_bytes).unwrap();
+    assert!(msg.envelope.is_read);
+
+    // 7. Excluir mensagem DELETE /messages/1001
+    let req = Request::builder()
+        .method("DELETE")
+        .uri("/messages/1001?box=INBOX")
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+
+    // Verificar se mensagem sumiu da INBOX
+    let req = Request::builder()
+        .method("GET")
+        .uri("/messages?box=INBOX")
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+    let envelopes: Vec<MessageEnvelope> = serde_json::from_slice(&body_bytes).unwrap();
+    assert!(envelopes.is_empty());
 }
 
 #[tokio::test]

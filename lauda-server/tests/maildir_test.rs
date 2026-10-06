@@ -17,24 +17,134 @@ async fn test_maildir_backend_read_mailboxes_and_messages() {
     assert!(backend.authenticate("lumen", "errada").await.is_err());
 
     // Caixas postais
-    let mailboxes = backend.list_mailboxes("lumen").await.expect("Listar caixas");
+    let mailboxes = backend
+        .list_mailboxes("lumen")
+        .await
+        .expect("Listar caixas");
     assert!(!mailboxes.is_empty());
-    let inbox = mailboxes.iter().find(|m| m.name == "INBOX").expect("INBOX existe");
-    assert!(inbox.total_messages >= 40, "Deve haver mais de 40 mensagens na INBOX");
+    let inbox = mailboxes
+        .iter()
+        .find(|m| m.name == "INBOX")
+        .expect("INBOX existe");
+    assert!(
+        inbox.total_messages >= 40,
+        "Deve haver mais de 40 mensagens na INBOX"
+    );
 
     // Listar mensagens
-    let messages = backend.list_messages("lumen", "INBOX").await.expect("Listar mensagens");
+    let messages = backend
+        .list_messages("lumen", "INBOX")
+        .await
+        .expect("Listar mensagens");
     assert!(!messages.is_empty());
     assert_eq!(messages.len() as u32, inbox.total_messages);
 
     // Mensagens devem estar ordenadas de forma decrescente por UID
     for window in messages.windows(2) {
-        assert!(window[0].uid >= window[1].uid, "Mensagens devem estar em ordem decrescente de UID");
+        assert!(
+            window[0].uid >= window[1].uid,
+            "Mensagens devem estar em ordem decrescente de UID"
+        );
     }
 
     // Carregar mensagem completa
     let first_uid = messages[0].uid;
-    let full_msg = backend.get_message("lumen", "INBOX", first_uid).await.expect("Carregar mensagem");
+    let full_msg = backend
+        .get_message("lumen", "INBOX", first_uid)
+        .await
+        .expect("Carregar mensagem");
     assert_eq!(full_msg.envelope.uid, first_uid);
-    assert!(full_msg.txt_original.is_some() || full_msg.html_sanitized.is_some() || full_msg.txt_auto.is_some());
+    assert!(
+        full_msg.txt_original.is_some()
+            || full_msg.html_sanitized.is_some()
+            || full_msg.txt_auto.is_some()
+    );
+}
+
+#[tokio::test]
+async fn test_hermetic_maildir_lifecycle() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+
+    // Estrutura Maildir básica
+    std::fs::create_dir_all(root.join("cur")).unwrap();
+    std::fs::create_dir_all(root.join("new")).unwrap();
+    std::fs::create_dir_all(root.join(".Sent").join("cur")).unwrap();
+    std::fs::create_dir_all(root.join(".Trash").join("cur")).unwrap();
+
+    // Mensagem de teste em cur/
+    let msg_filename = "1728000000.M123P456.test:2,";
+    let msg_content = "From: remetente@2lp.in\nTo: hi@lumen.pink\nSubject: Teste Hermetico\nDate: Mon, 05 Oct 2026 12:00:00 +0000\nContent-Type: text/plain; charset=utf-8\n\nOla Mundo!\n";
+    std::fs::write(root.join("cur").join(msg_filename), msg_content).unwrap();
+
+    // dovecot-uidlist
+    let uidlist_content =
+        "3 V1790640297 N2 Ga836741ba900bb6a090600002f3acf59\n100 :1728000000.M123P456.test\n";
+    std::fs::write(root.join("dovecot-uidlist"), uidlist_content).unwrap();
+
+    let backend = MaildirBackend::new(root);
+    backend.add_user("testuser", "senha123");
+
+    // 1. Listar caixas
+    let boxes = backend.list_mailboxes("testuser").await.unwrap();
+    assert!(boxes.iter().any(|b| b.name == "INBOX"));
+    assert!(boxes.iter().any(|b| b.name == "Sent"));
+    assert!(boxes.iter().any(|b| b.name == "Trash"));
+
+    let inbox = boxes.iter().find(|b| b.name == "INBOX").unwrap();
+    assert_eq!(inbox.total_messages, 1);
+    assert_eq!(inbox.unread_messages, 1);
+
+    // 2. Listar mensagens
+    let msgs = backend.list_messages("testuser", "INBOX").await.unwrap();
+    assert_eq!(msgs.len(), 1);
+    assert_eq!(msgs[0].uid, 100);
+    assert_eq!(msgs[0].subject, "Teste Hermetico");
+    assert!(!msgs[0].is_read);
+
+    // 3. Obter mensagem
+    let full = backend.get_message("testuser", "INBOX", 100).await.unwrap();
+    assert_eq!(full.envelope.subject, "Teste Hermetico");
+    assert_eq!(full.txt_original.as_deref(), Some("Ola Mundo!\n"));
+
+    // 4. Marcar como lida
+    backend
+        .mark_message_read("testuser", "INBOX", 100, true)
+        .await
+        .unwrap();
+    let msgs_after_read = backend.list_messages("testuser", "INBOX").await.unwrap();
+    assert!(msgs_after_read[0].is_read);
+
+    // 5. Enviar mensagem
+    let compose = lauda_types::ComposeForm {
+        from: "testuser@2lp.in".to_string(),
+        to: "dest@2lp.in".to_string(),
+        cc: None,
+        subject: "Resposta de Teste".to_string(),
+        body: "Texto enviado.".to_string(),
+    };
+    backend.send_message("testuser", &compose).await.unwrap();
+    let sent_msgs = backend.list_messages("testuser", "Sent").await.unwrap();
+    assert_eq!(sent_msgs.len(), 1);
+    assert_eq!(sent_msgs[0].subject, "Resposta de Teste");
+
+    // 6. Excluir mensagem (move para Trash)
+    backend
+        .delete_message("testuser", "INBOX", 100)
+        .await
+        .unwrap();
+    let inbox_after_del = backend.list_messages("testuser", "INBOX").await.unwrap();
+    assert!(inbox_after_del.is_empty());
+
+    let trash_msgs = backend.list_messages("testuser", "Trash").await.unwrap();
+    assert_eq!(trash_msgs.len(), 1);
+
+    // 7. Excluir permanentemente da Lixeira
+    let trash_uid = trash_msgs[0].uid;
+    backend
+        .delete_message("testuser", "Trash", trash_uid)
+        .await
+        .unwrap();
+    let trash_after_del = backend.list_messages("testuser", "Trash").await.unwrap();
+    assert!(trash_after_del.is_empty());
 }

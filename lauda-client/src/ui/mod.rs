@@ -147,6 +147,10 @@ pub fn App() -> Element {
                     Screen::MessageDetail(_uid) => rsx! {
                         MessageView {
                             screen,
+                            session,
+                            current_mailbox,
+                            messages,
+                            mailboxes,
                             active_message,
                             current_view_mode,
                         }

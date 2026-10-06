@@ -1,14 +1,21 @@
 use dioxus::prelude::*;
-use lauda_types::{Message, ViewMode};
+use lauda_types::{MailboxInfo, Message, MessageEnvelope, ViewMode};
 
+use crate::adapters::HttpApiClient;
+use crate::domain::ports::MailApiClient;
+use crate::domain::session::SessionConfig;
 use crate::domain::view::parse_markdown_to_html;
 use crate::ui::state::Screen;
 
 #[component]
 pub fn MessageView(
-    screen: Signal<Screen>,
-    active_message: Signal<Option<Message>>,
-    current_view_mode: Signal<ViewMode>,
+    mut screen: Signal<Screen>,
+    session: Signal<SessionConfig>,
+    current_mailbox: Signal<String>,
+    mut messages: Signal<Vec<MessageEnvelope>>,
+    mut mailboxes: Signal<Vec<MailboxInfo>>,
+    mut active_message: Signal<Option<Message>>,
+    mut current_view_mode: Signal<ViewMode>,
 ) -> Element {
     let msg = active_message.read().clone();
 
@@ -35,6 +42,50 @@ pub fn MessageView(
         format!("Re: {}", envelope.subject)
     };
 
+    let handle_toggle_read = move |_| {
+        let sess = session.read().clone();
+        let box_name = current_mailbox.read().clone();
+        if let Some(token) = sess.token
+            && let Some(current) = active_message.read().clone()
+        {
+            let uid = current.envelope.uid;
+            let new_read = !current.envelope.is_read;
+            spawn(async move {
+                let client = HttpApiClient::new(sess.server_url);
+                if client
+                    .mark_read(&token, &box_name, uid, new_read)
+                    .await
+                    .is_ok()
+                {
+                    if let Some(m) = active_message.write().as_mut() {
+                        m.envelope.is_read = new_read;
+                    }
+                    if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
+                        m.is_read = new_read;
+                    }
+                }
+            });
+        }
+    };
+
+    let handle_delete = move |_| {
+        let sess = session.read().clone();
+        let box_name = current_mailbox.read().clone();
+        if let Some(token) = sess.token
+            && let Some(current) = active_message.read().clone()
+        {
+            let uid = current.envelope.uid;
+            spawn(async move {
+                let client = HttpApiClient::new(sess.server_url);
+                if client.delete_message(&token, &box_name, uid).await.is_ok() {
+                    messages.write().retain(|m| m.uid != uid);
+                    active_message.set(None);
+                    screen.set(Screen::Inbox);
+                }
+            });
+        }
+    };
+
     let txt_auto_body = message.txt_auto.clone().unwrap_or_default();
     let txt_original_body = message.txt_original.clone().unwrap_or_default();
     let html_body = message.html_sanitized.clone().unwrap_or_default();
@@ -49,7 +100,7 @@ pub fn MessageView(
             div {
                 style: "border: 2px solid #0a0a0a; background: #fff; padding: 0.8rem 1rem; box-shadow: 4px 4px 0 #0a0a0a; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.8rem;",
                 div {
-                    style: "display: flex; gap: 0.5rem;",
+                    style: "display: flex; gap: 0.5rem; flex-wrap: wrap;",
                     button {
                         style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer;",
                         onclick: move |_| screen.set(Screen::Inbox),
@@ -62,6 +113,16 @@ pub fn MessageView(
                             reply_subject: Some(subject_for_reply.clone()),
                         }),
                         "RESPONDER"
+                    }
+                    button {
+                        style: "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer;",
+                        onclick: handle_toggle_read,
+                        if envelope.is_read { "MARCAR NÃO LIDA" } else { "MARCAR LIDA" }
+                    }
+                    button {
+                        style: "background: #fff; color: #8b0000; border: 1px solid #8b0000; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer;",
+                        onclick: handle_delete,
+                        "🗑 EXCLUIR"
                     }
                 }
 

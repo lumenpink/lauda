@@ -16,6 +16,7 @@ pub fn InboxView(
     mut active_message: Signal<Option<Message>>,
 ) -> Element {
     let mut is_refreshing = use_signal(|| false);
+    let mut search_query = use_signal(String::new);
 
     let handle_refresh = move |_| {
         let sess = session.read().clone();
@@ -47,6 +48,20 @@ pub fn InboxView(
 
     let username = session.read().username.clone();
 
+    let q = search_query.read().to_lowercase();
+    let filtered_messages: Vec<MessageEnvelope> = messages
+        .read()
+        .iter()
+        .filter(|env| {
+            if q.is_empty() {
+                true
+            } else {
+                env.subject.to_lowercase().contains(&q) || env.sender.to_lowercase().contains(&q)
+            }
+        })
+        .cloned()
+        .collect();
+
     rsx! {
         div {
             style: "display: flex; flex-direction: column; gap: 1rem;",
@@ -55,13 +70,13 @@ pub fn InboxView(
             div {
                 style: "border: 2px solid #0a0a0a; background: #fff; padding: 1rem; box-shadow: 4px 4px 0 #0a0a0a; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.8rem;",
                 div {
-                    style: "display: flex; align-items: center; gap: 0.8rem;",
+                    style: "display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;",
                     span {
                         style: "background: #0a0a0a; color: #fff; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.85rem;",
                         "CONTA: {username}"
                     }
                     div {
-                        style: "display: flex; gap: 0.4rem;",
+                        style: "display: flex; gap: 0.4rem; flex-wrap: wrap;",
                         for mb in mailboxes.read().iter() {
                             {
                                 let is_active = *current_mailbox.read() == mb.name;
@@ -111,16 +126,39 @@ pub fn InboxView(
                 }
             }
 
+            // Barra de Busca Rápida
+            div {
+                style: "border: 2px solid #0a0a0a; background: #fff; padding: 0.6rem 0.8rem; box-shadow: 3px 3px 0 #0a0a0a; display: flex; align-items: center; gap: 0.5rem;",
+                span { style: "color: #dc143c; font-weight: bold;", "🔍" }
+                input {
+                    style: "border: none; outline: none; width: 100%; font-family: monospace; font-size: 0.95rem; background: transparent; color: #0a0a0a;",
+                    placeholder: "Pesquisar por assunto ou remetente...",
+                    value: "{search_query.read()}",
+                    oninput: move |e| search_query.set(e.value()),
+                }
+                if !search_query.read().is_empty() {
+                    button {
+                        style: "background: none; border: none; cursor: pointer; color: #888; font-weight: bold; font-family: monospace;",
+                        onclick: move |_| search_query.set(String::new()),
+                        "✕"
+                    }
+                }
+            }
+
             // Lista de Mensagens
             div {
                 style: "display: flex; flex-direction: column; gap: 0.6rem;",
-                if messages.read().is_empty() {
+                if filtered_messages.is_empty() {
                     div {
                         style: "border: 2px dashed #666; background: #fff; padding: 2rem; text-align: center; color: #555;",
-                        "Nenhuma mensagem encontrada na caixa postal."
+                        if search_query.read().is_empty() {
+                            "Nenhuma mensagem encontrada na caixa postal."
+                        } else {
+                            "Nenhuma mensagem corresponde à pesquisa."
+                        }
                     }
                 }
-                for env in messages.read().iter() {
+                for env in filtered_messages.iter() {
                     {
                         let uid = env.uid;
                         let unread = !env.is_read;

@@ -29,4 +29,17 @@ pub trait MailBackend: Send + Sync {
         uid: u32,
     ) -> Result<Message, BackendError>;
     async fn send_message(&self, username: &str, form: &ComposeForm) -> Result<(), BackendError>;
+    async fn mark_message_read(
+        &self,
+        username: &str,
+        mailbox: &str,
+        uid: u32,
+        read: bool,
+    ) -> Result<(), BackendError>;
+    async fn delete_message(
+        &self,
+        username: &str,
+        mailbox: &str,
+        uid: u32,
+    ) -> Result<(), BackendError>;
 }
