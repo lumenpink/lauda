@@ -148,3 +148,82 @@ async fn test_hermetic_maildir_lifecycle() {
     let trash_after_del = backend.list_messages("testuser", "Trash").await.unwrap();
     assert!(trash_after_del.is_empty());
 }
+
+#[tokio::test]
+async fn test_hermetic_maildir_flag_move_and_attachments() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+
+    std::fs::create_dir_all(root.join("cur")).unwrap();
+    std::fs::create_dir_all(root.join("new")).unwrap();
+    std::fs::create_dir_all(root.join(".Archive").join("cur")).unwrap();
+
+    // Mensagem MIME com anexo em cur/
+    let mime_msg = "From: remetente@2lp.in\n\
+To: hi@lumen.pink\n\
+Cc: team@2lp.in\n\
+Subject: Proposta com Anexo\n\
+Date: Mon, 05 Oct 2026 14:00:00 +0000\n\
+MIME-Version: 1.0\n\
+Content-Type: multipart/mixed; boundary=\"BOUNDARY123\"\n\
+\n\
+--BOUNDARY123\n\
+Content-Type: text/plain; charset=utf-8\n\
+\n\
+Segue proposta anexada.\n\
+\n\
+--BOUNDARY123\n\
+Content-Type: application/pdf; name=\"proposta.pdf\"\n\
+Content-Disposition: attachment; filename=\"proposta.pdf\"\n\
+Content-Transfer-Encoding: base64\n\
+\n\
+SGVsbG8gTGF1ZGEh\n\
+--BOUNDARY123--\n";
+
+    let msg_filename = "1728000001.M999P888.test:2,";
+    std::fs::write(root.join("cur").join(msg_filename), mime_msg).unwrap();
+
+    let uidlist_content =
+        "3 V1790640297 N2 Ga836741ba900bb6a090600002f3acf59\n200 :1728000001.M999P888.test\n";
+    std::fs::write(root.join("dovecot-uidlist"), uidlist_content).unwrap();
+
+    let backend = MaildirBackend::new(root);
+    backend.add_user("testuser", "senha123");
+
+    // 1. Obter detalhes e verificar anexo e CC
+    let full = backend.get_message("testuser", "INBOX", 200).await.unwrap();
+    assert_eq!(full.envelope.subject, "Proposta com Anexo");
+    assert_eq!(full.envelope.cc.as_deref(), Some("team@2lp.in"));
+    assert_eq!(full.attachments.len(), 1);
+    assert_eq!(full.attachments[0].filename, "proposta.pdf");
+    assert_eq!(full.attachments[0].content_type, "application/pdf");
+
+    // 2. Extrair anexo diretamente
+    let (att_name, att_type, att_bytes) = backend
+        .get_attachment("testuser", "INBOX", 200, 0)
+        .await
+        .unwrap();
+    assert_eq!(att_name, "proposta.pdf");
+    assert_eq!(att_type, "application/pdf");
+    assert_eq!(att_bytes, b"Hello Lauda!");
+
+    // 3. Marcar como Favorito (Flagged)
+    backend
+        .mark_message_flagged("testuser", "INBOX", 200, true)
+        .await
+        .unwrap();
+    let msgs = backend.list_messages("testuser", "INBOX").await.unwrap();
+    assert!(msgs[0].is_flagged);
+
+    // 4. Mover para a pasta Archive
+    backend
+        .move_message("testuser", "INBOX", "Archive", 200)
+        .await
+        .unwrap();
+    let inbox_after = backend.list_messages("testuser", "INBOX").await.unwrap();
+    assert!(inbox_after.is_empty());
+
+    let archive_after = backend.list_messages("testuser", "Archive").await.unwrap();
+    assert_eq!(archive_after.len(), 1);
+    assert_eq!(archive_after[0].subject, "Proposta com Anexo");
+}

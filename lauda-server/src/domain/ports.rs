@@ -42,4 +42,25 @@ pub trait MailBackend: Send + Sync {
         mailbox: &str,
         uid: u32,
     ) -> Result<(), BackendError>;
+    async fn mark_message_flagged(
+        &self,
+        username: &str,
+        mailbox: &str,
+        uid: u32,
+        flagged: bool,
+    ) -> Result<(), BackendError>;
+    async fn move_message(
+        &self,
+        username: &str,
+        src_box: &str,
+        dest_box: &str,
+        uid: u32,
+    ) -> Result<(), BackendError>;
+    async fn get_attachment(
+        &self,
+        username: &str,
+        mailbox: &str,
+        uid: u32,
+        attachment_id: usize,
+    ) -> Result<(String, String, Vec<u8>), BackendError>;
 }

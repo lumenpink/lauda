@@ -46,6 +46,7 @@ fn test_message_envelope_roundtrip() {
         date: "2026-10-01T20:00:00Z".to_string(),
         is_read: false,
         is_flagged: true,
+        cc: None,
     };
     let json = serde_json::to_string(&envelope).unwrap();
     let decoded: MessageEnvelope = serde_json::from_str(&json).unwrap();
@@ -62,10 +63,17 @@ fn test_message_with_optional_bodies() {
             date: "2026-10-01T21:00:00Z".to_string(),
             is_read: true,
             is_flagged: false,
+            cc: Some("equipe@2lp.in".to_string()),
         },
         txt_auto: Some("# Titulo\nTexto limpo.".to_string()),
         txt_original: Some("Titulo\nTexto limpo.".to_string()),
         html_sanitized: Some("<h1>Titulo</h1><p>Texto limpo.</p>".to_string()),
+        attachments: vec![lauda_types::AttachmentMeta {
+            id: 0,
+            filename: "relatorio.pdf".to_string(),
+            content_type: "application/pdf".to_string(),
+            size_bytes: 1024,
+        }],
     };
     let json = serde_json::to_string(&msg).unwrap();
     let decoded: Message = serde_json::from_str(&json).unwrap();

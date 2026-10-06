@@ -11,7 +11,9 @@ pub fn ComposeView(
     screen: Signal<Screen>,
     session: Signal<SessionConfig>,
     reply_to: Option<String>,
+    reply_cc: Option<String>,
     reply_subject: Option<String>,
+    initial_body: Option<String>,
     current_mailbox: Signal<String>,
     messages: Signal<Vec<MessageEnvelope>>,
 ) -> Element {
@@ -24,9 +26,9 @@ pub fn ComposeView(
 
     let mut from_input = use_signal(|| sender_address);
     let mut to_input = use_signal(|| reply_to.unwrap_or_default());
-    let mut cc_input = use_signal(String::new);
+    let mut cc_input = use_signal(|| reply_cc.unwrap_or_default());
     let mut subject_input = use_signal(|| reply_subject.unwrap_or_default());
-    let mut body_input = use_signal(String::new);
+    let mut body_input = use_signal(|| initial_body.unwrap_or_default());
 
     let mut is_sending = use_signal(|| false);
     let mut error_msg = use_signal(|| None::<String>);

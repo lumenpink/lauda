@@ -217,4 +217,137 @@ impl MailApiClient for HttpApiClient {
             ))),
         }
     }
+
+    async fn mark_flagged(
+        &self,
+        token: &str,
+        mailbox: &str,
+        uid: u32,
+        flagged: bool,
+    ) -> Result<(), ClientError> {
+        let url = format!(
+            "{}/messages/{}/flag?box={}&flagged={}",
+            self.base_url, uid, mailbox, flagged
+        );
+        let headers = Self::auth_headers(token)?;
+        let resp = self
+            .client
+            .patch(&url)
+            .headers(headers)
+            .send()
+            .await
+            .map_err(|e| ClientError::Network(e.to_string()))?;
+
+        match resp.status() {
+            StatusCode::OK | StatusCode::NO_CONTENT => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(ClientError::AuthFailed),
+            StatusCode::NOT_FOUND => Err(ClientError::NotFound),
+            status => Err(ClientError::Network(format!(
+                "Erro ao alterar status de favorito: {}",
+                status
+            ))),
+        }
+    }
+
+    async fn move_message(
+        &self,
+        token: &str,
+        uid: u32,
+        src_box: &str,
+        dest_box: &str,
+    ) -> Result<(), ClientError> {
+        let url = format!(
+            "{}/messages/{}/move?src={}&dest={}",
+            self.base_url, uid, src_box, dest_box
+        );
+        let headers = Self::auth_headers(token)?;
+        let resp = self
+            .client
+            .post(&url)
+            .headers(headers)
+            .send()
+            .await
+            .map_err(|e| ClientError::Network(e.to_string()))?;
+
+        match resp.status() {
+            StatusCode::OK | StatusCode::NO_CONTENT => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(ClientError::AuthFailed),
+            StatusCode::NOT_FOUND => Err(ClientError::NotFound),
+            status => Err(ClientError::Network(format!(
+                "Erro ao mover mensagem: {}",
+                status
+            ))),
+        }
+    }
+
+    fn attachment_url(&self, mailbox: &str, uid: u32, attachment_id: usize) -> String {
+        format!(
+            "{}/messages/{}/attachments/{}?box={}",
+            self.base_url, uid, attachment_id, mailbox
+        )
+    }
+
+    async fn fetch_attachment(
+        &self,
+        token: &str,
+        mailbox: &str,
+        uid: u32,
+        attachment_id: usize,
+    ) -> Result<(String, String, Vec<u8>), ClientError> {
+        let url = self.attachment_url(mailbox, uid, attachment_id);
+        let headers = Self::auth_headers(token)?;
+        let resp = self
+            .client
+            .get(&url)
+            .headers(headers)
+            .send()
+            .await
+            .map_err(|e| ClientError::Network(e.to_string()))?;
+
+        if resp.status() == StatusCode::UNAUTHORIZED {
+            return Err(ClientError::AuthFailed);
+        }
+        if resp.status() == StatusCode::NOT_FOUND {
+            return Err(ClientError::NotFound);
+        }
+        if !resp.status().is_success() {
+            return Err(ClientError::Network(format!(
+                "Erro ao baixar anexo: status {}",
+                resp.status()
+            )));
+        }
+
+        let content_type = resp
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("application/octet-stream")
+            .to_string();
+
+        let filename = resp
+            .headers()
+            .get(reqwest::header::CONTENT_DISPOSITION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|cd| {
+                if let Some(pos) = cd.find("filename=\"") {
+                    let rest = &cd[pos + 10..];
+                    rest.split('"').next()
+                } else if let Some(pos) = cd.find("filename=") {
+                    let rest = &cd[pos + 9..];
+                    rest.split(';').next()
+                } else {
+                    None
+                }
+            })
+            .unwrap_or("anexo")
+            .to_string();
+
+        let bytes = resp
+            .bytes()
+            .await
+            .map_err(|e| ClientError::Network(format!("Erro ao ler bytes do anexo: {}", e)))?
+            .to_vec();
+
+        Ok((filename, content_type, bytes))
+    }
 }

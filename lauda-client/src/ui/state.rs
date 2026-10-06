@@ -8,9 +8,11 @@ pub enum Screen {
     Inbox,
     /// Visualizador trifocal de mensagem aberta.
     MessageDetail(u32),
-    /// Redação de nova mensagem ou resposta.
+    /// Redação de nova mensagem, resposta ou encaminhamento.
     Compose {
         reply_to: Option<String>,
+        reply_cc: Option<String>,
         reply_subject: Option<String>,
+        initial_body: Option<String>,
     },
 }

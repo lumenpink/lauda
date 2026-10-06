@@ -6,4 +6,4 @@ pub mod message;
 pub use auth::{LoginRequest, TokenResponse};
 pub use compose::ComposeForm;
 pub use mailbox::MailboxInfo;
-pub use message::{Message, MessageEnvelope, ViewMode};
+pub use message::{AttachmentMeta, Message, MessageEnvelope, ViewMode};

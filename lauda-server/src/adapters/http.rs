@@ -28,15 +28,25 @@ impl FromRequestParts<AppState> for AuthUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        let auth_header = parts
+        let token = if let Some(auth_header) = parts
             .headers
             .get(axum::http::header::AUTHORIZATION)
             .and_then(|value| value.to_str().ok())
-            .ok_or((StatusCode::UNAUTHORIZED, "Header de autorização ausente"))?;
-
-        let token = auth_header
-            .strip_prefix("Bearer ")
-            .ok_or((StatusCode::UNAUTHORIZED, "Formato do token inválido"))?;
+        {
+            auth_header
+                .strip_prefix("Bearer ")
+                .ok_or((StatusCode::UNAUTHORIZED, "Formato do token inválido"))?
+        } else if let Some(query) = parts.uri.query() {
+            query
+                .split('&')
+                .find_map(|pair| pair.strip_prefix("token="))
+                .ok_or((
+                    StatusCode::UNAUTHORIZED,
+                    "Header de autorização ou token ausente",
+                ))?
+        } else {
+            return Err((StatusCode::UNAUTHORIZED, "Header de autorização ausente"));
+        };
 
         let username = verify_token(token, &state.jwt_secret)
             .map_err(|_| (StatusCode::UNAUTHORIZED, "Token inválido ou expirado"))?;
@@ -162,6 +172,83 @@ async fn delete_message_handler(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[derive(Debug, Deserialize)]
+pub struct MarkFlagQuery {
+    pub r#box: Option<String>,
+    pub flagged: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MoveMessageQuery {
+    pub src: Option<String>,
+    pub dest: String,
+}
+
+async fn mark_flag_handler(
+    State(state): State<AppState>,
+    AuthUser(username): AuthUser,
+    Path(uid): Path<u32>,
+    Query(query): Query<MarkFlagQuery>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mailbox = query.r#box.as_deref().unwrap_or("INBOX");
+    let flagged = query.flagged.unwrap_or(true);
+    state
+        .backend
+        .mark_message_flagged(&username, mailbox, uid, flagged)
+        .await
+        .map_err(|e| match e {
+            BackendError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
+            other => (StatusCode::INTERNAL_SERVER_ERROR, other.to_string()),
+        })?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn move_message_handler(
+    State(state): State<AppState>,
+    AuthUser(username): AuthUser,
+    Path(uid): Path<u32>,
+    Query(query): Query<MoveMessageQuery>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let src = query.src.as_deref().unwrap_or("INBOX");
+    state
+        .backend
+        .move_message(&username, src, &query.dest, uid)
+        .await
+        .map_err(|e| match e {
+            BackendError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
+            other => (StatusCode::INTERNAL_SERVER_ERROR, other.to_string()),
+        })?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn get_attachment_handler(
+    State(state): State<AppState>,
+    AuthUser(username): AuthUser,
+    Path((uid, att_id)): Path<(u32, usize)>,
+    Query(query): Query<MessagesQuery>,
+) -> Result<axum::response::Response, (StatusCode, String)> {
+    let mailbox = query.r#box.as_deref().unwrap_or("INBOX");
+    let (filename, content_type, bytes) = state
+        .backend
+        .get_attachment(&username, mailbox, uid, att_id)
+        .await
+        .map_err(|e| match e {
+            BackendError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
+            other => (StatusCode::INTERNAL_SERVER_ERROR, other.to_string()),
+        })?;
+
+    let mut response = axum::response::Response::new(axum::body::Body::from(bytes));
+    let headers = response.headers_mut();
+    if let Ok(val) = axum::http::HeaderValue::from_str(&content_type) {
+        headers.insert(axum::http::header::CONTENT_TYPE, val);
+    }
+    let disp = format!("attachment; filename=\"{}\"", filename);
+    if let Ok(val) = axum::http::HeaderValue::from_str(&disp) {
+        headers.insert(axum::http::header::CONTENT_DISPOSITION, val);
+    }
+    Ok(response)
+}
+
 async fn compose_handler(
     State(state): State<AppState>,
     AuthUser(username): AuthUser,
@@ -192,6 +279,15 @@ pub fn app_router(backend: Arc<dyn MailBackend>, jwt_secret: impl Into<String>) 
         .route(
             "/messages/{uid}/read",
             patch(mark_read_handler).post(mark_read_handler),
+        )
+        .route(
+            "/messages/{uid}/flag",
+            patch(mark_flag_handler).post(mark_flag_handler),
+        )
+        .route("/messages/{uid}/move", post(move_message_handler))
+        .route(
+            "/messages/{uid}/attachments/{id}",
+            get(get_attachment_handler),
         )
         .route("/compose", post(compose_handler))
         .with_state(state)

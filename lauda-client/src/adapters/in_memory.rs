@@ -124,4 +124,70 @@ impl MailApiClient for InMemoryApiClient {
         }
         Err(ClientError::NotFound)
     }
+
+    async fn mark_flagged(
+        &self,
+        _token: &str,
+        mailbox: &str,
+        uid: u32,
+        flagged: bool,
+    ) -> Result<(), ClientError> {
+        let mut msgs = self.messages.write().unwrap();
+        if let Some(box_msgs) = msgs.get_mut(mailbox)
+            && let Some(msg) = box_msgs.iter_mut().find(|m| m.envelope.uid == uid)
+        {
+            msg.envelope.is_flagged = flagged;
+            return Ok(());
+        }
+        Err(ClientError::NotFound)
+    }
+
+    async fn move_message(
+        &self,
+        _token: &str,
+        uid: u32,
+        src_box: &str,
+        dest_box: &str,
+    ) -> Result<(), ClientError> {
+        let mut msgs = self.messages.write().unwrap();
+        let msg = {
+            let Some(box_msgs) = msgs.get_mut(src_box) else {
+                return Err(ClientError::NotFound);
+            };
+            let Some(pos) = box_msgs.iter().position(|m| m.envelope.uid == uid) else {
+                return Err(ClientError::NotFound);
+            };
+            box_msgs.remove(pos)
+        };
+        msgs.entry(dest_box.to_string()).or_default().push(msg);
+        Ok(())
+    }
+
+    fn attachment_url(&self, mailbox: &str, uid: u32, attachment_id: usize) -> String {
+        format!("in-memory://{mailbox}/{uid}/{attachment_id}")
+    }
+
+    async fn fetch_attachment(
+        &self,
+        _token: &str,
+        mailbox: &str,
+        uid: u32,
+        attachment_id: usize,
+    ) -> Result<(String, String, Vec<u8>), ClientError> {
+        let msgs = self.messages.read().unwrap();
+        let Some(box_msgs) = msgs.get(mailbox) else {
+            return Err(ClientError::NotFound);
+        };
+        let Some(msg) = box_msgs.iter().find(|m| m.envelope.uid == uid) else {
+            return Err(ClientError::NotFound);
+        };
+        let Some(meta) = msg.attachments.get(attachment_id) else {
+            return Err(ClientError::NotFound);
+        };
+        Ok((
+            meta.filename.clone(),
+            meta.content_type.clone(),
+            b"dummy content".to_vec(),
+        ))
+    }
 }

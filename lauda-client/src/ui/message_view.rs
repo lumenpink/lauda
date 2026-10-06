@@ -36,11 +36,36 @@ pub fn MessageView(
     let message = msg.unwrap();
     let envelope = message.envelope.clone();
     let sender_for_reply = envelope.sender.clone();
+    let cc_for_reply = envelope.cc.clone();
     let subject_for_reply = if envelope.subject.starts_with("Re:") {
         envelope.subject.clone()
     } else {
         format!("Re: {}", envelope.subject)
     };
+    let subject_for_forward = if envelope.subject.starts_with("Fwd:") {
+        envelope.subject.clone()
+    } else {
+        format!("Fwd: {}", envelope.subject)
+    };
+
+    let body_quote_source = message
+        .txt_original
+        .as_deref()
+        .or(message.txt_auto.as_deref())
+        .unwrap_or("");
+    let quoted_lines = body_quote_source
+        .lines()
+        .map(|l| format!("> {}", l))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let reply_body = format!(
+        "\n\nEm {}, {} escreveu:\n{}",
+        envelope.date, envelope.sender, quoted_lines
+    );
+    let forward_body = format!(
+        "\n\n---------- Mensagem Encaminhada ----------\nDe: {}\nData: {}\nAssunto: {}\n\n{}",
+        envelope.sender, envelope.date, envelope.subject, body_quote_source
+    );
 
     let handle_toggle_read = move |_| {
         let sess = session.read().clone();
@@ -63,6 +88,57 @@ pub fn MessageView(
                     if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
                         m.is_read = new_read;
                     }
+                }
+            });
+        }
+    };
+
+    let handle_toggle_flag = move |_| {
+        let sess = session.read().clone();
+        let box_name = current_mailbox.read().clone();
+        if let Some(token) = sess.token
+            && let Some(current) = active_message.read().clone()
+        {
+            let uid = current.envelope.uid;
+            let new_flagged = !current.envelope.is_flagged;
+            spawn(async move {
+                let client = HttpApiClient::new(sess.server_url);
+                if client
+                    .mark_flagged(&token, &box_name, uid, new_flagged)
+                    .await
+                    .is_ok()
+                {
+                    if let Some(m) = active_message.write().as_mut() {
+                        m.envelope.is_flagged = new_flagged;
+                    }
+                    if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
+                        m.is_flagged = new_flagged;
+                    }
+                }
+            });
+        }
+    };
+
+    let handle_archive = move |_| {
+        let sess = session.read().clone();
+        let box_name = current_mailbox.read().clone();
+        if let Some(token) = sess.token
+            && let Some(current) = active_message.read().clone()
+        {
+            let uid = current.envelope.uid;
+            spawn(async move {
+                let client = HttpApiClient::new(sess.server_url.clone());
+                if client
+                    .move_message(&token, uid, &box_name, "Archive")
+                    .await
+                    .is_ok()
+                {
+                    messages.write().retain(|m| m.uid != uid);
+                    active_message.set(None);
+                    if let Ok(boxes) = client.list_mailboxes(&token).await {
+                        mailboxes.set(boxes);
+                    }
+                    screen.set(Screen::Inbox);
                 }
             });
         }
@@ -92,11 +168,44 @@ pub fn MessageView(
 
     let rendered_markdown_html = parse_markdown_to_html(&txt_auto_body);
 
+    let server_url = session.read().server_url.clone();
+    let token_opt = session.read().token.clone();
+    let current_box_name = current_mailbox.read().clone();
+
+    let formatted_attachments: Vec<(usize, String, String, String, String)> = message
+        .attachments
+        .iter()
+        .map(|att| {
+            let size_kb = (att.size_bytes as f64 / 1024.0).max(0.1);
+            let size_str = if size_kb > 1024.0 {
+                format!("{:.1} MB", size_kb / 1024.0)
+            } else {
+                format!("{:.1} KB", size_kb)
+            };
+            let token_param = if let Some(ref t) = token_opt {
+                format!("&token={}", t)
+            } else {
+                String::new()
+            };
+            let dl_url = format!(
+                "{}/messages/{}/attachments/{}?box={}{}",
+                server_url, envelope.uid, att.id, current_box_name, token_param
+            );
+            (
+                att.id,
+                att.filename.clone(),
+                att.content_type.clone(),
+                size_str,
+                dl_url,
+            )
+        })
+        .collect();
+
     rsx! {
         div {
             style: "display: flex; flex-direction: column; gap: 1rem;",
 
-            // Barra de Navegação e Alternador Trifocal
+            // Barra de Navegação e Ações Rápidas
             div {
                 style: "border: 2px solid #0a0a0a; background: #fff; padding: 0.8rem 1rem; box-shadow: 4px 4px 0 #0a0a0a; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.8rem;",
                 div {
@@ -108,11 +217,58 @@ pub fn MessageView(
                     }
                     button {
                         style: "background: #dc143c; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
-                        onclick: move |_| screen.set(Screen::Compose {
-                            reply_to: Some(sender_for_reply.clone()),
-                            reply_subject: Some(subject_for_reply.clone()),
-                        }),
+                        onclick: {
+                            let s_rep = sender_for_reply.clone();
+                            let sub_rep = subject_for_reply.clone();
+                            let b_rep = reply_body.clone();
+                            move |_| screen.set(Screen::Compose {
+                                reply_to: Some(s_rep.clone()),
+                                reply_cc: None,
+                                reply_subject: Some(sub_rep.clone()),
+                                initial_body: Some(b_rep.clone()),
+                            })
+                        },
                         "RESPONDER"
+                    }
+                    button {
+                        style: "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer;",
+                        onclick: {
+                            let s_rep = sender_for_reply.clone();
+                            let cc_rep = cc_for_reply.clone();
+                            let sub_rep = subject_for_reply.clone();
+                            let b_rep = reply_body.clone();
+                            move |_| screen.set(Screen::Compose {
+                                reply_to: Some(s_rep.clone()),
+                                reply_cc: cc_rep.clone(),
+                                reply_subject: Some(sub_rep.clone()),
+                                initial_body: Some(b_rep.clone()),
+                            })
+                        },
+                        "RESP. TODOS"
+                    }
+                    button {
+                        style: "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer;",
+                        onclick: {
+                            let sub_fwd = subject_for_forward.clone();
+                            let b_fwd = forward_body.clone();
+                            move |_| screen.set(Screen::Compose {
+                                reply_to: None,
+                                reply_cc: None,
+                                reply_subject: Some(sub_fwd.clone()),
+                                initial_body: Some(b_fwd.clone()),
+                            })
+                        },
+                        "ENCAMINHAR"
+                    }
+                    button {
+                        style: "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer;",
+                        onclick: handle_toggle_flag,
+                        if envelope.is_flagged { "★ FAVORITO" } else { "☆ MARCAR" }
+                    }
+                    button {
+                        style: "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer;",
+                        onclick: handle_archive,
+                        "📦 ARQUIVAR"
                     }
                     button {
                         style: "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer;",
@@ -144,6 +300,7 @@ pub fn MessageView(
                     style: "display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;",
                     h2 {
                         style: "font-size: 1.3rem; margin: 0; color: #0a0a0a; font-weight: bold;",
+                        if envelope.is_flagged { "★ " } else { "" }
                         "{envelope.subject}"
                     }
                     span {
@@ -154,6 +311,9 @@ pub fn MessageView(
                 div {
                     style: "font-size: 0.9rem; color: #333; display: flex; flex-direction: column; gap: 0.2rem;",
                     div { span { style: "font-weight: bold; color: #0a0a0a;", "DE: " } "{envelope.sender}" }
+                    if let Some(cc) = envelope.cc.as_ref() {
+                        div { span { style: "font-weight: bold; color: #0a0a0a;", "CC: " } "{cc}" }
+                    }
                     div { span { style: "font-weight: bold; color: #0a0a0a;", "DATA: " } "{envelope.date}" }
                     div {
                         style: "margin-top: 0.3rem; font-size: 0.8rem; font-weight: bold; color: #8b0000;",
@@ -184,6 +344,40 @@ pub fn MessageView(
                             dangerous_inner_html: "{html_body}",
                         }
                     },
+                }
+            }
+
+            // Bloco de Anexos
+            if !message.attachments.is_empty() {
+                div {
+                    style: "border: 2px solid #0a0a0a; background: #fff; padding: 1rem; box-shadow: 4px 4px 0 #0a0a0a;",
+                    div {
+                        style: "font-weight: bold; font-size: 0.9rem; color: #0a0a0a; margin-bottom: 0.8rem; border-bottom: 1px solid #0a0a0a; padding-bottom: 0.4rem; display: flex; align-items: center; gap: 0.4rem;",
+                        span { "📎 ANEXOS (" }
+                        span { style: "color: #dc143c;", "{message.attachments.len()}" }
+                        span { ")" }
+                    }
+                    div {
+                        style: "display: flex; flex-direction: column; gap: 0.5rem;",
+                        for (id, filename, content_type, size_str, dl_url) in &formatted_attachments {
+                            div {
+                                key: "{id}",
+                                style: "display: flex; justify-content: space-between; align-items: center; background: #faf9f6; border: 1px solid #0a0a0a; padding: 0.5rem 0.8rem;",
+                                div {
+                                    style: "display: flex; flex-direction: column;",
+                                    span { style: "font-weight: bold; font-size: 0.9rem; color: #0a0a0a;", "{filename}" }
+                                    span { style: "font-size: 0.75rem; color: #666;", "{content_type} • {size_str}" }
+                                }
+                                a {
+                                    href: "{dl_url}",
+                                    target: "_blank",
+                                    download: "{filename}",
+                                    style: "background: #0a0a0a; color: #fff; text-decoration: none; padding: 0.3rem 0.7rem; font-size: 0.8rem; font-weight: bold; border: 1px solid #0a0a0a; box-shadow: 2px 2px 0 #dc143c; white-space: nowrap;",
+                                    "BAIXAR"
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

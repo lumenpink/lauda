@@ -4,7 +4,7 @@ use std::sync::RwLock;
 
 use async_trait::async_trait;
 use lauda_types::{ComposeForm, MailboxInfo, Message, MessageEnvelope};
-use mail_parser::{Address, MessageParser};
+use mail_parser::{Address, MessageParser, MimeHeaders};
 
 use crate::domain::ports::{BackendError, MailBackend};
 
@@ -35,6 +35,7 @@ impl MaildirBackend {
             "DRAFTS" => self.base_dir.join(".Drafts"),
             "TRASH" => self.base_dir.join(".Trash"),
             "JUNK" | "SPAM" => self.base_dir.join(".Junk"),
+            "ARCHIVE" => self.base_dir.join(".Archive"),
             "ALL" => self.base_dir.join(".All"),
             other => {
                 let custom = self.base_dir.join(format!(".{}", other));
@@ -270,6 +271,7 @@ impl MailBackend for MaildirBackend {
             ("Drafts", self.base_dir.join(".Drafts")),
             ("Trash", self.base_dir.join(".Trash")),
             ("Junk", self.base_dir.join(".Junk")),
+            ("Archive", self.base_dir.join(".Archive")),
         ];
 
         for (name, path) in candidates {
@@ -358,6 +360,7 @@ impl MailBackend for MaildirBackend {
                             "2026-10-05T00:00:00Z".to_string()
                         });
 
+                        let cc = parsed.cc().map(Self::format_address);
                         envelopes.push(MessageEnvelope {
                             uid,
                             subject,
@@ -365,6 +368,7 @@ impl MailBackend for MaildirBackend {
                             date,
                             is_read,
                             is_flagged,
+                            cc,
                         });
                     }
                 }
@@ -406,6 +410,7 @@ impl MailBackend for MaildirBackend {
             .date()
             .map(|d| d.to_rfc3339())
             .unwrap_or_else(|| "2026-10-05T00:00:00Z".to_string());
+        let cc = parsed.cc().map(Self::format_address);
 
         let envelope = MessageEnvelope {
             uid,
@@ -414,6 +419,7 @@ impl MailBackend for MaildirBackend {
             date,
             is_read,
             is_flagged,
+            cc,
         };
 
         let txt_original = parsed.body_text(0).map(|s| s.to_string());
@@ -429,11 +435,38 @@ impl MailBackend for MaildirBackend {
             })
         });
 
+        let attachments: Vec<lauda_types::AttachmentMeta> = parsed
+            .attachments()
+            .enumerate()
+            .map(|(idx, part)| {
+                let filename = part
+                    .attachment_name()
+                    .unwrap_or("anexo_sem_nome")
+                    .to_string();
+                let content_type = part
+                    .content_type()
+                    .map(|ct| match ct.subtype() {
+                        Some(sub) => format!("{}/{}", ct.c_type, sub),
+                        None => ct.c_type.to_string(),
+                    })
+                    .unwrap_or_else(|| "application/octet-stream".to_string());
+                let size_bytes = part.contents().len();
+
+                lauda_types::AttachmentMeta {
+                    id: idx,
+                    filename,
+                    content_type,
+                    size_bytes,
+                }
+            })
+            .collect();
+
         Ok(Message {
             envelope,
             txt_auto,
             txt_original,
             html_sanitized,
+            attachments,
         })
     }
 
@@ -532,5 +565,119 @@ impl MailBackend for MaildirBackend {
                 .map_err(|e| BackendError::Internal(e.to_string()))?;
         }
         Ok(())
+    }
+
+    async fn mark_message_flagged(
+        &self,
+        _username: &str,
+        mailbox: &str,
+        uid: u32,
+        flagged: bool,
+    ) -> Result<(), BackendError> {
+        let dir = self.resolve_mailbox_dir(mailbox)?;
+        let (file_path, filename, _, current_flagged) =
+            self.find_message_file(&dir, uid).ok_or_else(|| {
+                BackendError::NotFound(format!(
+                    "Mensagem UID {} não encontrada na caixa {}",
+                    uid, mailbox
+                ))
+            })?;
+
+        if current_flagged == flagged {
+            return Ok(());
+        }
+
+        let parts: Vec<&str> = filename.split(":2,").collect();
+        let base_name = parts[0];
+        let current_flags = if parts.len() > 1 { parts[1] } else { "" };
+
+        let mut flags_chars: Vec<char> = current_flags.chars().filter(|&c| c != 'F').collect();
+        if flagged {
+            flags_chars.push('F');
+        }
+        flags_chars.sort();
+        flags_chars.dedup();
+        let new_flags: String = flags_chars.into_iter().collect();
+
+        let new_filename = format!("{}:2,{}", base_name, new_flags);
+        let target_dir = file_path.parent().unwrap_or(&dir);
+        let new_path = target_dir.join(new_filename);
+
+        std::fs::rename(&file_path, &new_path)
+            .map_err(|e| BackendError::Internal(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn move_message(
+        &self,
+        _username: &str,
+        src_box: &str,
+        dest_box: &str,
+        uid: u32,
+    ) -> Result<(), BackendError> {
+        let src_dir = self.resolve_mailbox_dir(src_box)?;
+        let (file_path, filename, _, _) =
+            self.find_message_file(&src_dir, uid).ok_or_else(|| {
+                BackendError::NotFound(format!(
+                    "Mensagem UID {} não encontrada na caixa {}",
+                    uid, src_box
+                ))
+            })?;
+
+        let dest_dir = if dest_box.eq_ignore_ascii_case("INBOX") {
+            self.base_dir.clone()
+        } else {
+            self.base_dir.join(format!(".{}", dest_box))
+        };
+
+        let target_dir = dest_dir.join("cur");
+        std::fs::create_dir_all(&target_dir).map_err(|e| BackendError::Internal(e.to_string()))?;
+        let target_path = target_dir.join(&filename);
+        std::fs::rename(&file_path, &target_path)
+            .map_err(|e| BackendError::Internal(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn get_attachment(
+        &self,
+        _username: &str,
+        mailbox: &str,
+        uid: u32,
+        attachment_id: usize,
+    ) -> Result<(String, String, Vec<u8>), BackendError> {
+        let dir = self.resolve_mailbox_dir(mailbox)?;
+        let (file_path, _, _, _) = self.find_message_file(&dir, uid).ok_or_else(|| {
+            BackendError::NotFound(format!(
+                "Mensagem UID {} não encontrada na caixa {}",
+                uid, mailbox
+            ))
+        })?;
+
+        let bytes = std::fs::read(&file_path).map_err(|e| BackendError::Internal(e.to_string()))?;
+        let parsed = MessageParser::default().parse(&bytes).ok_or_else(|| {
+            BackendError::Internal("Falha ao analisar mensagem RFC 5322".to_string())
+        })?;
+
+        let part = parsed.attachments().nth(attachment_id).ok_or_else(|| {
+            BackendError::NotFound(format!(
+                "Anexo {} da mensagem UID {} não encontrado",
+                attachment_id, uid
+            ))
+        })?;
+
+        let filename = part
+            .attachment_name()
+            .unwrap_or("anexo_sem_nome")
+            .to_string();
+        let content_type = part
+            .content_type()
+            .map(|ct| match ct.subtype() {
+                Some(sub) => format!("{}/{}", ct.c_type, sub),
+                None => ct.c_type.to_string(),
+            })
+            .unwrap_or_else(|| "application/octet-stream".to_string());
+        let contents = part.contents().to_vec();
+
+        Ok((filename, content_type, contents))
     }
 }

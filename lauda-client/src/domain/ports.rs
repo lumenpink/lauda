@@ -40,6 +40,28 @@ pub trait MailApiClient: Send + Sync {
         uid: u32,
         read: bool,
     ) -> Result<(), ClientError>;
+    async fn mark_flagged(
+        &self,
+        token: &str,
+        mailbox: &str,
+        uid: u32,
+        flagged: bool,
+    ) -> Result<(), ClientError>;
+    async fn move_message(
+        &self,
+        token: &str,
+        uid: u32,
+        src_box: &str,
+        dest_box: &str,
+    ) -> Result<(), ClientError>;
+    fn attachment_url(&self, mailbox: &str, uid: u32, attachment_id: usize) -> String;
+    async fn fetch_attachment(
+        &self,
+        token: &str,
+        mailbox: &str,
+        uid: u32,
+        attachment_id: usize,
+    ) -> Result<(String, String, Vec<u8>), ClientError>;
     async fn delete_message(&self, token: &str, mailbox: &str, uid: u32)
     -> Result<(), ClientError>;
 }

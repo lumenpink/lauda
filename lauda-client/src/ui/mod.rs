@@ -155,12 +155,19 @@ pub fn App() -> Element {
                             current_view_mode,
                         }
                     },
-                    Screen::Compose { reply_to, reply_subject } => rsx! {
+                    Screen::Compose {
+                        reply_to,
+                        reply_cc,
+                        reply_subject,
+                        initial_body,
+                    } => rsx! {
                         ComposeView {
                             screen,
                             session,
                             reply_to,
+                            reply_cc,
                             reply_subject,
+                            initial_body,
                             current_mailbox,
                             messages,
                         }

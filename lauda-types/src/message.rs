@@ -33,8 +33,21 @@ impl ViewMode {
     }
 }
 
+/// Metadados resumidos de um anexo da mensagem.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct AttachmentMeta {
+    /// Identificador/índice do anexo na mensagem.
+    pub id: usize,
+    /// Nome original do arquivo.
+    pub filename: String,
+    /// Tipo MIME do anexo.
+    pub content_type: String,
+    /// Tamanho em bytes.
+    pub size_bytes: usize,
+}
+
 /// Metadados resumidos de uma mensagem para listagens de caixa de entrada.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct MessageEnvelope {
     /// Identificador estável IMAP (UID).
     pub uid: u32,
@@ -48,10 +61,13 @@ pub struct MessageEnvelope {
     pub is_read: bool,
     /// Flag booleana de mensagem marcada (\Flagged).
     pub is_flagged: bool,
+    /// Destinatários em cópia (CC).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cc: Option<String>,
 }
 
 /// Mensagem completa incluindo envelopes e representações de corpo.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Message {
     /// Envelope e cabeçalhos principais da mensagem.
     #[serde(flatten)]
@@ -65,4 +81,7 @@ pub struct Message {
     /// HTML sanitizado sem scripts ou rastreadores.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub html_sanitized: Option<String>,
+    /// Lista de anexos da mensagem.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<AttachmentMeta>,
 }

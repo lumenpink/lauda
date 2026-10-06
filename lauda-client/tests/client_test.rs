@@ -81,9 +81,11 @@ async fn test_in_memory_api_client() {
                 subject: "Teste".to_string(),
                 sender: "a@b.com".to_string(),
                 date: "2026-10-02T06:00:00Z".to_string(),
+                cc: None,
                 is_read: false,
                 is_flagged: false,
             },
+            attachments: Vec::new(),
             txt_auto: Some("# Teste".to_string()),
             txt_original: Some("Teste".to_string()),
             html_sanitized: None,
@@ -125,4 +127,53 @@ async fn test_in_memory_api_client() {
     assert!(del_res.is_ok());
     let list_after = client.list_messages(token, "INBOX").await.unwrap();
     assert!(list_after.is_empty());
+
+    // 7. Flagging
+    client.add_message(
+        "INBOX",
+        Message {
+            envelope: MessageEnvelope {
+                uid: 102,
+                subject: "Mensagem com Anexo".to_string(),
+                sender: "colleague@2lp.in".to_string(),
+                date: "2026-10-06T10:00:00Z".to_string(),
+                cc: Some("team@2lp.in".to_string()),
+                is_read: false,
+                is_flagged: false,
+            },
+            attachments: vec![lauda_types::AttachmentMeta {
+                id: 0,
+                filename: "relatorio.pdf".to_string(),
+                content_type: "application/pdf".to_string(),
+                size_bytes: 1024,
+            }],
+            txt_auto: Some("Veja o anexo.".to_string()),
+            txt_original: Some("Veja o anexo.".to_string()),
+            html_sanitized: None,
+        },
+    );
+
+    let flag_res = client.mark_flagged(token, "INBOX", 102, true).await;
+    assert!(flag_res.is_ok());
+    let flagged_msg = client.get_message(token, "INBOX", 102).await.unwrap();
+    assert!(flagged_msg.envelope.is_flagged);
+    assert_eq!(flagged_msg.envelope.cc.as_deref(), Some("team@2lp.in"));
+
+    // 8. Attachment Fetch
+    let (att_name, att_type, att_bytes) = client
+        .fetch_attachment(token, "INBOX", 102, 0)
+        .await
+        .unwrap();
+    assert_eq!(att_name, "relatorio.pdf");
+    assert_eq!(att_type, "application/pdf");
+    assert!(!att_bytes.is_empty());
+
+    // 9. Move Message
+    let move_res = client.move_message(token, 102, "INBOX", "Archive").await;
+    assert!(move_res.is_ok());
+    let inbox_msgs = client.list_messages(token, "INBOX").await.unwrap();
+    assert!(inbox_msgs.is_empty());
+    let archive_msgs = client.list_messages(token, "Archive").await.unwrap();
+    assert_eq!(archive_msgs.len(), 1);
+    assert_eq!(archive_msgs[0].uid, 102);
 }

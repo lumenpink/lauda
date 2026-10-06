@@ -148,4 +148,79 @@ impl MailBackend for InMemoryMailBackend {
             "Mensagem UID {uid} não encontrada"
         )))
     }
+
+    async fn mark_message_flagged(
+        &self,
+        username: &str,
+        mailbox: &str,
+        uid: u32,
+        flagged: bool,
+    ) -> Result<(), BackendError> {
+        let mut msgs = self.messages.write().unwrap();
+        if let Some(user_boxes) = msgs.get_mut(username)
+            && let Some(box_msgs) = user_boxes.get_mut(mailbox)
+            && let Some(msg) = box_msgs.iter_mut().find(|m| m.envelope.uid == uid)
+        {
+            msg.envelope.is_flagged = flagged;
+            return Ok(());
+        }
+        Err(BackendError::NotFound(format!(
+            "Mensagem UID {uid} não encontrada"
+        )))
+    }
+
+    async fn move_message(
+        &self,
+        username: &str,
+        src_box: &str,
+        dest_box: &str,
+        uid: u32,
+    ) -> Result<(), BackendError> {
+        let mut msgs = self.messages.write().unwrap();
+        if let Some(user_boxes) = msgs.get_mut(username) {
+            let msg_opt = if let Some(src_msgs) = user_boxes.get_mut(src_box) {
+                src_msgs
+                    .iter()
+                    .position(|m| m.envelope.uid == uid)
+                    .map(|pos| src_msgs.remove(pos))
+            } else {
+                None
+            };
+
+            if let Some(msg) = msg_opt {
+                user_boxes
+                    .entry(dest_box.to_string())
+                    .or_default()
+                    .push(msg);
+                return Ok(());
+            }
+        }
+        Err(BackendError::NotFound(format!(
+            "Mensagem UID {uid} não encontrada"
+        )))
+    }
+
+    async fn get_attachment(
+        &self,
+        username: &str,
+        mailbox: &str,
+        uid: u32,
+        attachment_id: usize,
+    ) -> Result<(String, String, Vec<u8>), BackendError> {
+        let msgs = self.messages.read().unwrap();
+        if let Some(user_boxes) = msgs.get(username)
+            && let Some(box_msgs) = user_boxes.get(mailbox)
+            && let Some(msg) = box_msgs.iter().find(|m| m.envelope.uid == uid)
+            && let Some(att) = msg.attachments.iter().find(|a| a.id == attachment_id)
+        {
+            return Ok((
+                att.filename.clone(),
+                att.content_type.clone(),
+                format!("Conteúdo simulado de {}", att.filename).into_bytes(),
+            ));
+        }
+        Err(BackendError::NotFound(format!(
+            "Anexo {attachment_id} da mensagem UID {uid} não encontrado"
+        )))
+    }
 }
