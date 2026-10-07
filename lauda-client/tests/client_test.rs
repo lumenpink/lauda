@@ -82,6 +82,7 @@ async fn test_in_memory_api_client() {
                 sender: "a@b.com".to_string(),
                 date: "2026-10-02T06:00:00Z".to_string(),
                 cc: None,
+                has_attachments: false,
                 is_read: false,
                 is_flagged: false,
             },
@@ -109,6 +110,7 @@ async fn test_in_memory_api_client() {
                 cc: None,
                 subject: "Envio".to_string(),
                 body: "Corpo".to_string(),
+                attachments: vec![],
             },
         )
         .await;
@@ -138,6 +140,7 @@ async fn test_in_memory_api_client() {
                 sender: "colleague@2lp.in".to_string(),
                 date: "2026-10-06T10:00:00Z".to_string(),
                 cc: Some("team@2lp.in".to_string()),
+                has_attachments: true,
                 is_read: false,
                 is_flagged: false,
             },
@@ -176,4 +179,10 @@ async fn test_in_memory_api_client() {
     let archive_msgs = client.list_messages(token, "Archive").await.unwrap();
     assert_eq!(archive_msgs.len(), 1);
     assert_eq!(archive_msgs[0].uid, 102);
+
+    // 10. List Contacts
+    let contacts = client.list_contacts(token).await.unwrap();
+    assert_eq!(contacts.len(), 2);
+    assert!(contacts.iter().any(|c| c.email == "colleague@2lp.in"));
+    assert!(contacts.iter().any(|c| c.email == "a@b.com"));
 }

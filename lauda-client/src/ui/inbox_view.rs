@@ -6,6 +6,15 @@ use crate::domain::ports::MailApiClient;
 use crate::domain::session::{SessionConfig, clear_session};
 use crate::ui::state::Screen;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum InboxFilter {
+    #[default]
+    All,
+    Unread,
+    Flagged,
+    Attachments,
+}
+
 #[component]
 pub fn InboxView(
     mut screen: Signal<Screen>,
@@ -17,6 +26,7 @@ pub fn InboxView(
 ) -> Element {
     let mut is_refreshing = use_signal(|| false);
     let mut search_query = use_signal(String::new);
+    let mut active_filter = use_signal(|| InboxFilter::All);
 
     let handle_refresh = move |_| {
         let sess = session.read().clone();
@@ -49,10 +59,20 @@ pub fn InboxView(
     let username = session.read().username.clone();
 
     let q = search_query.read().to_lowercase();
+    let current_filt = *active_filter.read();
     let filtered_messages: Vec<MessageEnvelope> = messages
         .read()
         .iter()
         .filter(|env| {
+            let matches_status = match current_filt {
+                InboxFilter::All => true,
+                InboxFilter::Unread => !env.is_read,
+                InboxFilter::Flagged => env.is_flagged,
+                InboxFilter::Attachments => env.has_attachments,
+            };
+            if !matches_status {
+                return false;
+            }
             if q.is_empty() {
                 true
             } else {
@@ -119,6 +139,11 @@ pub fn InboxView(
                         "+ NOVA MENSAGEM"
                     }
                     button {
+                        style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                        onclick: move |_| screen.set(Screen::Contacts),
+                        "👥 CONTATOS"
+                    }
+                    button {
                         style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer;",
                         onclick: handle_refresh,
                         if *is_refreshing.read() { "..." } else { "🔄" }
@@ -150,6 +175,47 @@ pub fn InboxView(
                 }
             }
 
+            // Barra de Filtros Rápidos (Pills)
+            div {
+                style: "display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;",
+                button {
+                    style: if *active_filter.read() == InboxFilter::All {
+                        "background: #0a0a0a; color: #fff; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #dc143c;"
+                    } else {
+                        "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: bold; cursor: pointer;"
+                    },
+                    onclick: move |_| active_filter.set(InboxFilter::All),
+                    "TODOS"
+                }
+                button {
+                    style: if *active_filter.read() == InboxFilter::Unread {
+                        "background: #0a0a0a; color: #fff; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #dc143c;"
+                    } else {
+                        "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: bold; cursor: pointer;"
+                    },
+                    onclick: move |_| active_filter.set(InboxFilter::Unread),
+                    "NÃO LIDOS"
+                }
+                button {
+                    style: if *active_filter.read() == InboxFilter::Flagged {
+                        "background: #0a0a0a; color: #fff; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #dc143c;"
+                    } else {
+                        "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: bold; cursor: pointer;"
+                    },
+                    onclick: move |_| active_filter.set(InboxFilter::Flagged),
+                    "★ FAVORITOS"
+                }
+                button {
+                    style: if *active_filter.read() == InboxFilter::Attachments {
+                        "background: #0a0a0a; color: #fff; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #dc143c;"
+                    } else {
+                        "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: bold; cursor: pointer;"
+                    },
+                    onclick: move |_| active_filter.set(InboxFilter::Attachments),
+                    "📎 COM ANEXOS"
+                }
+            }
+
             // Lista de Mensagens
             div {
                 style: "display: flex; flex-direction: column; gap: 0.6rem;",
@@ -157,9 +223,9 @@ pub fn InboxView(
                     div {
                         style: "border: 2px dashed #666; background: #fff; padding: 2rem; text-align: center; color: #555;",
                         if search_query.read().is_empty() {
-                            "Nenhuma mensagem encontrada na caixa postal."
+                            "Nenhuma mensagem corresponde aos filtros ativos."
                         } else {
-                            "Nenhuma mensagem corresponde à pesquisa."
+                            "Nenhuma mensagem corresponde à pesquisa e filtros."
                         }
                     }
                 }
@@ -167,6 +233,8 @@ pub fn InboxView(
                     {
                         let uid = env.uid;
                         let unread = !env.is_read;
+                        let is_flagged = env.is_flagged;
+                        let has_att = env.has_attachments;
                         let sender = env.sender.clone();
                         let subject = env.subject.clone();
                         let date = env.date.clone();
@@ -200,7 +268,16 @@ pub fn InboxView(
                                         }
                                         span { style: "font-weight: bold; font-size: 0.95rem; color: #0a0a0a;", "{sender}" }
                                     }
-                                    span { style: "font-size: 0.8rem; color: #666;", "{date}" }
+                                    div {
+                                        style: "display: flex; align-items: center; gap: 0.4rem;",
+                                        if has_att {
+                                            span { style: "font-size: 0.85rem; color: #444;", "📎" }
+                                        }
+                                        if is_flagged {
+                                            span { style: "color: #dc143c; font-size: 0.95rem; font-weight: bold;", "★" }
+                                        }
+                                        span { style: "font-size: 0.8rem; color: #666; margin-left: 0.3rem;", "{date}" }
+                                    }
                                 }
                                 div {
                                     style: "font-size: 1.05rem; font-weight: {font_weight}; color: #0a0a0a; margin-top: 0.2rem;",

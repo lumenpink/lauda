@@ -122,6 +122,7 @@ async fn test_hermetic_maildir_lifecycle() {
         cc: None,
         subject: "Resposta de Teste".to_string(),
         body: "Texto enviado.".to_string(),
+        attachments: vec![],
     };
     backend.send_message("testuser", &compose).await.unwrap();
     let sent_msgs = backend.list_messages("testuser", "Sent").await.unwrap();
@@ -226,4 +227,31 @@ SGVsbG8gTGF1ZGEh\n\
     let archive_after = backend.list_messages("testuser", "Archive").await.unwrap();
     assert_eq!(archive_after.len(), 1);
     assert_eq!(archive_after[0].subject, "Proposta com Anexo");
+
+    // 5. Listar contatos
+    let contacts = backend.list_contacts("testuser").await.unwrap();
+    assert_eq!(contacts.len(), 1);
+    assert_eq!(contacts[0].email, "remetente@2lp.in");
+
+    // 6. Enviar mensagem com anexo e CC
+    let compose_with_att = lauda_types::ComposeForm {
+        from: "testuser@2lp.in".to_string(),
+        to: "socio@empresa.com".to_string(),
+        cc: Some("diretoria@2lp.in".to_string()),
+        subject: "Contrato Assinado".to_string(),
+        body: "Segue em anexo o contrato em PDF.".to_string(),
+        attachments: vec![lauda_types::AttachmentUpload {
+            filename: "contrato.pdf".to_string(),
+            content_type: "application/pdf".to_string(),
+            data_base64: "SGVsbG8gTGF1ZGEh".to_string(),
+        }],
+    };
+    backend
+        .send_message("testuser", &compose_with_att)
+        .await
+        .unwrap();
+    let sent_msgs = backend.list_messages("testuser", "Sent").await.unwrap();
+    assert_eq!(sent_msgs.len(), 1);
+    assert_eq!(sent_msgs[0].subject, "Contrato Assinado");
+    assert!(sent_msgs[0].has_attachments);
 }

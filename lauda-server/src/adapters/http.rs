@@ -3,12 +3,15 @@ use std::sync::Arc;
 use axum::extract::{FromRequestParts, Path, Query, State};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::routing::{get, patch, post};
 use axum::{Json, Router};
 use lauda_types::{
-    ComposeForm, LoginRequest, MailboxInfo, Message, MessageEnvelope, TokenResponse,
+    ComposeForm, ContactInfo, LoginRequest, MailboxInfo, Message, MessageEnvelope, TokenResponse,
 };
 use serde::Deserialize;
+use tokio_stream::StreamExt;
+use tokio_stream::wrappers::BroadcastStream;
 
 use crate::auth::{create_token, verify_token};
 use crate::domain::{BackendError, MailBackend};
@@ -17,6 +20,7 @@ use crate::domain::{BackendError, MailBackend};
 pub struct AppState {
     pub backend: Arc<dyn MailBackend>,
     pub jwt_secret: String,
+    pub events_tx: tokio::sync::broadcast::Sender<String>,
 }
 
 pub struct AuthUser(pub String);
@@ -151,6 +155,10 @@ async fn mark_read_handler(
             BackendError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
             other => (StatusCode::INTERNAL_SERVER_ERROR, other.to_string()),
         })?;
+    let _ = state.events_tx.send(format!(
+        "{{\"event\":\"read_update\",\"box\":\"{}\",\"uid\":{}}}",
+        mailbox, uid
+    ));
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -169,6 +177,10 @@ async fn delete_message_handler(
             BackendError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
             other => (StatusCode::INTERNAL_SERVER_ERROR, other.to_string()),
         })?;
+    let _ = state.events_tx.send(format!(
+        "{{\"event\":\"delete\",\"box\":\"{}\",\"uid\":{}}}",
+        mailbox, uid
+    ));
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -200,6 +212,10 @@ async fn mark_flag_handler(
             BackendError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
             other => (StatusCode::INTERNAL_SERVER_ERROR, other.to_string()),
         })?;
+    let _ = state.events_tx.send(format!(
+        "{{\"event\":\"flag_update\",\"box\":\"{}\",\"uid\":{}}}",
+        mailbox, uid
+    ));
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -218,6 +234,10 @@ async fn move_message_handler(
             BackendError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
             other => (StatusCode::INTERNAL_SERVER_ERROR, other.to_string()),
         })?;
+    let _ = state.events_tx.send(format!(
+        "{{\"event\":\"move\",\"src\":\"{}\",\"dest\":\"{}\",\"uid\":{}}}",
+        src, query.dest, uid
+    ));
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -259,17 +279,48 @@ async fn compose_handler(
         .send_message(&username, &form)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let _ = state
+        .events_tx
+        .send("{\"event\":\"sent\",\"box\":\"Sent\"}".to_string());
     Ok(StatusCode::CREATED)
 }
 
+async fn events_handler(
+    State(state): State<AppState>,
+    AuthUser(_username): AuthUser,
+) -> Sse<impl tokio_stream::Stream<Item = Result<Event, std::convert::Infallible>>> {
+    let rx = state.events_tx.subscribe();
+    let stream = BroadcastStream::new(rx)
+        .filter_map(|res| res.ok())
+        .map(|msg| Ok(Event::default().data(msg)));
+
+    Sse::new(stream).keep_alive(KeepAlive::default())
+}
+
+async fn list_contacts_handler(
+    State(state): State<AppState>,
+    AuthUser(username): AuthUser,
+) -> Result<Json<Vec<ContactInfo>>, (StatusCode, String)> {
+    let contacts = state
+        .backend
+        .list_contacts(&username)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(contacts))
+}
+
 pub fn app_router(backend: Arc<dyn MailBackend>, jwt_secret: impl Into<String>) -> Router {
+    let (events_tx, _) = tokio::sync::broadcast::channel(128);
     let state = AppState {
         backend,
         jwt_secret: jwt_secret.into(),
+        events_tx,
     };
 
     Router::new()
         .route("/auth/login", post(login_handler))
+        .route("/events", get(events_handler))
+        .route("/contacts", get(list_contacts_handler))
         .route("/mailboxes", get(list_mailboxes_handler))
         .route("/messages", get(list_messages_handler))
         .route(

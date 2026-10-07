@@ -350,4 +350,31 @@ impl MailApiClient for HttpApiClient {
 
         Ok((filename, content_type, bytes))
     }
+
+    async fn list_contacts(
+        &self,
+        token: &str,
+    ) -> Result<Vec<lauda_types::ContactInfo>, ClientError> {
+        let url = format!("{}/contacts", self.base_url);
+        let headers = Self::auth_headers(token)?;
+        let resp = self
+            .client
+            .get(&url)
+            .headers(headers)
+            .send()
+            .await
+            .map_err(|e| ClientError::Network(e.to_string()))?;
+
+        match resp.status() {
+            StatusCode::OK => resp
+                .json::<Vec<lauda_types::ContactInfo>>()
+                .await
+                .map_err(|e| ClientError::Network(format!("Erro ao deserializar contatos: {}", e))),
+            StatusCode::UNAUTHORIZED => Err(ClientError::AuthFailed),
+            status => Err(ClientError::Network(format!(
+                "Status inesperado: {}",
+                status
+            ))),
+        }
+    }
 }

@@ -340,6 +340,7 @@ async fn test_live_tcp_lauda_server_client_trifocal_and_compose() {
             sender: "diretoria@2lp.in".to_string(),
             date: "2026-10-02T09:30:00Z".to_string(),
             cc: None,
+            has_attachments: false,
             is_read: false,
             is_flagged: false,
         },
@@ -452,6 +453,7 @@ async fn test_live_tcp_lauda_server_client_trifocal_and_compose() {
         cc: None,
         subject: "Re: Relatorio Financeiro e Comunicado".to_string(),
         body: "Confirmado recebimento via Lauda smolclient.".to_string(),
+        attachments: vec![],
     };
     client
         .send_message(&token, &compose)
@@ -606,6 +608,7 @@ Content-Type: text/html; charset=utf-8\r\n\
                 sender: "lumen@2lp.in".to_string(),
                 date: "2026-10-02T09:45:00Z".to_string(),
                 cc: None,
+                has_attachments: false,
                 is_read: false,
                 is_flagged: true,
             },

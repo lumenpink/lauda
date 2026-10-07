@@ -100,6 +100,7 @@ Content-Type: text/html; charset=utf-8\r\n\
                 sender: sender.to_string(),
                 date: "2026-10-02T08:30:00Z".to_string(),
                 cc: None,
+                has_attachments: false,
                 is_read: false,
                 is_flagged: false,
             },
@@ -173,6 +174,7 @@ Content-Type: text/html; charset=utf-8\r\n\
         cc: None,
         subject: "Re: Comunicado com Tracker e XSS".to_string(),
         body: "Recebido e visualizado com sucesso no modo txt auto seguro.".to_string(),
+        attachments: vec![],
     };
 
     let compose_req = Request::builder()

@@ -47,6 +47,7 @@ fn test_message_envelope_roundtrip() {
         is_read: false,
         is_flagged: true,
         cc: None,
+        has_attachments: false,
     };
     let json = serde_json::to_string(&envelope).unwrap();
     let decoded: MessageEnvelope = serde_json::from_str(&json).unwrap();
@@ -64,6 +65,7 @@ fn test_message_with_optional_bodies() {
             is_read: true,
             is_flagged: false,
             cc: Some("equipe@2lp.in".to_string()),
+            has_attachments: false,
         },
         txt_auto: Some("# Titulo\nTexto limpo.".to_string()),
         txt_original: Some("Titulo\nTexto limpo.".to_string()),
@@ -88,10 +90,29 @@ fn test_compose_form_roundtrip() {
         cc: Some("copia@exemplo.org".to_string()),
         subject: "Nova Mensagem".to_string(),
         body: "Texto digitado no smolclient.".to_string(),
+        attachments: vec![lauda_types::AttachmentUpload {
+            filename: "doc.txt".to_string(),
+            content_type: "text/plain".to_string(),
+            data_base64: "aGVsbG8=".to_string(),
+        }],
     };
     let json = serde_json::to_string(&form).unwrap();
     let decoded: ComposeForm = serde_json::from_str(&json).unwrap();
     assert_eq!(form, decoded);
+}
+
+#[test]
+fn test_contact_info_roundtrip() {
+    let contact = lauda_types::ContactInfo {
+        email: "alice@example.com".to_string(),
+        name: Some("Alice".to_string()),
+        message_count: 5,
+        has_autocrypt: true,
+        autocrypt_fingerprint: Some("ABCD 1234".to_string()),
+    };
+    let json = serde_json::to_string(&contact).unwrap();
+    let decoded: lauda_types::ContactInfo = serde_json::from_str(&json).unwrap();
+    assert_eq!(contact, decoded);
 }
 
 #[test]

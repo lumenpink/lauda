@@ -29,6 +29,7 @@ pub fn ComposeView(
     let mut cc_input = use_signal(|| reply_cc.unwrap_or_default());
     let mut subject_input = use_signal(|| reply_subject.unwrap_or_default());
     let mut body_input = use_signal(|| initial_body.unwrap_or_default());
+    let mut attached_files = use_signal(Vec::<lauda_types::AttachmentUpload>::new);
 
     let mut is_sending = use_signal(|| false);
     let mut error_msg = use_signal(|| None::<String>);
@@ -44,6 +45,7 @@ pub fn ComposeView(
             Some(cc_val)
         };
         let body = body_input.read().clone();
+        let attachments = attached_files.read().clone();
 
         if to.is_empty() {
             error_msg.set(Some("Destinatário (Para) é obrigatório.".to_string()));
@@ -68,6 +70,7 @@ pub fn ComposeView(
                     cc,
                     subject,
                     body,
+                    attachments,
                 };
 
                 match client.send_message(&token, &form).await {
@@ -172,6 +175,35 @@ pub fn ComposeView(
                         value: "{body_input}",
                         oninput: move |evt| body_input.set(evt.value()),
                         placeholder: "Escreva sua mensagem aqui...",
+                    }
+                }
+
+                // Seção de Anexos
+                div {
+                    style: "border-top: 1px dashed #0a0a0a; padding-top: 0.8rem; display: flex; flex-direction: column; gap: 0.5rem;",
+                    div {
+                        style: "display: flex; justify-content: space-between; align-items: center;",
+                        span { style: "font-weight: bold; font-size: 0.85rem; color: #0a0a0a;", "📎 ANEXOS ({attached_files.read().len()}):" }
+                    }
+
+                    if !attached_files.read().is_empty() {
+                        div {
+                            style: "display: flex; flex-direction: column; gap: 0.4rem;",
+                            for (idx, att) in attached_files.read().iter().enumerate() {
+                                div {
+                                    key: "{idx}",
+                                    style: "display: flex; justify-content: space-between; align-items: center; background: #faf9f6; border: 1px solid #0a0a0a; padding: 0.3rem 0.6rem;",
+                                    span { style: "font-size: 0.85rem; font-family: monospace; font-weight: bold;", "{att.filename}" }
+                                    button {
+                                        style: "background: #dc143c; color: #fff; border: none; padding: 0.2rem 0.5rem; font-size: 0.75rem; font-weight: bold; cursor: pointer;",
+                                        onclick: move |_| {
+                                            attached_files.write().remove(idx);
+                                        },
+                                        "REMOVER ✕"
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

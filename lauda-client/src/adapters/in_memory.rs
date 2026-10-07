@@ -190,4 +190,42 @@ impl MailApiClient for InMemoryApiClient {
             b"dummy content".to_vec(),
         ))
     }
+
+    async fn list_contacts(
+        &self,
+        _token: &str,
+    ) -> Result<Vec<lauda_types::ContactInfo>, ClientError> {
+        let msgs = self.messages.read().unwrap();
+        let mut map: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+
+        for box_msgs in msgs.values() {
+            for m in box_msgs {
+                *map.entry(m.envelope.sender.clone()).or_insert(0) += 1;
+            }
+        }
+
+        let mut contacts: Vec<lauda_types::ContactInfo> = map
+            .into_iter()
+            .map(|(sender, count)| {
+                let (name, email) = if sender.contains('<') && sender.contains('>') {
+                    let parts: Vec<&str> = sender.split('<').collect();
+                    let n = parts[0].trim().to_string();
+                    let e = parts[1].trim_matches('>').trim().to_string();
+                    (if n.is_empty() { None } else { Some(n) }, e)
+                } else {
+                    (None, sender)
+                };
+                lauda_types::ContactInfo {
+                    email,
+                    name,
+                    message_count: count,
+                    has_autocrypt: false,
+                    autocrypt_fingerprint: None,
+                }
+            })
+            .collect();
+
+        contacts.sort_by_key(|c| std::cmp::Reverse(c.message_count));
+        Ok(contacts)
+    }
 }

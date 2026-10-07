@@ -64,4 +64,8 @@ pub trait MailApiClient: Send + Sync {
     ) -> Result<(String, String, Vec<u8>), ClientError>;
     async fn delete_message(&self, token: &str, mailbox: &str, uid: u32)
     -> Result<(), ClientError>;
+    async fn list_contacts(
+        &self,
+        token: &str,
+    ) -> Result<Vec<lauda_types::ContactInfo>, ClientError>;
 }

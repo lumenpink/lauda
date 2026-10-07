@@ -63,4 +63,8 @@ pub trait MailBackend: Send + Sync {
         uid: u32,
         attachment_id: usize,
     ) -> Result<(String, String, Vec<u8>), BackendError>;
+    async fn list_contacts(
+        &self,
+        username: &str,
+    ) -> Result<Vec<lauda_types::ContactInfo>, BackendError>;
 }

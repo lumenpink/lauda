@@ -361,6 +361,17 @@ impl MailBackend for MaildirBackend {
                         });
 
                         let cc = parsed.cc().map(Self::format_address);
+                        let has_attachments = parsed
+                            .content_type()
+                            .map(|ct| {
+                                ct.c_type.eq_ignore_ascii_case("multipart")
+                                    && !ct
+                                        .subtype()
+                                        .map(|s| s.eq_ignore_ascii_case("alternative"))
+                                        .unwrap_or(false)
+                            })
+                            .unwrap_or(false);
+
                         envelopes.push(MessageEnvelope {
                             uid,
                             subject,
@@ -369,6 +380,7 @@ impl MailBackend for MaildirBackend {
                             is_read,
                             is_flagged,
                             cc,
+                            has_attachments,
                         });
                     }
                 }
@@ -412,16 +424,6 @@ impl MailBackend for MaildirBackend {
             .unwrap_or_else(|| "2026-10-05T00:00:00Z".to_string());
         let cc = parsed.cc().map(Self::format_address);
 
-        let envelope = MessageEnvelope {
-            uid,
-            subject,
-            sender,
-            date,
-            is_read,
-            is_flagged,
-            cc,
-        };
-
         let txt_original = parsed.body_text(0).map(|s| s.to_string());
         let html_sanitized = parsed.body_html(0).map(|s| s.to_string());
 
@@ -461,6 +463,19 @@ impl MailBackend for MaildirBackend {
             })
             .collect();
 
+        let has_attachments = !attachments.is_empty();
+
+        let envelope = MessageEnvelope {
+            uid,
+            subject,
+            sender,
+            date,
+            is_read,
+            is_flagged,
+            cc,
+            has_attachments,
+        };
+
         Ok(Message {
             envelope,
             txt_auto,
@@ -480,15 +495,53 @@ impl MailBackend for MaildirBackend {
             .unwrap_or(0);
         let pid = std::process::id();
         let msg_id = format!("<{}.{}@2lp.in>", timestamp, pid);
-        let raw_email = format!(
-            "From: {}\nTo: {}\nSubject: {}\nDate: {}\nMessage-ID: {}\nContent-Type: text/plain; charset=utf-8\n\n{}\n",
-            form.from,
-            form.to,
-            form.subject,
-            chrono::Utc::now().to_rfc2822(),
-            msg_id,
-            form.body
-        );
+
+        let cc_header = form
+            .cc
+            .as_ref()
+            .map(|cc| format!("Cc: {}\n", cc))
+            .unwrap_or_default();
+
+        let raw_email = if form.attachments.is_empty() {
+            format!(
+                "From: {}\nTo: {}\n{}Subject: {}\nDate: {}\nMessage-ID: {}\nContent-Type: text/plain; charset=utf-8\n\n{}\n",
+                form.from,
+                form.to,
+                cc_header,
+                form.subject,
+                chrono::Utc::now().to_rfc2822(),
+                msg_id,
+                form.body
+            )
+        } else {
+            let boundary = format!("=_lauda_{}_{}", timestamp, pid);
+            let mut parts = format!(
+                "From: {}\nTo: {}\n{}Subject: {}\nDate: {}\nMessage-ID: {}\nMIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=\"{}\"\n\n--{}\nContent-Type: text/plain; charset=utf-8\nContent-Transfer-Encoding: 8bit\n\n{}\n\n",
+                form.from,
+                form.to,
+                cc_header,
+                form.subject,
+                chrono::Utc::now().to_rfc2822(),
+                msg_id,
+                boundary,
+                boundary,
+                form.body
+            );
+
+            for att in &form.attachments {
+                parts.push_str(&format!(
+                    "--{}\nContent-Type: {}; name=\"{}\"\nContent-Disposition: attachment; filename=\"{}\"\nContent-Transfer-Encoding: base64\n\n{}\n\n",
+                    boundary,
+                    att.content_type,
+                    att.filename,
+                    att.filename,
+                    att.data_base64
+                ));
+            }
+
+            parts.push_str(&format!("--{}--\n", boundary));
+            parts
+        };
 
         let filename = format!("{}.M{}P{}.lauda:2,S", timestamp, timestamp % 1000, pid);
         let _ = std::fs::write(sent_dir.join(filename), &raw_email);
@@ -679,5 +732,86 @@ impl MailBackend for MaildirBackend {
         let contents = part.contents().to_vec();
 
         Ok((filename, content_type, contents))
+    }
+
+    async fn list_contacts(
+        &self,
+        _username: &str,
+    ) -> Result<Vec<lauda_types::ContactInfo>, BackendError> {
+        let mut map: HashMap<String, (Option<String>, usize, bool, Option<String>)> =
+            HashMap::new();
+
+        let boxes = self.list_mailboxes(_username).await.unwrap_or_default();
+        let box_names: Vec<String> = if boxes.is_empty() {
+            vec!["INBOX".to_string(), "Sent".to_string(), "Archive".to_string()]
+        } else {
+            boxes.into_iter().map(|b| b.name).collect()
+        };
+
+        for box_name in &box_names {
+            if let Ok(dir) = self.resolve_mailbox_dir(box_name) {
+                for sub in &["cur", "new"] {
+                    let sub_dir = dir.join(sub);
+                    if let Ok(entries) = std::fs::read_dir(sub_dir) {
+                        for entry in entries.flatten() {
+                            let path = entry.path();
+                            if !path.is_file() {
+                                continue;
+                            }
+                            if let Ok(bytes) = std::fs::read(&path)
+                                && let Some(parsed) = MessageParser::default().parse_headers(&bytes)
+                            {
+                                let addr_opt = if *box_name == "Sent" {
+                                    parsed.to()
+                                } else {
+                                    parsed.from()
+                                };
+
+                                if let Some(addr) = addr_opt {
+                                    let formatted = Self::format_address(addr);
+                                    let (name, email) =
+                                        if formatted.contains('<') && formatted.contains('>') {
+                                            let parts: Vec<&str> = formatted.split('<').collect();
+                                            let n = parts[0].trim().to_string();
+                                            let e = parts[1].trim_matches('>').trim().to_string();
+                                            (if n.is_empty() { None } else { Some(n) }, e)
+                                        } else {
+                                            (None, formatted)
+                                        };
+
+                                    if !email.is_empty() && email != "Desconhecido" {
+                                        let entry =
+                                            map.entry(email).or_insert((name, 0, false, None));
+                                        entry.1 += 1;
+                                        if let Some(header_val) = parsed.header("Autocrypt")
+                                            && let Some(val_str) = header_val.as_text()
+                                            && val_str.contains("type=p")
+                                        {
+                                            entry.2 = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut contacts: Vec<lauda_types::ContactInfo> = map
+            .into_iter()
+            .map(
+                |(email, (name, count, has_autocrypt, fingerprint))| lauda_types::ContactInfo {
+                    email,
+                    name,
+                    message_count: count,
+                    has_autocrypt,
+                    autocrypt_fingerprint: fingerprint,
+                },
+            )
+            .collect();
+
+        contacts.sort_by_key(|c| std::cmp::Reverse(c.message_count));
+        Ok(contacts)
     }
 }

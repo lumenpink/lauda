@@ -2,12 +2,14 @@ use dioxus::prelude::*;
 use lauda_types::{MailboxInfo, Message, MessageEnvelope, ViewMode};
 
 pub mod compose_view;
+pub mod contacts_view;
 pub mod inbox_view;
 pub mod login_view;
 pub mod message_view;
 pub mod state;
 
 use compose_view::ComposeView;
+use contacts_view::ContactsView;
 use inbox_view::InboxView;
 use login_view::LoginView;
 use message_view::MessageView;
@@ -170,6 +172,12 @@ pub fn App() -> Element {
                             initial_body,
                             current_mailbox,
                             messages,
+                        }
+                    },
+                    Screen::Contacts => rsx! {
+                        ContactsView {
+                            screen,
+                            session,
                         }
                     },
                 }

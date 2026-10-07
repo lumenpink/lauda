@@ -300,6 +300,7 @@ async fn test_e2e_apk_mobile_client_live_server_full_loop() {
                 sender: "postmaster@2lp.in".to_string(),
                 date: "2026-10-03T12:00:00Z".to_string(),
                 cc: None,
+                has_attachments: false,
                 is_read: false,
                 is_flagged: false,
             },
@@ -378,6 +379,7 @@ async fn test_e2e_apk_mobile_client_live_server_full_loop() {
                 cc: None,
                 subject: "Re: Bem-vindo ao Lauda Android".to_string(),
                 body: "Confirmacao de recebimento pelo cliente mobile em aarch64.".to_string(),
+                attachments: vec![],
             },
         )
         .await;

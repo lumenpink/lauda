@@ -35,6 +35,7 @@ fn setup_test_backend() -> Arc<InMemoryMailBackend> {
                 sender: "sistema@2lp.in".to_string(),
                 date: "2026-10-02T06:00:00Z".to_string(),
                 cc: None,
+                has_attachments: false,
                 is_read: false,
                 is_flagged: true,
             },
@@ -135,6 +136,7 @@ async fn test_login_success_and_protected_flow() {
         cc: None,
         subject: "Olá do Smolclient".to_string(),
         body: "Testando envio via lauda-server.".to_string(),
+        attachments: vec![],
     })
     .unwrap();
 
@@ -262,6 +264,7 @@ async fn test_mua_flag_move_and_attachment_endpoints() {
                 sender: "advogado@2lp.in".to_string(),
                 date: "2026-10-06T11:00:00Z".to_string(),
                 cc: Some("socio@2lp.in".to_string()),
+                has_attachments: true,
                 is_read: false,
                 is_flagged: false,
             },
@@ -385,4 +388,36 @@ async fn test_mua_flag_move_and_attachment_endpoints() {
     let archive_msgs: Vec<MessageEnvelope> = serde_json::from_slice(&body_bytes).unwrap();
     assert_eq!(archive_msgs.len(), 1);
     assert_eq!(archive_msgs[0].uid, 5001);
+
+    // 5. Testar endpoint /contacts
+    let req = Request::builder()
+        .method("GET")
+        .uri("/contacts")
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+    let contacts: Vec<lauda_types::ContactInfo> = serde_json::from_slice(&body_bytes).unwrap();
+    assert_eq!(contacts.len(), 1);
+    assert_eq!(contacts[0].email, "advogado@2lp.in");
+
+    // 6. Testar endpoint /events (SSE) com token via query param
+    let req = Request::builder()
+        .method("GET")
+        .uri(format!("/events?token={token}"))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get("content-type")
+            .unwrap()
+            .to_str()
+            .unwrap(),
+        "text/event-stream"
+    );
 }

@@ -15,4 +15,6 @@ pub enum Screen {
         reply_subject: Option<String>,
         initial_body: Option<String>,
     },
+    /// Painel de contatos e chaves criptográficas Autocrypt.
+    Contacts,
 }

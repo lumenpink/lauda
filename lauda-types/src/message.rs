@@ -64,6 +64,9 @@ pub struct MessageEnvelope {
     /// Destinatários em cópia (CC).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cc: Option<String>,
+    /// Indica se a mensagem possui anexos.
+    #[serde(default)]
+    pub has_attachments: bool,
 }
 
 /// Mensagem completa incluindo envelopes e representações de corpo.

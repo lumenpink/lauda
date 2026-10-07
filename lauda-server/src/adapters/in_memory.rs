@@ -223,4 +223,45 @@ impl MailBackend for InMemoryMailBackend {
             "Anexo {attachment_id} da mensagem UID {uid} não encontrado"
         )))
     }
+
+    async fn list_contacts(
+        &self,
+        username: &str,
+    ) -> Result<Vec<lauda_types::ContactInfo>, BackendError> {
+        let msgs = self.messages.read().unwrap();
+        let mut map: HashMap<String, (Option<String>, usize)> = HashMap::new();
+
+        if let Some(user_boxes) = msgs.get(username) {
+            for box_msgs in user_boxes.values() {
+                for msg in box_msgs {
+                    let sender = &msg.envelope.sender;
+                    let (name, email) = if sender.contains('<') && sender.contains('>') {
+                        let parts: Vec<&str> = sender.split('<').collect();
+                        let n = parts[0].trim().to_string();
+                        let e = parts[1].trim_matches('>').trim().to_string();
+                        (if n.is_empty() { None } else { Some(n) }, e)
+                    } else {
+                        (None, sender.clone())
+                    };
+
+                    let entry = map.entry(email).or_insert((name, 0));
+                    entry.1 += 1;
+                }
+            }
+        }
+
+        let mut contacts: Vec<lauda_types::ContactInfo> = map
+            .into_iter()
+            .map(|(email, (name, count))| lauda_types::ContactInfo {
+                email,
+                name,
+                message_count: count,
+                has_autocrypt: false,
+                autocrypt_fingerprint: None,
+            })
+            .collect();
+
+        contacts.sort_by_key(|c| std::cmp::Reverse(c.message_count));
+        Ok(contacts)
+    }
 }
