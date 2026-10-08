@@ -7,8 +7,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 APK_PATH="$REPO_ROOT/site/lauda-latest.apk"
-PACKAGE_NAME="com.example.LaudaClient"
-ACTIVITY_NAME="com.example.LaudaClient/dev.dioxus.main.MainActivity"
+PACKAGE_NAME="in.twolp.lauda"
+ACTIVITY_NAME="in.twolp.lauda/dev.dioxus.main.MainActivity"
 
 # Localizar ADB
 if command -v adb >/dev/null 2>&1; then
@@ -140,7 +140,7 @@ if [ -n "$TOKEN" ]; then
   "token": "$TOKEN"
 }
 EOF
-    $ADB -s "$DEVICE_ID" push "$SESSION_TMP" /data/data/com.example.LaudaClient/files/session.json >/dev/null 2>&1 || true
+    $ADB -s "$DEVICE_ID" push "$SESSION_TMP" /data/data/in.twolp.lauda/files/session.json >/dev/null 2>&1 || true
     # Reiniciar aplicação com sessão injetada
     $ADB -s "$DEVICE_ID" shell am force-stop "$PACKAGE_NAME"
     sleep 1
@@ -204,7 +204,7 @@ echo "✅ Retorno ao Inbox após envio capturado em: $SCREENSHOT_RESTORED"
 
 # 15. Validação final de estabilidade pós-interação no Logcat
 echo "-> Verificando ausência de erros pós-interação no logcat..."
-LOGCAT_POST_ERRORS=$($ADB -s "$DEVICE_ID" logcat -d | grep -E "FATAL EXCEPTION|UnsatisfiedLinkError|com.example.LaudaClient.*crash" | grep -v "NativeCrashHandlerImpl" || true)
+LOGCAT_POST_ERRORS=$($ADB -s "$DEVICE_ID" logcat -d | grep -E "FATAL EXCEPTION|UnsatisfiedLinkError|in.twolp.lauda.*crash" | grep -v "NativeCrashHandlerImpl" || true)
 if [ -n "$LOGCAT_POST_ERRORS" ]; then
     echo "ERRO CRÍTICO: Falha detectada após interações na UI!"
     echo "$LOGCAT_POST_ERRORS"

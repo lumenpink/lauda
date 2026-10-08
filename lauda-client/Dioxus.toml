@@ -6,4 +6,4 @@ asset_dir = "assets"
 
 [android]
 app_title = "Lauda"
-package = "com.example.LaudaClient"
+package = "in.twolp.lauda"

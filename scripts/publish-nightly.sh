@@ -61,6 +61,8 @@ echo "-> Configurando packaging e versão em $GRADLE_BUILD_KTS..."
 
 sed -i "s/versionCode = [0-9]\+/versionCode = $VERSION_CODE/g" "$GRADLE_BUILD_KTS"
 sed -i "s/versionName = \".*\"/versionName = \"$NIGHTLY_VERSION\"/g" "$GRADLE_BUILD_KTS"
+sed -i 's/applicationId = ".*"/applicationId = "in.twolp.lauda"/g' "$GRADLE_BUILD_KTS"
+sed -i 's/namespace = ".*"/namespace = "in.twolp.lauda"/g' "$GRADLE_BUILD_KTS"
 
 # Injetar useLegacyPackaging se não estiver presente
 if ! grep -q "useLegacyPackaging = true" "$GRADLE_BUILD_KTS"; then
@@ -121,83 +123,57 @@ if [ ! -f "$GEN_APK" ]; then
 fi
 
 cp "$GEN_APK" "$NIGHTLY_APK_PATH"
+cp "$GEN_APK" "$SITE_DIR/lauda-latest.apk"
 APK_SIZE="$(du -h "$NIGHTLY_APK_PATH" | cut -f1)"
-echo "✅ APK Nightly gerado em $NIGHTLY_APK_PATH ($APK_SIZE)"
+echo "✅ APK gerado em $NIGHTLY_APK_PATH ($APK_SIZE)"
 
-# 7. Gerar manifesto site/version-nightly.json
-echo "-> Atualizando $MANIFEST_PATH..."
+# 7. Gerar manifestos site/version-nightly.json e site/version.json
+echo "-> Atualizando manifestos de versão..."
 cat <<EOF > "$MANIFEST_PATH"
 {
   "version": "$NIGHTLY_VERSION",
   "min_compatible_version": "0.1.0",
   "apk_url": "https://lauda.2lp.in/lauda-nightly.apk",
-  "release_notes": "Build contínua experimental do Lauda Smolclient (commit $GIT_HASH).",
+  "package_id": "in.twolp.lauda",
+  "release_notes": "Build contínua do Lauda Smolclient (commit $GIT_HASH).",
   "published_at": "$PUBLISHED_AT"
 }
 EOF
 
-# 8. Upload do APK para o Bucket Cloudflare R2
-echo "-> Enviando $REMOTE_KEY para o bucket R2: $BUCKET_NAME..."
-npx wrangler r2 object put "$BUCKET_NAME/$REMOTE_KEY" \
+cat <<EOF > "$SITE_DIR/version.json"
+{
+  "version": "$NIGHTLY_VERSION",
+  "min_compatible_version": "0.1.0",
+  "apk_url": "https://lauda.2lp.in/lauda-latest.apk",
+  "package_id": "in.twolp.lauda",
+  "release_notes": "Build contínua do Lauda Smolclient (commit $GIT_HASH).",
+  "published_at": "$PUBLISHED_AT"
+}
+EOF
+
+# 8. Upload dos APKs para o Bucket Cloudflare R2
+echo "-> Enviando APKs para o bucket R2: $BUCKET_NAME..."
+npx wrangler r2 object put "$BUCKET_NAME/lauda-nightly.apk" \
     --file="$NIGHTLY_APK_PATH" \
     --content-type="application/vnd.android.package-archive" \
     --remote
 
-echo "✅ Upload do lauda-nightly.apk concluído com sucesso no R2."
-
-echo "-> Sincronizando lauda-latest.apk no R2..."
 npx wrangler r2 object put "$BUCKET_NAME/lauda-latest.apk" \
-    --file="$NIGHTLY_APK_PATH" \
+    --file="$SITE_DIR/lauda-latest.apk" \
     --content-type="application/vnd.android.package-archive" \
     --remote
 
-CURRENT_VERSION="$(cat "$REPO_ROOT/VERSION" | tr -d '[:space:]')"
-TAG_NAME="v$CURRENT_VERSION"
-if command -v tea >/dev/null 2>&1; then
-    echo "-> Sincronizando asset APK na release Codeberg ($TAG_NAME)..."
-    tea release assets delete "$TAG_NAME" "lauda-${CURRENT_VERSION}.apk" >/dev/null 2>&1 || true
-    VERSIONED_APK="/tmp/lauda-${CURRENT_VERSION}.apk"
-    cp "$NIGHTLY_APK_PATH" "$VERSIONED_APK"
-    tea release assets create "$TAG_NAME" "$VERSIONED_APK" >/dev/null 2>&1 || true
-    rm -f "$VERSIONED_APK"
-fi
+echo "✅ Upload dos APKs concluído com sucesso no R2."
 
 # 9. Deploy do Worker e Assets
 echo "-> Fazendo deploy do Worker e Static Assets (lauda.2lp.in)..."
 cd "$REPO_ROOT"
 npx wrangler deploy
 
-# 10. Atualizar release 'nightly' no Codeberg via tea
-if command -v tea >/dev/null 2>&1; then
-    echo "-> Atualizando pré-release 'nightly' no Codeberg..."
-    tea releases delete nightly >/dev/null 2>&1 || true
-    git tag -d nightly >/dev/null 2>&1 || true
-    git push origin :refs/tags/nightly >/dev/null 2>&1 || true
-
-    tea releases create \
-        --tag "nightly" \
-        --target "main" \
-        --title "nightly — Bleeding Edge Build ($DATE_STR)" \
-        --note "### Lauda Smolclient Nightly ($NIGHTLY_VERSION)
-
-Build diária de ponta baseada no commit \`$GIT_HASH\`.
-
-#### 📱 Download do APK Android (Universal / Dual-ABI)
-* **Download Direto:** [lauda-nightly.apk](https://lauda.2lp.in/lauda-nightly.apk)
-* **Manifesto:** [version-nightly.json](https://lauda.2lp.in/version-nightly.json)
-* **Portal:** [lauda.2lp.in](https://lauda.2lp.in)
-
-#### 🔄 Obtainium
-Para rastrear o canal Nightly no Obtainium:
-* URL: \`https://codeberg.org/lumenpink/lauda\` (com a opção 'Include prereleases' ativada)
-* Ou via Webpage: \`https://lauda.2lp.in/version-nightly.json\`" \
-        --asset "$NIGHTLY_APK_PATH" \
-        --prerelease || echo "Aviso: Criação da release no Codeberg falhou ou já atualizada."
-fi
-
 echo ""
 echo "================================================================="
-echo "🎉 Publicação do Canal Nightly concluída!"
-echo "   APK URL:       https://lauda.2lp.in/lauda-nightly.apk"
-echo "   Manifesto URL: https://lauda.2lp.in/version-nightly.json"
+echo "🎉 Publicação concluída com sucesso em lauda.2lp.in!"
+echo "   Package ID:    in.twolp.lauda"
+echo "   APK URL:       https://lauda.2lp.in/lauda-latest.apk"
+echo "   Manifesto URL: https://lauda.2lp.in/version.json"
 echo "================================================================="

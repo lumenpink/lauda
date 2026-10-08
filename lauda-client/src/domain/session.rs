@@ -34,10 +34,10 @@ pub fn get_default_session_path() -> PathBuf {
         {
             return PathBuf::from(home).join("session.json");
         }
-        if Path::new("/data/data/com.example.LaudaClient/files").exists() {
-            return PathBuf::from("/data/data/com.example.LaudaClient/files/session.json");
+        if Path::new("/data/data/in.twolp.lauda/files").exists() {
+            return PathBuf::from("/data/data/in.twolp.lauda/files/session.json");
         }
-        PathBuf::from("/data/data/com.example.LaudaClient/session.json")
+        PathBuf::from("/data/data/in.twolp.lauda/session.json")
     }
     #[cfg(not(target_os = "android"))]
     {
