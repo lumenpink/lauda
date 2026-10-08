@@ -18,6 +18,7 @@ pub fn MessageView(
     mut current_view_mode: Signal<ViewMode>,
 ) -> Element {
     let msg = active_message.read().clone();
+    let mut download_status = use_signal(|| None::<(usize, String)>);
 
     if msg.is_none() {
         return rsx! {
@@ -360,20 +361,73 @@ pub fn MessageView(
                     div {
                         style: "display: flex; flex-direction: column; gap: 0.5rem;",
                         for (id, filename, content_type, size_str, dl_url) in &formatted_attachments {
-                            div {
-                                key: "{id}",
-                                style: "display: flex; justify-content: space-between; align-items: center; background: #faf9f6; border: 1px solid #0a0a0a; padding: 0.5rem 0.8rem;",
-                                div {
-                                    style: "display: flex; flex-direction: column;",
-                                    span { style: "font-weight: bold; font-size: 0.9rem; color: #0a0a0a;", "{filename}" }
-                                    span { style: "font-size: 0.75rem; color: #666;", "{content_type} • {size_str}" }
-                                }
-                                a {
-                                    href: "{dl_url}",
-                                    target: "_blank",
-                                    download: "{filename}",
-                                    style: "background: #0a0a0a; color: #fff; text-decoration: none; padding: 0.3rem 0.7rem; font-size: 0.8rem; font-weight: bold; border: 1px solid #0a0a0a; box-shadow: 2px 2px 0 #dc143c; white-space: nowrap;",
-                                    "BAIXAR"
+                            {
+                                let att_id = *id;
+                                let fname = filename.clone();
+                                let box_name = current_mailbox.read().clone();
+                                let uid = envelope.uid;
+                                let sess = session.read().clone();
+                                let status_for_this = download_status.read().clone();
+
+                                rsx! {
+                                    div {
+                                        key: "{id}",
+                                        style: "display: flex; flex-direction: column; background: #faf9f6; border: 1px solid #0a0a0a; padding: 0.5rem 0.8rem; gap: 0.4rem;",
+                                        div {
+                                            style: "display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;",
+                                            div {
+                                                style: "display: flex; flex-direction: column;",
+                                                span { style: "font-weight: bold; font-size: 0.9rem; color: #0a0a0a;", "{filename}" }
+                                                span { style: "font-size: 0.75rem; color: #666;", "{content_type} • {size_str}" }
+                                            }
+                                            div {
+                                                style: "display: flex; gap: 0.4rem; align-items: center;",
+                                                button {
+                                                    style: "background: #fff; color: #0a0a0a; padding: 0.3rem 0.6rem; font-size: 0.8rem; font-weight: bold; border: 1px solid #0a0a0a; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                                                    onclick: move |_| {
+                                                        let sess = sess.clone();
+                                                        let box_name = box_name.clone();
+                                                        let fname = fname.clone();
+                                                        download_status.set(Some((att_id, "Baixando...".to_string())));
+                                                        if let Some(token) = sess.token {
+                                                            spawn(async move {
+                                                                let client = HttpApiClient::new(sess.server_url);
+                                                                match client.fetch_attachment(&token, &box_name, uid, att_id).await {
+                                                                    Ok((_name, _ct, bytes)) => {
+                                                                        let target = resolve_download_dir().join(&fname);
+                                                                        if std::fs::write(&target, bytes).is_ok() {
+                                                                            download_status.set(Some((att_id, format!("✓ Salvo em {}", target.display()))));
+                                                                        } else {
+                                                                            download_status.set(Some((att_id, "Erro ao gravar arquivo no disco".to_string())));
+                                                                        }
+                                                                    }
+                                                                    Err(e) => {
+                                                                        download_status.set(Some((att_id, format!("Falha no download: {e}"))));
+                                                                    }
+                                                                }
+                                                            });
+                                                        }
+                                                    },
+                                                    "💾 SALVAR"
+                                                }
+                                                a {
+                                                    href: "{dl_url}",
+                                                    target: "_blank",
+                                                    download: "{filename}",
+                                                    style: "background: #0a0a0a; color: #fff; text-decoration: none; padding: 0.3rem 0.6rem; font-size: 0.8rem; font-weight: bold; border: 1px solid #0a0a0a; box-shadow: 2px 2px 0 #dc143c; white-space: nowrap;",
+                                                    "LINK"
+                                                }
+                                            }
+                                        }
+                                        if let Some((sid, msg)) = status_for_this {
+                                            if sid == att_id {
+                                                div {
+                                                    style: "font-size: 0.75rem; color: #dc143c; font-weight: bold; background: #fff; padding: 0.2rem 0.4rem; border-left: 2px solid #dc143c;",
+                                                    "{msg}"
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -382,4 +436,14 @@ pub fn MessageView(
             }
         }
     }
+}
+
+fn resolve_download_dir() -> std::path::PathBuf {
+    if let Ok(home) = std::env::var("HOME") {
+        let p = std::path::PathBuf::from(home).join("Downloads");
+        if p.exists() {
+            return p;
+        }
+    }
+    std::env::temp_dir()
 }

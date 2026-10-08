@@ -743,7 +743,11 @@ impl MailBackend for MaildirBackend {
 
         let boxes = self.list_mailboxes(_username).await.unwrap_or_default();
         let box_names: Vec<String> = if boxes.is_empty() {
-            vec!["INBOX".to_string(), "Sent".to_string(), "Archive".to_string()]
+            vec![
+                "INBOX".to_string(),
+                "Sent".to_string(),
+                "Archive".to_string(),
+            ]
         } else {
             boxes.into_iter().map(|b| b.name).collect()
         };

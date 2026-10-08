@@ -39,17 +39,33 @@ pub fn App() -> Element {
 
     let mut update_notice = use_signal(|| None::<crate::domain::update::UpdateManifest>);
 
-    // Carregamento inicial assíncrono se houver sessão gravada
+    // Carregamento inicial assíncrono e sincronização periódica em background (a cada 15s)
     use_effect(move || {
         let sess = session.read().clone();
         if let Some(token) = sess.token {
             spawn(async move {
-                let client = HttpApiClient::new(sess.server_url);
+                let client = HttpApiClient::new(sess.server_url.clone());
                 if let Ok(boxes) = client.list_mailboxes(&token).await {
                     mailboxes.set(boxes);
                 }
-                if let Ok(msgs) = client.list_messages(&token, "INBOX").await {
+                let initial_box = current_mailbox.read().clone();
+                if let Ok(msgs) = client.list_messages(&token, &initial_box).await {
                     messages.set(msgs);
+                }
+
+                // Loop de auto-refresh em background a cada 15 segundos
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+                    if session.read().token.is_none() {
+                        break;
+                    }
+                    let active_box = current_mailbox.read().clone();
+                    if let Ok(boxes) = client.list_mailboxes(&token).await {
+                        mailboxes.set(boxes);
+                    }
+                    if let Ok(msgs) = client.list_messages(&token, &active_box).await {
+                        messages.set(msgs);
+                    }
                 }
             });
         }
