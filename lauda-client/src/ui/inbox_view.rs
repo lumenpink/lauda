@@ -101,7 +101,11 @@ pub fn InboxView(
                             {
                                 let is_active = *current_mailbox.read() == mb.name;
                                 let name = mb.name.clone();
-                                let label = format!("{} ({})", mb.name, mb.unread_messages);
+                                let label = if mb.unread_messages > 0 {
+                                    format!("{} ({} / {})", mb.name, mb.unread_messages, mb.total_messages)
+                                } else {
+                                    format!("{} ({})", mb.name, mb.total_messages)
+                                };
                                 rsx! {
                                     button {
                                         key: "{mb.name}",

@@ -168,14 +168,24 @@ impl MaildirBackend {
                     };
 
                     if matched {
-                        let is_read = filename.contains(":2,S") || filename.contains(",S");
-                        let is_flagged = filename.contains('F');
+                        let (is_read, is_flagged) = Self::parse_maildir_flags(sub, &filename);
                         return Some((path, filename, is_read, is_flagged));
                     }
                 }
             }
         }
         None
+    }
+
+    fn parse_maildir_flags(sub: &str, filename: &str) -> (bool, bool) {
+        let (is_read, is_flagged) = if let Some(flags) = filename.split(":2,").nth(1) {
+            (flags.contains('S'), flags.contains('F'))
+        } else {
+            (false, false)
+        };
+
+        let is_read = if sub == "new" { false } else { is_read };
+        (is_read, is_flagged)
     }
 
     fn dispatch_sendmail(raw_email: &str) -> Result<(), String> {
@@ -291,8 +301,8 @@ impl MailBackend for MaildirBackend {
                             continue;
                         }
                         total += 1;
-                        if *sub == "new" || (!filename.contains(":2,S") && !filename.contains(",S"))
-                        {
+                        let (is_read, _) = Self::parse_maildir_flags(sub, &filename);
+                        if !is_read {
                             unread += 1;
                         }
                     }
@@ -339,8 +349,7 @@ impl MailBackend for MaildirBackend {
                         fallback_uid
                     });
 
-                    let is_read = filename.contains(":2,S") || filename.contains(",S");
-                    let is_flagged = filename.contains('F');
+                    let (is_read, is_flagged) = Self::parse_maildir_flags(sub, &filename);
 
                     if let Ok(bytes) = std::fs::read(&path)
                         && let Some(parsed) = MessageParser::default().parse_headers(&bytes)
@@ -653,7 +662,7 @@ impl MailBackend for MaildirBackend {
         let new_flags: String = flags_chars.into_iter().collect();
 
         let new_filename = format!("{}:2,{}", base_name, new_flags);
-        let target_dir = file_path.parent().unwrap_or(&dir);
+        let target_dir = dir.join("cur");
         let new_path = target_dir.join(new_filename);
 
         std::fs::rename(&file_path, &new_path)

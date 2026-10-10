@@ -255,3 +255,74 @@ SGVsbG8gTGF1ZGEh\n\
     assert_eq!(sent_msgs[0].subject, "Contrato Assinado");
     assert!(sent_msgs[0].has_attachments);
 }
+
+#[tokio::test]
+async fn test_dovecot_maildir_flag_parsing_with_size_metadata() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+
+    std::fs::create_dir_all(root.join("cur")).unwrap();
+    std::fs::create_dir_all(root.join("new")).unwrap();
+
+    let email_raw = "From: teste@2lp.in\nTo: hi@lumen.pink\nSubject: Dovecot Test\nDate: Mon, 05 Oct 2026 12:00:00 +0000\nContent-Type: text/plain\n\nCorpo\n";
+
+    // 1. Não lido em cur/ com metadados ,S=1099,W=1125:2,
+    let f1 = "1790640297.M460601P1545.mail.lumen.pink,S=1099,W=1125:2,";
+    std::fs::write(root.join("cur").join(f1), email_raw).unwrap();
+
+    // 2. Lido em cur/ com metadados ,S=2048,W=2100:2,S
+    let f2 = "1790640298.M460602P1545.mail.lumen.pink,S=2048,W=2100:2,S";
+    std::fs::write(root.join("cur").join(f2), email_raw).unwrap();
+
+    // 3. Lido e Favorito em cur/ com metadados ,S=500,W=510:2,FS
+    let f3 = "1790640299.M460603P1545.mail.lumen.pink,S=500,W=510:2,FS";
+    std::fs::write(root.join("cur").join(f3), email_raw).unwrap();
+
+    // 4. Não lido em new/ sem sufixo de flags
+    let f4 = "1790640300.M460604P1545.mail.lumen.pink,S=1200,W=1250";
+    std::fs::write(root.join("new").join(f4), email_raw).unwrap();
+
+    // dovecot-uidlist associando uids 10, 20, 30, 40
+    let uidlist = "3 V1790640297 N5 Ga836741ba900bb6a090600002f3acf59\n10 :1790640297.M460601P1545.mail.lumen.pink,S=1099,W=1125\n20 :1790640298.M460602P1545.mail.lumen.pink,S=2048,W=2100\n30 :1790640299.M460603P1545.mail.lumen.pink,S=500,W=510\n40 :1790640300.M460604P1545.mail.lumen.pink,S=1200,W=1250\n";
+    std::fs::write(root.join("dovecot-uidlist"), uidlist).unwrap();
+
+    let backend = MaildirBackend::new(root);
+    backend.add_user("testuser", "senha123");
+
+    // Verificar contagem de mailboxes
+    let boxes = backend.list_mailboxes("testuser").await.unwrap();
+    let inbox = boxes.iter().find(|b| b.name == "INBOX").unwrap();
+    assert_eq!(inbox.total_messages, 4);
+    assert_eq!(inbox.unread_messages, 2); // f1 e f4 não lidos
+
+    // Verificar mensagens individuais
+    let msgs = backend.list_messages("testuser", "INBOX").await.unwrap();
+    let m1 = msgs.iter().find(|m| m.uid == 10).unwrap();
+    assert!(!m1.is_read);
+    assert!(!m1.is_flagged);
+
+    let m2 = msgs.iter().find(|m| m.uid == 20).unwrap();
+    assert!(m2.is_read);
+    assert!(!m2.is_flagged);
+
+    let m3 = msgs.iter().find(|m| m.uid == 30).unwrap();
+    assert!(m3.is_read);
+    assert!(m3.is_flagged);
+
+    let m4 = msgs.iter().find(|m| m.uid == 40).unwrap();
+    assert!(!m4.is_read);
+    assert!(!m4.is_flagged);
+
+    // Marcar m1 como lida
+    backend.mark_message_read("testuser", "INBOX", 10, true).await.unwrap();
+    let boxes_after = backend.list_mailboxes("testuser").await.unwrap();
+    let inbox_after = boxes_after.iter().find(|b| b.name == "INBOX").unwrap();
+    assert_eq!(inbox_after.unread_messages, 1);
+
+    // Marcar m1 de volta como não lida
+    backend.mark_message_read("testuser", "INBOX", 10, false).await.unwrap();
+    let boxes_unread = backend.list_mailboxes("testuser").await.unwrap();
+    let inbox_unread = boxes_unread.iter().find(|b| b.name == "INBOX").unwrap();
+    assert_eq!(inbox_unread.unread_messages, 2);
+}
+
