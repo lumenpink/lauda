@@ -27,3 +27,37 @@ pub fn filter_aliases(aliases: &[String], query: &str) -> Vec<String> {
         .cloned()
         .collect()
 }
+
+/// Remove marcadores de comentários HTML (ex: <!--papeli:sig:...--> ou <!-- ... -->)
+/// presentes no texto puro de e-mails, preservando o conteúdo textual e quebras de linha.
+pub fn clean_comment_tags(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut remaining = text;
+
+    while let Some(start_idx) = remaining.find("<!--") {
+        result.push_str(&remaining[..start_idx]);
+        if let Some(end_rel) = remaining[start_idx..].find("-->") {
+            let after_comment = start_idx + end_rel + 3;
+            remaining = &remaining[after_comment..];
+            if remaining.starts_with("\r\n") {
+                remaining = &remaining[2..];
+            } else if remaining.starts_with('\n') {
+                remaining = &remaining[1..];
+            }
+        } else if let Some(end_rel) = remaining[start_idx..].find('>') {
+            let after_comment = start_idx + end_rel + 1;
+            remaining = &remaining[after_comment..];
+            if remaining.starts_with("\r\n") {
+                remaining = &remaining[2..];
+            } else if remaining.starts_with('\n') {
+                remaining = &remaining[1..];
+            }
+        } else {
+            result.push_str(&remaining[start_idx..]);
+            remaining = "";
+            break;
+        }
+    }
+    result.push_str(remaining);
+    result
+}

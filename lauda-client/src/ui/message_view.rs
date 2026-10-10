@@ -4,7 +4,7 @@ use lauda_types::{MailboxInfo, Message, MessageEnvelope, ViewMode};
 use crate::adapters::HttpApiClient;
 use crate::domain::ports::MailApiClient;
 use crate::domain::session::SessionConfig;
-use crate::domain::view::parse_markdown_to_html;
+use crate::domain::view::{clean_comment_tags, parse_markdown_to_html};
 use crate::ui::state::Screen;
 
 #[component]
@@ -49,11 +49,12 @@ pub fn MessageView(
         format!("Fwd: {}", envelope.subject)
     };
 
-    let body_quote_source = message
+    let raw_quote_source = message
         .txt_original
         .as_deref()
         .or(message.txt_auto.as_deref())
         .unwrap_or("");
+    let body_quote_source = clean_comment_tags(raw_quote_source);
     let quoted_lines = body_quote_source
         .lines()
         .map(|l| format!("> {}", l))
@@ -163,8 +164,10 @@ pub fn MessageView(
         }
     };
 
-    let txt_auto_body = message.txt_auto.clone().unwrap_or_default();
-    let txt_original_body = message.txt_original.clone().unwrap_or_default();
+    let raw_txt_auto = message.txt_auto.clone().unwrap_or_default();
+    let raw_txt_original = message.txt_original.clone().unwrap_or_default();
+    let txt_auto_body = clean_comment_tags(&raw_txt_auto);
+    let txt_original_body = clean_comment_tags(&raw_txt_original);
     let html_body = message.html_sanitized.clone().unwrap_or_default();
 
     let rendered_markdown_html = parse_markdown_to_html(&txt_auto_body);
@@ -324,27 +327,38 @@ pub fn MessageView(
             }
 
             // Corpo da Mensagem conforme o Modo Trifocal
-            div {
-                style: "border: 2px solid #0a0a0a; background: #fff; padding: 1.5rem; box-shadow: 6px 6px 0 #0a0a0a; min-height: 250px;",
-                match *current_view_mode.read() {
-                    ViewMode::TxtAuto => rsx! {
-                        div {
-                            style: "line-height: 1.6; font-size: 1rem; color: #0a0a0a;",
-                            dangerous_inner_html: "{rendered_markdown_html}",
+            {
+                let is_html_mode = *current_view_mode.read() == ViewMode::Html;
+                let container_style = if is_html_mode {
+                    "border: 2px solid #0a0a0a; background: #fff; padding: 0; box-shadow: 6px 6px 0 #0a0a0a; overflow: hidden;"
+                } else {
+                    "border: 2px solid #0a0a0a; background: #fff; padding: 1.5rem; box-shadow: 6px 6px 0 #0a0a0a; min-height: 250px;"
+                };
+
+                rsx! {
+                    div {
+                        style: "{container_style}",
+                        match *current_view_mode.read() {
+                            ViewMode::TxtAuto => rsx! {
+                                div {
+                                    style: "line-height: 1.6; font-size: 1rem; color: #0a0a0a;",
+                                    dangerous_inner_html: "{rendered_markdown_html}",
+                                }
+                            },
+                            ViewMode::TxtOriginal => rsx! {
+                                pre {
+                                    style: "white-space: pre-wrap; font-family: monospace; font-size: 0.95rem; line-height: 1.5; color: #0a0a0a; margin: 0; background: #faf9f6; padding: 1rem; border: 1px dashed #0a0a0a;",
+                                    "{txt_original_body}"
+                                }
+                            },
+                            ViewMode::Html => rsx! {
+                                div {
+                                    style: "line-height: 1.5; font-size: 0.95rem; color: #0a0a0a; background: transparent; padding: 0; overflow-x: auto; width: 100%;",
+                                    dangerous_inner_html: "{html_body}",
+                                }
+                            },
                         }
-                    },
-                    ViewMode::TxtOriginal => rsx! {
-                        pre {
-                            style: "white-space: pre-wrap; font-family: monospace; font-size: 0.95rem; line-height: 1.5; color: #0a0a0a; margin: 0; background: #faf9f6; padding: 1rem; border: 1px dashed #0a0a0a;",
-                            "{txt_original_body}"
-                        }
-                    },
-                    ViewMode::Html => rsx! {
-                        div {
-                            style: "line-height: 1.5; font-size: 0.95rem; color: #0a0a0a; background: #fff; padding: 0.5rem; overflow-x: auto;",
-                            dangerous_inner_html: "{html_body}",
-                        }
-                    },
+                    }
                 }
             }
 

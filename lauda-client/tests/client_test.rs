@@ -1,7 +1,28 @@
 use lauda_client::adapters::in_memory::InMemoryApiClient;
 use lauda_client::domain::ports::MailApiClient;
-use lauda_client::domain::view::{ViewMode, filter_aliases, parse_markdown_to_html};
+use lauda_client::domain::view::{
+    ViewMode, clean_comment_tags, filter_aliases, parse_markdown_to_html,
+};
 use lauda_types::{ComposeForm, LoginRequest, MailboxInfo, Message, MessageEnvelope};
+
+#[test]
+fn test_clean_comment_tags() {
+    let raw_long = "=== 2LP ===\n\nSegue contrato.\n\n--\n<!--papeli:sig:start:long-->\nLumen Pink\n2LP\n<!--papeli:sig:end:long-->";
+    let cleaned = clean_comment_tags(raw_long);
+    assert_eq!(
+        cleaned,
+        "=== 2LP ===\n\nSegue contrato.\n\n--\nLumen Pink\n2LP\n"
+    );
+
+    let raw_short = "<!--papeli:sig:start:short-->\n— Lumen (2LP)\n<!--papeli:sig:end:short-->";
+    let cleaned_short = clean_comment_tags(raw_short);
+    assert_eq!(cleaned_short, "— Lumen (2LP)\n");
+
+    let raw_variant =
+        "Mensagem <!--papeli-sig-start-long>comentario<!--papeli-sig-end-long> normal";
+    let cleaned_variant = clean_comment_tags(raw_variant);
+    assert_eq!(cleaned_variant, "Mensagem comentario normal");
+}
 
 #[test]
 fn test_markdown_parser_conversion() {

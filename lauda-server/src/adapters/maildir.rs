@@ -188,6 +188,38 @@ impl MaildirBackend {
         (is_read, is_flagged)
     }
 
+    fn clean_comment_tags(text: &str) -> String {
+        let mut result = String::with_capacity(text.len());
+        let mut remaining = text;
+
+        while let Some(start_idx) = remaining.find("<!--") {
+            result.push_str(&remaining[..start_idx]);
+            if let Some(end_rel) = remaining[start_idx..].find("-->") {
+                let after_comment = start_idx + end_rel + 3;
+                remaining = &remaining[after_comment..];
+                if remaining.starts_with("\r\n") {
+                    remaining = &remaining[2..];
+                } else if remaining.starts_with('\n') {
+                    remaining = &remaining[1..];
+                }
+            } else if let Some(end_rel) = remaining[start_idx..].find('>') {
+                let after_comment = start_idx + end_rel + 1;
+                remaining = &remaining[after_comment..];
+                if remaining.starts_with("\r\n") {
+                    remaining = &remaining[2..];
+                } else if remaining.starts_with('\n') {
+                    remaining = &remaining[1..];
+                }
+            } else {
+                result.push_str(&remaining[start_idx..]);
+                remaining = "";
+                break;
+            }
+        }
+        result.push_str(remaining);
+        result
+    }
+
     fn dispatch_sendmail(raw_email: &str) -> Result<(), String> {
         if let Ok(custom_cmd) = std::env::var("LAUDA_SENDMAIL_CMD") {
             let mut child = std::process::Command::new("sh")
@@ -436,15 +468,18 @@ impl MailBackend for MaildirBackend {
         let txt_original = parsed.body_text(0).map(|s| s.to_string());
         let html_sanitized = parsed.body_html(0).map(|s| s.to_string());
 
-        let txt_auto = txt_original.clone().or_else(|| {
-            html_sanitized.as_ref().map(|html| {
-                html.replace("<br>", "\n")
-                    .replace("<br/>", "\n")
-                    .replace("<br />", "\n")
-                    .replace("<p>", "\n\n")
-                    .replace("</p>", "")
-            })
-        });
+        let txt_auto = txt_original
+            .as_deref()
+            .map(Self::clean_comment_tags)
+            .or_else(|| {
+                html_sanitized.as_ref().map(|html| {
+                    html.replace("<br>", "\n")
+                        .replace("<br/>", "\n")
+                        .replace("<br />", "\n")
+                        .replace("<p>", "\n\n")
+                        .replace("</p>", "")
+                })
+            });
 
         let attachments: Vec<lauda_types::AttachmentMeta> = parsed
             .attachments()
