@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "lauda-types",
+    "lauda-index",
     "lauda-server",
     "lauda-client",
 ]

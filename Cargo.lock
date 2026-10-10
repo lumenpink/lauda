@@ -3339,6 +3339,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lauda-index"
+version = "0.2.0"
+dependencies = [
+ "lauda-types",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "lauda-server"
 version = "0.2.0"
 dependencies = [

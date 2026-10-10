@@ -1,0 +1,18 @@
+[package]
+name = "lauda-index"
+version = "0.2.0"
+edition = "2024"
+authors = ["Lumen <lumen@2lp.in>"]
+description = "Motor de busca de e-mails em Rust puro com parser Gmail, BM25 e fuzzy search"
+license = "GPL-3.0"
+
+[dependencies]
+lauda-types = { path = "../lauda-types" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true
