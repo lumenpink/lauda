@@ -31,7 +31,7 @@ pub fn ComposeView(
     let mut body_input = use_signal(|| initial_body.unwrap_or_default());
     let mut attached_files = use_signal(Vec::<lauda_types::AttachmentUpload>::new);
 
-    let mut is_sending = use_signal(|| false);
+    let is_sending = use_signal(|| false);
     let mut error_msg = use_signal(|| None::<String>);
 
     let handle_send = move |_| {
@@ -58,37 +58,58 @@ pub fn ComposeView(
         }
 
         let sess_snapshot = session.read().clone();
-        if let Some(token) = sess_snapshot.token {
-            is_sending.set(true);
-            error_msg.set(None);
+        if sess_snapshot.token.is_some() {
+            let form = ComposeForm {
+                from,
+                to,
+                cc,
+                subject,
+                body,
+                attachments,
+            };
 
-            spawn(async move {
-                let client = HttpApiClient::new(sess_snapshot.server_url.clone());
-                let form = ComposeForm {
-                    from,
-                    to,
-                    cc,
-                    subject,
-                    body,
-                    attachments,
-                };
+            // Enfileirar optimistamente na Outbox local
+            let cache_dir = crate::domain::cache::get_default_cache_dir();
+            let queue = crate::domain::outbox::OutboxQueue::new(&cache_dir);
+            let now_unix = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
 
-                match client.send_message(&token, &form).await {
-                    Ok(_) => {
-                        is_sending.set(false);
-                        // Atualizar lista da caixa postal
-                        let box_name = current_mailbox.read().clone();
-                        if let Ok(msgs) = client.list_messages(&token, &box_name).await {
-                            messages.set(msgs);
+            if let Err(err) = queue.enqueue(form.clone(), now_unix) {
+                error_msg.set(Some(format!("Falha ao enfileirar mensagem na Outbox: {}", err)));
+                return;
+            }
+
+            // Fechar tela de composição imediatamente (Optimistic UI - 0ms de bloqueio)
+            screen.set(Screen::Inbox);
+
+            // Disparar envio em segundo plano
+            if let Some(token) = sess_snapshot.token {
+                let box_name = current_mailbox.read().clone();
+                spawn(async move {
+                    let client = HttpApiClient::new(sess_snapshot.server_url.clone());
+                    let items = queue.list().unwrap_or_default();
+                    for item in items {
+                        let _ = queue.update_status(&item.id, crate::domain::outbox::OutboxStatus::Sending, false);
+                        match client.send_message(&token, &item.form).await {
+                            Ok(_) => {
+                                let _ = queue.remove(&item.id);
+                                if let Ok(msgs) = client.list_messages(&token, &box_name).await {
+                                    messages.set(msgs);
+                                }
+                            }
+                            Err(err) => {
+                                let _ = queue.update_status(
+                                    &item.id,
+                                    crate::domain::outbox::OutboxStatus::Failed(err.to_string()),
+                                    true,
+                                );
+                            }
                         }
-                        screen.set(Screen::Inbox);
                     }
-                    Err(err) => {
-                        is_sending.set(false);
-                        error_msg.set(Some(format!("Falha ao enviar mensagem: {}", err)));
-                    }
-                }
-            });
+                });
+            }
         }
     };
 
