@@ -93,32 +93,117 @@ pub fn App() -> Element {
         let _ = dioxus::document::eval(js);
     });
 
-    // Carregamento inicial assíncrono e sincronização periódica em background (a cada 15s)
+    let mut is_online = use_signal(|| true);
+    let mut outbox_pending_count = use_signal(|| 0usize);
+
+    // Carregamento inicial SWR do cache local (0ms bloqueio)
+    use_effect(move || {
+        let cache_dir = crate::domain::cache::get_default_cache_dir();
+        let cache = crate::domain::cache::LocalMessageCache::new(&cache_dir);
+        let outbox = crate::domain::outbox::OutboxQueue::new(&cache_dir);
+
+        if let Ok(Some(boxes)) = cache.load_mailboxes()
+            && !boxes.is_empty()
+        {
+            mailboxes.set(boxes);
+        }
+        let initial_box = current_mailbox.read().clone();
+        if let Ok(Some(cached_msgs)) = cache.load_envelopes(&initial_box)
+            && !cached_msgs.is_empty()
+        {
+            messages.set(cached_msgs);
+        }
+        if let Ok(count) = outbox.pending_count() {
+            outbox_pending_count.set(count);
+        }
+    });
+
+    // Ciclo SWR em segundo plano: flush de ações, flush de outbox e revalidação do servidor
     use_effect(move || {
         let sess = session.read().clone();
         if let Some(token) = sess.token {
             spawn(async move {
-                let client = HttpApiClient::new(sess.server_url.clone());
-                if let Ok(boxes) = client.list_mailboxes(&token).await {
-                    mailboxes.set(boxes);
-                }
-                let initial_box = current_mailbox.read().clone();
-                if let Ok(msgs) = client.list_messages(&token, &initial_box).await {
-                    messages.set(msgs);
-                }
+                let cache_dir = crate::domain::cache::get_default_cache_dir();
+                let cache = crate::domain::cache::LocalMessageCache::new(&cache_dir);
+                let outbox = crate::domain::outbox::OutboxQueue::new(&cache_dir);
+                let actions = crate::domain::sync::ActionsQueue::new(&cache_dir);
 
-                // Loop de auto-refresh em background a cada 15 segundos
+                let client = HttpApiClient::new(sess.server_url.clone());
+
                 loop {
-                    tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+                    // 1. Flush de Ações Pendentes
+                    if let Ok(pending_actions) = actions.list() {
+                        for act in pending_actions {
+                            let res = match act.action {
+                                crate::domain::sync::ActionType::MarkRead { read } => {
+                                    client.mark_read(&token, &act.mailbox, act.uid, read).await
+                                }
+                                crate::domain::sync::ActionType::MarkFlagged { flagged } => {
+                                    client.mark_flagged(&token, &act.mailbox, act.uid, flagged).await
+                                }
+                                crate::domain::sync::ActionType::Move { ref dest_box } => {
+                                    client.move_message(&token, act.uid, &act.mailbox, dest_box).await
+                                }
+                                crate::domain::sync::ActionType::Delete => {
+                                    client.delete_message(&token, &act.mailbox, act.uid).await
+                                }
+                            };
+                            if res.is_ok() {
+                                let _ = actions.remove(&act.id);
+                            }
+                        }
+                    }
+
+                    // 2. Flush de Outbox
+                    if let Ok(pending_items) = outbox.list() {
+                        for item in pending_items {
+                            let _ = outbox.update_status(
+                                &item.id,
+                                crate::domain::outbox::OutboxStatus::Sending,
+                                false,
+                            );
+                            match client.send_message(&token, &item.form).await {
+                                Ok(_) => {
+                                    let _ = outbox.remove(&item.id);
+                                }
+                                Err(e) => {
+                                    let _ = outbox.update_status(
+                                        &item.id,
+                                        crate::domain::outbox::OutboxStatus::Failed(e.to_string()),
+                                        true,
+                                    );
+                                }
+                            }
+                        }
+                    }
+
+                    if let Ok(count) = outbox.pending_count() {
+                        outbox_pending_count.set(count);
+                    }
+
+                    // 3. Revalidação das caixas e mensagens com o servidor
+                    let active_box = current_mailbox.read().clone();
+                    match client.list_mailboxes(&token).await {
+                        Ok(boxes) => {
+                            is_online.set(true);
+                            let _ = cache.save_mailboxes(&boxes);
+                            mailboxes.set(boxes);
+                        }
+                        Err(_) => {
+                            is_online.set(false);
+                        }
+                    }
+
+                    if let Ok(server_msgs) = client.list_messages(&token, &active_box).await {
+                        is_online.set(true);
+                        let _ = cache.save_envelopes(&active_box, &server_msgs);
+                        messages.set(server_msgs);
+                    }
+
+                    // Pausa de 10s antes da próxima sincronização
+                    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
                     if session.read().token.is_none() {
                         break;
-                    }
-                    let active_box = current_mailbox.read().clone();
-                    if let Ok(boxes) = client.list_mailboxes(&token).await {
-                        mailboxes.set(boxes);
-                    }
-                    if let Ok(msgs) = client.list_messages(&token, &active_box).await {
-                        messages.set(msgs);
                     }
                 }
             });
@@ -169,14 +254,36 @@ pub fn App() -> Element {
                     }
                 }
 
-                // Alternador Trifásico Global (Botão Único Rotativo)
-                button {
-                    style: "background: #0a0a0a; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #dc143c; white-space: nowrap;",
-                    onclick: move |_| {
-                        let next_mode = current_view_mode.read().next();
-                        current_view_mode.set(next_mode);
-                    },
-                    "{current_view_mode.read().label()}"
+                // Bloco direito do Header: Status de Rede, Outbox e Alternador Trifocal
+                div {
+                    style: "display: flex; align-items: center; gap: 0.6rem;",
+                    if *outbox_pending_count.read() > 0 {
+                        span {
+                            style: "background: #dc143c; color: #fff; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.75rem; border: 1px solid #0a0a0a;",
+                            "OUTBOX: {outbox_pending_count.read()}"
+                        }
+                    }
+                    if *is_online.read() {
+                        span {
+                            style: "background: #e8f5e9; color: #2e7d32; padding: 0.3rem 0.5rem; font-size: 0.75rem; font-weight: bold; border: 1px solid #2e7d32;",
+                            "● ONLINE"
+                        }
+                    } else {
+                        span {
+                            style: "background: #ffebee; color: #c62828; padding: 0.3rem 0.5rem; font-size: 0.75rem; font-weight: bold; border: 1px solid #c62828;",
+                            "○ OFFLINE (CACHE)"
+                        }
+                    }
+
+                    // Alternador Trifásico Global (Botão Único Rotativo)
+                    button {
+                        style: "background: #0a0a0a; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #dc143c; white-space: nowrap;",
+                        onclick: move |_| {
+                            let next_mode = current_view_mode.read().next();
+                            current_view_mode.set(next_mode);
+                        },
+                        "{current_view_mode.read().label()}"
+                    }
                 }
             }
 

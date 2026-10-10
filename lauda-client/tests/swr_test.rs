@@ -24,7 +24,9 @@ async fn test_swr_and_offline_sync_reconciliation() {
         cc: None,
         has_attachments: false,
     };
-    cache.save_envelopes("INBOX", &[initial_env.clone()]).expect("save envs");
+    cache
+        .save_envelopes("INBOX", std::slice::from_ref(&initial_env))
+        .expect("save envs");
 
     // SWR imediato carrega do cache local
     let cached = cache.load_envelopes("INBOX").expect("load").unwrap();
