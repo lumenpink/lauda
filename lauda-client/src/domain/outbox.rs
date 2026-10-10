@@ -33,6 +33,10 @@ impl OutboxQueue {
         }
     }
 
+    pub fn queue_path(&self) -> &Path {
+        &self.queue_path
+    }
+
     /// Retorna todos os itens da fila ordenados por data de criação.
     pub fn list(&self) -> std::io::Result<Vec<OutboxItem>> {
         unimplemented!()
