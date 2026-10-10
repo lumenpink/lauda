@@ -1,0 +1,31 @@
+name: "Tests & Lint"
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - "v*"
+  pull_request:
+
+jobs:
+  test:
+    name: "Rust Test, Lint & E2E (GOST-CI)"
+    runs-on: ubuntu-latest
+    container:
+      image: codeberg.org/lumenpink/gost-ci-lauda:latest
+    steps:
+      - name: "Checkout repository"
+        uses: https://github.com/actions/checkout@v4
+      - name: "Link Hermetic Dependencies"
+        run: |
+          if [ -d /opt/gost/deps ]; then
+            ln -sf /opt/gost/deps/* ../ 2>/dev/null || true
+          fi
+      - name: "Format Check"
+        run: cargo fmt -- --check
+      - name: "Clippy (Zero Warnings)"
+        run: cargo clippy --workspace -- -D warnings
+      - name: "Run All Tests & E2E Suites"
+        run: cargo test --workspace
