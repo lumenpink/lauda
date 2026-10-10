@@ -1,8 +1,8 @@
 {
-  "version": "0.2.0-nightly.20261010.dbbb672",
+  "version": "0.2.0-nightly.20261010.8010128",
   "min_compatible_version": "0.1.0",
   "apk_url": "https://lauda.2lp.in/lauda-latest.apk",
   "package_id": "in.twolp.lauda",
-  "release_notes": "Build contínua do Lauda Smolclient (commit dbbb672).",
-  "published_at": "2026-10-10T23:11:31Z"
+  "release_notes": "Build contínua do Lauda Smolclient (commit 8010128).",
+  "published_at": "2026-10-10T23:52:53Z"
 }

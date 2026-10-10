@@ -3328,6 +3328,7 @@ version = "0.2.0"
 dependencies = [
  "async-trait",
  "dioxus",
+ "lauda-index",
  "lauda-types",
  "pulldown-cmark",
  "reqwest",
