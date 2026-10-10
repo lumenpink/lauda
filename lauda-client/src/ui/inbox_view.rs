@@ -58,29 +58,50 @@ pub fn InboxView(
 
     let username = session.read().username.clone();
 
-    let q = search_query.read().to_lowercase();
     let current_filt = *active_filter.read();
-    let filtered_messages: Vec<MessageEnvelope> = messages
-        .read()
-        .iter()
-        .filter(|env| {
-            let matches_status = match current_filt {
+    let query_str = search_query.read().trim().to_string();
+
+    let filtered_messages: Vec<MessageEnvelope> = if query_str.is_empty() {
+        messages
+            .read()
+            .iter()
+            .filter(|env| match current_filt {
                 InboxFilter::All => true,
                 InboxFilter::Unread => !env.is_read,
                 InboxFilter::Flagged => env.is_flagged,
                 InboxFilter::Attachments => env.has_attachments,
+            })
+            .cloned()
+            .collect()
+    } else {
+        // Construir índice em memória sob demanda sobre os envelopes da caixa ativa
+        let mut index = lauda_index::MessageIndex::new();
+        let box_name = current_mailbox.read().clone();
+        for env in messages.read().iter() {
+            let msg = Message {
+                envelope: env.clone(),
+                txt_auto: None,
+                txt_original: None,
+                html_sanitized: None,
+                attachments: vec![],
             };
-            if !matches_status {
-                return false;
-            }
-            if q.is_empty() {
-                true
-            } else {
-                env.subject.to_lowercase().contains(&q) || env.sender.to_lowercase().contains(&q)
-            }
-        })
-        .cloned()
-        .collect();
+            index.index_message(&box_name, &msg);
+        }
+
+        let ranked_uids = index.search(&query_str);
+        let msgs_snapshot = messages.read();
+
+        ranked_uids
+            .into_iter()
+            .filter_map(|uid| msgs_snapshot.iter().find(|m| m.uid == uid).cloned())
+            .filter(|env| match current_filt {
+                InboxFilter::All => true,
+                InboxFilter::Unread => !env.is_read,
+                InboxFilter::Flagged => env.is_flagged,
+                InboxFilter::Attachments => env.has_attachments,
+            })
+            .collect()
+    };
 
     rsx! {
         div {
