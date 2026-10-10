@@ -45,7 +45,11 @@ fn test_outbox_queue_lifecycle() {
 
     // Atualiza status do item 1 para Falha com incremento de retry
     queue
-        .update_status(&item1.id, OutboxStatus::Failed("Erro de conexão".to_string()), true)
+        .update_status(
+            &item1.id,
+            OutboxStatus::Failed("Erro de conexão".to_string()),
+            true,
+        )
         .expect("update status");
 
     let updated_list = queue.list().unwrap();

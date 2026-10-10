@@ -1,8 +1,6 @@
-use lauda_client::domain::{
-    ActionType, ActionsQueue, LocalMessageCache, OutboxQueue,
-};
-use lauda_client::domain::ports::MailApiClient;
 use lauda_client::adapters::InMemoryApiClient;
+use lauda_client::domain::ports::MailApiClient;
+use lauda_client::domain::{ActionType, ActionsQueue, LocalMessageCache, OutboxQueue};
 use lauda_types::ComposeForm;
 use tempfile::tempdir;
 
@@ -57,13 +55,16 @@ async fn test_swr_and_offline_sync_reconciliation() {
 
     // 4. Reconexão e Flush de Reconciliação
     let mock_api = InMemoryApiClient::new();
-    mock_api.add_message("INBOX", lauda_types::Message {
-        envelope: initial_env.clone(),
-        txt_auto: Some("Corpo".to_string()),
-        txt_original: None,
-        html_sanitized: None,
-        attachments: vec![],
-    });
+    mock_api.add_message(
+        "INBOX",
+        lauda_types::Message {
+            envelope: initial_env.clone(),
+            txt_auto: Some("Corpo".to_string()),
+            txt_original: None,
+            html_sanitized: None,
+            attachments: vec![],
+        },
+    );
     let token = "test-token";
 
     // Flush de ações offline
@@ -71,24 +72,40 @@ async fn test_swr_and_offline_sync_reconciliation() {
     for act in pending_acts {
         match act.action {
             ActionType::MarkRead { read } => {
-                mock_api.mark_read(token, &act.mailbox, act.uid, read).await.unwrap();
+                mock_api
+                    .mark_read(token, &act.mailbox, act.uid, read)
+                    .await
+                    .unwrap();
                 actions.remove(&act.id).unwrap();
             }
             ActionType::MarkFlagged { flagged } => {
-                mock_api.mark_flagged(token, &act.mailbox, act.uid, flagged).await.unwrap();
+                mock_api
+                    .mark_flagged(token, &act.mailbox, act.uid, flagged)
+                    .await
+                    .unwrap();
                 actions.remove(&act.id).unwrap();
             }
             ActionType::Move { dest_box } => {
-                mock_api.move_message(token, act.uid, &act.mailbox, &dest_box).await.unwrap();
+                mock_api
+                    .move_message(token, act.uid, &act.mailbox, &dest_box)
+                    .await
+                    .unwrap();
                 actions.remove(&act.id).unwrap();
             }
             ActionType::Delete => {
-                mock_api.delete_message(token, &act.mailbox, act.uid).await.unwrap();
+                mock_api
+                    .delete_message(token, &act.mailbox, act.uid)
+                    .await
+                    .unwrap();
                 actions.remove(&act.id).unwrap();
             }
         }
     }
-    assert_eq!(actions.count().unwrap(), 0, "Todas as ações devem ser reconciliadas");
+    assert_eq!(
+        actions.count().unwrap(),
+        0,
+        "Todas as ações devem ser reconciliadas"
+    );
 
     // Flush de Outbox
     let pending_out = outbox.list().unwrap();
@@ -96,5 +113,9 @@ async fn test_swr_and_offline_sync_reconciliation() {
         mock_api.send_message(token, &item.form).await.unwrap();
         outbox.remove(&item.id).unwrap();
     }
-    assert_eq!(outbox.pending_count().unwrap(), 0, "Outbox deve ser limpa após envio");
+    assert_eq!(
+        outbox.pending_count().unwrap(),
+        0,
+        "Outbox deve ser limpa após envio"
+    );
 }

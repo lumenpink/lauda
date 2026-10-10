@@ -139,10 +139,14 @@ pub fn App() -> Element {
                                     client.mark_read(&token, &act.mailbox, act.uid, read).await
                                 }
                                 crate::domain::sync::ActionType::MarkFlagged { flagged } => {
-                                    client.mark_flagged(&token, &act.mailbox, act.uid, flagged).await
+                                    client
+                                        .mark_flagged(&token, &act.mailbox, act.uid, flagged)
+                                        .await
                                 }
                                 crate::domain::sync::ActionType::Move { ref dest_box } => {
-                                    client.move_message(&token, act.uid, &act.mailbox, dest_box).await
+                                    client
+                                        .move_message(&token, act.uid, &act.mailbox, dest_box)
+                                        .await
                                 }
                                 crate::domain::sync::ActionType::Delete => {
                                     client.delete_message(&token, &act.mailbox, act.uid).await

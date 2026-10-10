@@ -1,6 +1,6 @@
+use lauda_types::{MailboxInfo, Message, MessageEnvelope};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use lauda_types::{MailboxInfo, Message, MessageEnvelope};
 
 /// Motor de persistência de cache local no disco.
 ///
@@ -97,7 +97,11 @@ impl LocalMessageCache {
     }
 
     /// Grava a lista de envelopes de uma caixa de correio de forma atômica.
-    pub fn save_envelopes(&self, mailbox: &str, envelopes: &[MessageEnvelope]) -> std::io::Result<()> {
+    pub fn save_envelopes(
+        &self,
+        mailbox: &str,
+        envelopes: &[MessageEnvelope],
+    ) -> std::io::Result<()> {
         let path = self.mailbox_dir(mailbox).join("envelopes.json");
         let json = serde_json::to_vec_pretty(envelopes)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
@@ -168,7 +172,12 @@ impl LocalMessageCache {
                 (
                     time_parts[0].parse().unwrap_or(0),
                     time_parts[1].parse().unwrap_or(0),
-                    time_parts[2].split('.').next().unwrap_or("0").parse().unwrap_or(0),
+                    time_parts[2]
+                        .split('.')
+                        .next()
+                        .unwrap_or("0")
+                        .parse()
+                        .unwrap_or(0),
                 )
             } else {
                 (0, 0, 0)
@@ -202,7 +211,11 @@ impl LocalMessageCache {
     /// Executa a purga de retenção: remove arquivos de corpo completo de mensagens
     /// cuja data no envelope seja anterior ao limite (ex: 90 dias).
     /// Retorna o número de mensagens expurgadas.
-    pub fn purge_expired_messages(&self, max_age: Duration, now_unix: u64) -> std::io::Result<usize> {
+    pub fn purge_expired_messages(
+        &self,
+        max_age: Duration,
+        now_unix: u64,
+    ) -> std::io::Result<usize> {
         let max_age_secs = max_age.as_secs();
         if now_unix < max_age_secs {
             return Ok(0);

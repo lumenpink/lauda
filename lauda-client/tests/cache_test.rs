@@ -25,9 +25,14 @@ fn test_cache_atomic_mailboxes_roundtrip() {
         },
     ];
 
-    cache.save_mailboxes(&mailboxes).expect("save should succeed");
+    cache
+        .save_mailboxes(&mailboxes)
+        .expect("save should succeed");
 
-    let loaded = cache.load_mailboxes().expect("load should succeed").expect("some mailboxes");
+    let loaded = cache
+        .load_mailboxes()
+        .expect("load should succeed")
+        .expect("some mailboxes");
     assert_eq!(loaded, mailboxes);
 }
 
@@ -62,9 +67,14 @@ fn test_cache_atomic_envelopes_roundtrip() {
         },
     ];
 
-    cache.save_envelopes("INBOX", &envelopes).expect("save envelopes");
+    cache
+        .save_envelopes("INBOX", &envelopes)
+        .expect("save envelopes");
 
-    let loaded = cache.load_envelopes("INBOX").expect("load envelopes").expect("some envelopes");
+    let loaded = cache
+        .load_envelopes("INBOX")
+        .expect("load envelopes")
+        .expect("some envelopes");
     assert_eq!(loaded, envelopes);
 }
 
@@ -73,7 +83,9 @@ fn test_cache_atomic_message_roundtrip() {
     let temp = tempdir().expect("tempdir");
     let cache = LocalMessageCache::new(temp.path());
 
-    let initial = cache.load_message("INBOX", 42).expect("load should succeed");
+    let initial = cache
+        .load_message("INBOX", 42)
+        .expect("load should succeed");
     assert_eq!(initial, None);
 
     let msg = Message {
@@ -95,7 +107,10 @@ fn test_cache_atomic_message_roundtrip() {
 
     cache.save_message("INBOX", &msg).expect("save message");
 
-    let loaded = cache.load_message("INBOX", 42).expect("load message").expect("some message");
+    let loaded = cache
+        .load_message("INBOX", 42)
+        .expect("load message")
+        .expect("some message");
     assert_eq!(loaded, msg);
 }
 
@@ -145,8 +160,12 @@ fn test_cache_purge_90_day_retention() {
 
     let envelopes = vec![recent_msg.envelope.clone(), old_msg.envelope.clone()];
 
-    cache.save_envelopes("INBOX", &envelopes).expect("save envelopes");
-    cache.save_message("INBOX", &recent_msg).expect("save recent");
+    cache
+        .save_envelopes("INBOX", &envelopes)
+        .expect("save envelopes");
+    cache
+        .save_message("INBOX", &recent_msg)
+        .expect("save recent");
     cache.save_message("INBOX", &old_msg).expect("save old");
 
     // Purga mensagens com mais de 90 dias

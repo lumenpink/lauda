@@ -1,6 +1,6 @@
-use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 use lauda_types::ComposeForm;
+use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
 /// Status de um item na fila da Outbox.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -87,7 +87,8 @@ impl OutboxQueue {
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
-                .as_nanos() % 1_000_000
+                .as_nanos()
+                % 1_000_000
         );
 
         let item = OutboxItem {
@@ -117,7 +118,12 @@ impl OutboxQueue {
     }
 
     /// Atualiza o status e contador de retentativas de um item.
-    pub fn update_status(&self, id: &str, status: OutboxStatus, increment_retry: bool) -> std::io::Result<bool> {
+    pub fn update_status(
+        &self,
+        id: &str,
+        status: OutboxStatus,
+        increment_retry: bool,
+    ) -> std::io::Result<bool> {
         let mut items = self.list()?;
         let mut found = false;
         for item in &mut items {

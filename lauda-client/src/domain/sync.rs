@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
 /// Tipo de mutação realizada pelo usuário sobre uma mensagem.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -79,7 +79,13 @@ impl ActionsQueue {
     }
 
     /// Enfileira uma nova ação atômica.
-    pub fn enqueue(&self, uid: u32, mailbox: &str, action: ActionType, now_unix: u64) -> std::io::Result<QueuedAction> {
+    pub fn enqueue(
+        &self,
+        uid: u32,
+        mailbox: &str,
+        action: ActionType,
+        now_unix: u64,
+    ) -> std::io::Result<QueuedAction> {
         let mut actions = self.list()?;
         let id = format!(
             "act_{}_{}_{}",
@@ -88,7 +94,8 @@ impl ActionsQueue {
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
-                .as_nanos() % 1_000_000
+                .as_nanos()
+                % 1_000_000
         );
 
         let queued = QueuedAction {

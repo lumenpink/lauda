@@ -20,7 +20,12 @@ fn test_actions_queue_lifecycle() {
 
     // Enfileirar marcação como favorito
     let a2 = queue
-        .enqueue(102, "INBOX", ActionType::MarkFlagged { flagged: true }, 1005)
+        .enqueue(
+            102,
+            "INBOX",
+            ActionType::MarkFlagged { flagged: true },
+            1005,
+        )
         .expect("enqueue 2");
     assert_eq!(queue.count().unwrap(), 2);
 

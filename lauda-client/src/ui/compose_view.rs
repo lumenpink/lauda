@@ -77,7 +77,10 @@ pub fn ComposeView(
                 .as_secs();
 
             if let Err(err) = queue.enqueue(form.clone(), now_unix) {
-                error_msg.set(Some(format!("Falha ao enfileirar mensagem na Outbox: {}", err)));
+                error_msg.set(Some(format!(
+                    "Falha ao enfileirar mensagem na Outbox: {}",
+                    err
+                )));
                 return;
             }
 
@@ -91,7 +94,11 @@ pub fn ComposeView(
                     let client = HttpApiClient::new(sess_snapshot.server_url.clone());
                     let items = queue.list().unwrap_or_default();
                     for item in items {
-                        let _ = queue.update_status(&item.id, crate::domain::outbox::OutboxStatus::Sending, false);
+                        let _ = queue.update_status(
+                            &item.id,
+                            crate::domain::outbox::OutboxStatus::Sending,
+                            false,
+                        );
                         match client.send_message(&token, &item.form).await {
                             Ok(_) => {
                                 let _ = queue.remove(&item.id);
