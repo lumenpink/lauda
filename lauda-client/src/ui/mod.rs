@@ -39,6 +39,60 @@ pub fn App() -> Element {
 
     let mut update_notice = use_signal(|| None::<crate::domain::update::UpdateManifest>);
 
+    // Interceptar navegação de histórico / popstate (suporte a gestos Android e botão Voltar)
+    use_effect(move || {
+        let mut eval = dioxus::document::eval(
+            r#"
+            window.__lauda_can_go_back = false;
+            window.__lauda_handle_back = function() {
+                if (window.__lauda_can_go_back) {
+                    dioxus.send("back");
+                    return true;
+                }
+                return false;
+            };
+            window.addEventListener('popstate', function() {
+                dioxus.send("back");
+            });
+        "#,
+        );
+        spawn(async move {
+            while let Ok(msg) = eval.recv::<String>().await {
+                if msg == "back" {
+                    let current = screen.read().clone();
+                    match current {
+                        Screen::MessageDetail(_) | Screen::Compose { .. } | Screen::Contacts => {
+                            screen.set(Screen::Inbox);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        });
+    });
+
+    // Sincronizar estado do histórico web com a tela ativa
+    use_effect(move || {
+        let current = screen.read().clone();
+        let is_subscreen = matches!(
+            current,
+            Screen::MessageDetail(_) | Screen::Compose { .. } | Screen::Contacts
+        );
+        let js = if is_subscreen {
+            r#"
+                window.__lauda_can_go_back = true;
+                if (window.history && (!window.history.state || window.history.state.screen !== 'sub')) {
+                    window.history.pushState({ screen: 'sub' }, '');
+                }
+            "#
+        } else {
+            r#"
+                window.__lauda_can_go_back = false;
+            "#
+        };
+        let _ = dioxus::document::eval(js);
+    });
+
     // Carregamento inicial assíncrono e sincronização periódica em background (a cada 15s)
     use_effect(move || {
         let sess = session.read().clone();

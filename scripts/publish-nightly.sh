@@ -110,6 +110,13 @@ if [ -f "$MANIFEST_XML" ] && ! grep -q "usesCleartextTraffic" "$MANIFEST_XML"; t
     sed -i 's/<application /<application android:usesCleartextTraffic="true" /g' "$MANIFEST_XML"
 fi
 
+# Injetar MainActivity.kt com suporte a OnBackPressedDispatcher (gestos de voltar)
+MAIN_KT="$REPO_ROOT/target/dx/lauda-client/release/android/app/app/src/main/kotlin/dev/dioxus/main/MainActivity.kt"
+if [ -f "$REPO_ROOT/lauda-client/android/MainActivity.kt" ]; then
+    echo "-> Configurando OnBackPressedDispatcher em $MAIN_KT..."
+    cp "$REPO_ROOT/lauda-client/android/MainActivity.kt" "$MAIN_KT"
+fi
+
 # 5. Montar APK comprimido via Gradle
 echo "-> Montando APK via Gradle (assembleDebug)..."
 cd "$REPO_ROOT/target/dx/lauda-client/release/android/app"

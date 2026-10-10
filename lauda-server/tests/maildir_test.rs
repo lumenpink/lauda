@@ -314,15 +314,20 @@ async fn test_dovecot_maildir_flag_parsing_with_size_metadata() {
     assert!(!m4.is_flagged);
 
     // Marcar m1 como lida
-    backend.mark_message_read("testuser", "INBOX", 10, true).await.unwrap();
+    backend
+        .mark_message_read("testuser", "INBOX", 10, true)
+        .await
+        .unwrap();
     let boxes_after = backend.list_mailboxes("testuser").await.unwrap();
     let inbox_after = boxes_after.iter().find(|b| b.name == "INBOX").unwrap();
     assert_eq!(inbox_after.unread_messages, 1);
 
     // Marcar m1 de volta como não lida
-    backend.mark_message_read("testuser", "INBOX", 10, false).await.unwrap();
+    backend
+        .mark_message_read("testuser", "INBOX", 10, false)
+        .await
+        .unwrap();
     let boxes_unread = backend.list_mailboxes("testuser").await.unwrap();
     let inbox_unread = boxes_unread.iter().find(|b| b.name == "INBOX").unwrap();
     assert_eq!(inbox_unread.unread_messages, 2);
 }
-
