@@ -62,15 +62,14 @@ export default {
       return new Response(object.body, { headers });
     }
 
-    // Roteamento da WebApp SPA (/app e /app/)
-    if (url.pathname === "/app" || url.pathname === "/app/") {
-      const appIndexUrl = new URL("/app/index.html", request.url);
-      return env.ASSETS.fetch(new Request(appIndexUrl, request));
+    // Normalizar /app sem barra para /app/
+    if (url.pathname === "/app") {
+      return Response.redirect(new URL("/app/", request.url).toString(), 301);
     }
 
-    // Se for rota sob /app/* mas não for asset direto (sem extensão de arquivo), faz fallback para /app/index.html
-    if (url.pathname.startsWith("/app/") && !url.pathname.includes(".")) {
-      const appIndexUrl = new URL("/app/index.html", request.url);
+    // Se for sub-rota client-side sob /app/* sem extensão, fazer fallback para /app/
+    if (url.pathname.startsWith("/app/") && !url.pathname.includes(".") && url.pathname !== "/app/") {
+      const appIndexUrl = new URL("/app/", request.url);
       return env.ASSETS.fetch(new Request(appIndexUrl, request));
     }
 
