@@ -46,10 +46,7 @@ impl OutboxQueue {
 
         let tmp_file = dest.with_extension(format!(
             "tmp.{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos()
+            crate::domain::time::current_unix_timestamp()
         ));
 
         std::fs::write(&tmp_file, content)?;
@@ -115,11 +112,7 @@ impl OutboxQueue {
         let id = format!(
             "out_{}_{}",
             now_unix,
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos()
-                % 1_000_000
+            crate::domain::time::current_unix_timestamp() % 1_000_000
         );
 
         let item = OutboxItem {

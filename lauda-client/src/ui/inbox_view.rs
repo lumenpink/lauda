@@ -289,26 +289,44 @@ pub fn InboxView(
                                     if let Some(token) = sess.token.clone() {
                                         loading_uid.set(Some(uid));
                                         error_msg.set(None);
+
+                                        // Atualização reativa imediata na UI local (optimistic update)
+                                        let was_unread = unread;
+                                        if was_unread {
+                                            if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
+                                                m.is_read = true;
+                                            }
+                                            if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name)
+                                                && mb.unread_messages > 0
+                                            {
+                                                mb.unread_messages -= 1;
+                                            }
+                                        }
+
                                         spawn(async move {
                                             let client = HttpApiClient::new(sess.server_url.clone());
                                             match client.get_message(&token, &box_name, uid).await {
-                                                Ok(msg) => {
-                                                    let is_unread = !msg.envelope.is_read;
+                                                Ok(mut msg) => {
+                                                    if was_unread {
+                                                        msg.envelope.is_read = true;
+                                                    }
                                                     active_message.set(Some(msg));
                                                     screen.set(Screen::MessageDetail(uid));
-                                                    if is_unread {
+                                                    if was_unread {
                                                         let client_read = HttpApiClient::new(sess.server_url);
-                                                        if client_read.mark_read(&token, &box_name, uid, true).await.is_ok() {
-                                                            if let Some(m) = active_message.write().as_mut() {
-                                                                m.envelope.is_read = true;
-                                                            }
-                                                            if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
-                                                                m.is_read = true;
-                                                            }
-                                                        }
+                                                        let _ = client_read.mark_read(&token, &box_name, uid, true).await;
                                                     }
                                                 }
                                                 Err(e) => {
+                                                    // Reverter estado se falhou ao abrir a mensagem
+                                                    if was_unread {
+                                                        if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
+                                                            m.is_read = false;
+                                                        }
+                                                        if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name) {
+                                                            mb.unread_messages += 1;
+                                                        }
+                                                    }
                                                     error_msg.set(Some(format!("Falha ao abrir mensagem #{}: {}", uid, e)));
                                                 }
                                             }

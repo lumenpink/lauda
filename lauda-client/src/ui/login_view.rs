@@ -196,6 +196,11 @@ pub fn LoginView(
                         "ENTRAR / CONECTAR"
                     }
                 }
+
+                div {
+                    style: "text-align: center; margin-top: 1.2rem; font-size: 0.72rem; color: #888; letter-spacing: 1px;",
+                    "LAUDA // v{env!(\"LAUDA_APP_VERSION\")} (dx0.7)"
+                }
             }
         }
     }

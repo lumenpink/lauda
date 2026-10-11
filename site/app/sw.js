@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lauda-pwa-v4';
+const CACHE_NAME = 'lauda-pwa-v6';
 const ASSETS_TO_CACHE = [
   '/app/',
   '/app/index.html',
@@ -33,6 +33,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Para navegações / index.html, tentar rede primeiro para sempre buscar versão mais recente
+  if (event.request.mode === 'navigate' || url.pathname === '/app/' || url.pathname.endsWith('index.html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/app/index.html')))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) {
@@ -46,10 +62,6 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       });
-    }).catch(() => {
-      if (event.request.mode === 'navigate') {
-        return caches.match('/app/index.html');
-      }
     })
   );
 });

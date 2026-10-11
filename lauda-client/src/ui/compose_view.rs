@@ -71,10 +71,7 @@ pub fn ComposeView(
             // Enfileirar optimistamente na Outbox local
             let cache_dir = crate::domain::cache::get_default_cache_dir();
             let queue = crate::domain::outbox::OutboxQueue::new(&cache_dir);
-            let now_unix = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
+            let now_unix = crate::domain::time::current_unix_timestamp();
 
             if let Err(err) = queue.enqueue(form.clone(), now_unix) {
                 error_msg.set(Some(format!(

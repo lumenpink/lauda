@@ -60,10 +60,7 @@ impl LocalMessageCache {
 
         let tmp_file = dest.with_extension(format!(
             "tmp.{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos()
+            crate::domain::time::current_unix_timestamp()
         ));
 
         std::fs::write(&tmp_file, content)?;

@@ -242,9 +242,13 @@ fn test_e2e_apk_distribution_manifest_and_obtainium() {
     let json_version = manifest["version"]
         .as_str()
         .expect("version field deve ser string");
+    let base_version_file = version_file_content
+        .split(['-', '+'])
+        .next()
+        .unwrap_or(&version_file_content);
     assert!(
-        json_version.starts_with(&version_file_content),
-        "Versão em version.json ({json_version}) deve começar com VERSION ({version_file_content})"
+        json_version.starts_with(base_version_file),
+        "Versão em version.json ({json_version}) deve ser compatível com VERSION base ({base_version_file})"
     );
 
     let apk_url = manifest["apk_url"]

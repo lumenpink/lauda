@@ -94,9 +94,11 @@ pub fn App() -> Element {
     });
 
     let mut is_online = use_signal(|| true);
+    #[allow(unused_mut)]
     let mut outbox_pending_count = use_signal(|| 0usize);
 
-    // Carregamento inicial SWR do cache local (0ms bloqueio)
+    #[cfg(not(target_arch = "wasm32"))]
+    // Carregamento inicial SWR do cache local no desktop/mobile (0ms bloqueio)
     use_effect(move || {
         let cache_dir = crate::domain::cache::get_default_cache_dir();
         let cache = crate::domain::cache::LocalMessageCache::new(&cache_dir);
@@ -118,71 +120,80 @@ pub fn App() -> Element {
         }
     });
 
-    // Ciclo SWR em segundo plano: flush de ações, flush de outbox e revalidação do servidor
+    // Ciclo SWR em segundo plano: revalidação do servidor e flush de outbox/ações
     use_effect(move || {
         let sess = session.read().clone();
         if let Some(token) = sess.token {
             spawn(async move {
+                #[cfg(not(target_arch = "wasm32"))]
                 let cache_dir = crate::domain::cache::get_default_cache_dir();
+                #[cfg(not(target_arch = "wasm32"))]
                 let cache = crate::domain::cache::LocalMessageCache::new(&cache_dir);
+                #[cfg(not(target_arch = "wasm32"))]
                 let outbox = crate::domain::outbox::OutboxQueue::new(&cache_dir);
+                #[cfg(not(target_arch = "wasm32"))]
                 let actions = crate::domain::sync::ActionsQueue::new(&cache_dir);
 
                 let client = HttpApiClient::new(sess.server_url.clone());
 
                 loop {
-                    // 1. Flush de Ações Pendentes
-                    if let Ok(pending_actions) = actions.list() {
-                        for act in pending_actions {
-                            let res = match act.action {
-                                crate::domain::sync::ActionType::MarkRead { read } => {
-                                    client.mark_read(&token, &act.mailbox, act.uid, read).await
-                                }
-                                crate::domain::sync::ActionType::MarkFlagged { flagged } => {
-                                    client
-                                        .mark_flagged(&token, &act.mailbox, act.uid, flagged)
-                                        .await
-                                }
-                                crate::domain::sync::ActionType::Move { ref dest_box } => {
-                                    client
-                                        .move_message(&token, act.uid, &act.mailbox, dest_box)
-                                        .await
-                                }
-                                crate::domain::sync::ActionType::Delete => {
-                                    client.delete_message(&token, &act.mailbox, act.uid).await
-                                }
-                            };
-                            if res.is_ok() {
-                                let _ = actions.remove(&act.id);
-                            }
-                        }
-                    }
-
-                    // 2. Flush de Outbox
-                    if let Ok(pending_items) = outbox.list() {
-                        for item in pending_items {
-                            let _ = outbox.update_status(
-                                &item.id,
-                                crate::domain::outbox::OutboxStatus::Sending,
-                                false,
-                            );
-                            match client.send_message(&token, &item.form).await {
-                                Ok(_) => {
-                                    let _ = outbox.remove(&item.id);
-                                }
-                                Err(e) => {
-                                    let _ = outbox.update_status(
-                                        &item.id,
-                                        crate::domain::outbox::OutboxStatus::Failed(e.to_string()),
-                                        true,
-                                    );
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        // 1. Flush de Ações Pendentes
+                        if let Ok(pending_actions) = actions.list() {
+                            for act in pending_actions {
+                                let res = match act.action {
+                                    crate::domain::sync::ActionType::MarkRead { read } => {
+                                        client.mark_read(&token, &act.mailbox, act.uid, read).await
+                                    }
+                                    crate::domain::sync::ActionType::MarkFlagged { flagged } => {
+                                        client
+                                            .mark_flagged(&token, &act.mailbox, act.uid, flagged)
+                                            .await
+                                    }
+                                    crate::domain::sync::ActionType::Move { ref dest_box } => {
+                                        client
+                                            .move_message(&token, act.uid, &act.mailbox, dest_box)
+                                            .await
+                                    }
+                                    crate::domain::sync::ActionType::Delete => {
+                                        client.delete_message(&token, &act.mailbox, act.uid).await
+                                    }
+                                };
+                                if res.is_ok() {
+                                    let _ = actions.remove(&act.id);
                                 }
                             }
                         }
-                    }
 
-                    if let Ok(count) = outbox.pending_count() {
-                        outbox_pending_count.set(count);
+                        // 2. Flush de Outbox
+                        if let Ok(pending_items) = outbox.list() {
+                            for item in pending_items {
+                                let _ = outbox.update_status(
+                                    &item.id,
+                                    crate::domain::outbox::OutboxStatus::Sending,
+                                    false,
+                                );
+                                match client.send_message(&token, &item.form).await {
+                                    Ok(_) => {
+                                        let _ = outbox.remove(&item.id);
+                                    }
+                                    Err(e) => {
+                                        let _ = outbox.update_status(
+                                            &item.id,
+                                            crate::domain::outbox::OutboxStatus::Failed(
+                                                e.to_string(),
+                                            ),
+                                            true,
+                                        );
+                                    }
+                                }
+                            }
+                        }
+
+                        if let Ok(count) = outbox.pending_count() {
+                            outbox_pending_count.set(count);
+                        }
                     }
 
                     // 3. Revalidação das caixas e mensagens com o servidor
@@ -190,6 +201,7 @@ pub fn App() -> Element {
                     match client.list_mailboxes(&token).await {
                         Ok(boxes) => {
                             is_online.set(true);
+                            #[cfg(not(target_arch = "wasm32"))]
                             let _ = cache.save_mailboxes(&boxes);
                             mailboxes.set(boxes);
                         }
@@ -200,12 +212,13 @@ pub fn App() -> Element {
 
                     if let Ok(server_msgs) = client.list_messages(&token, &active_box).await {
                         is_online.set(true);
+                        #[cfg(not(target_arch = "wasm32"))]
                         let _ = cache.save_envelopes(&active_box, &server_msgs);
                         messages.set(server_msgs);
                     }
 
-                    // Pausa de 10s antes da próxima sincronização
-                    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                    // Pausa assíncrona segura em todas as plataformas (Tokio em desktop/Android, setTimeout em WASM)
+                    crate::domain::time::async_sleep(std::time::Duration::from_secs(10)).await;
                     if session.read().token.is_none() {
                         break;
                     }
@@ -255,6 +268,10 @@ pub fn App() -> Element {
                     span {
                         style: "background: #dc143c; color: #fff; padding: 0.2rem 0.5rem; font-weight: bold; font-size: 0.8rem; margin-left: 0.5rem; vertical-align: middle;",
                         "SMOLCLIENT"
+                    }
+                    span {
+                        style: "font-size: 0.7rem; color: #666; margin-left: 0.5rem; vertical-align: middle; border: 1px solid #ccc; padding: 0.1rem 0.4rem; background: #fff;",
+                        "v{env!(\"LAUDA_APP_VERSION\")}"
                     }
                 }
 

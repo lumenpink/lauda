@@ -72,23 +72,49 @@ pub fn MessageView(
     let handle_toggle_read = move |_| {
         let sess = session.read().clone();
         let box_name = current_mailbox.read().clone();
+        let current_opt = active_message.read().clone();
         if let Some(token) = sess.token
-            && let Some(current) = active_message.read().clone()
+            && let Some(current) = current_opt
         {
             let uid = current.envelope.uid;
             let new_read = !current.envelope.is_read;
+
+            // Reatividade imediata (optimistic update)
+            if let Some(m) = active_message.write().as_mut() {
+                m.envelope.is_read = new_read;
+            }
+            if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
+                m.is_read = new_read;
+            }
+            if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name) {
+                if new_read && mb.unread_messages > 0 {
+                    mb.unread_messages -= 1;
+                } else if !new_read {
+                    mb.unread_messages += 1;
+                }
+            }
+
             spawn(async move {
                 let client = HttpApiClient::new(sess.server_url);
                 if client
                     .mark_read(&token, &box_name, uid, new_read)
                     .await
-                    .is_ok()
+                    .is_err()
                 {
+                    // Rollback se falhar
+                    let rollback_read = !new_read;
                     if let Some(m) = active_message.write().as_mut() {
-                        m.envelope.is_read = new_read;
+                        m.envelope.is_read = rollback_read;
                     }
                     if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
-                        m.is_read = new_read;
+                        m.is_read = rollback_read;
+                    }
+                    if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name) {
+                        if rollback_read && mb.unread_messages > 0 {
+                            mb.unread_messages -= 1;
+                        } else if !rollback_read {
+                            mb.unread_messages += 1;
+                        }
                     }
                 }
             });
@@ -98,23 +124,35 @@ pub fn MessageView(
     let handle_toggle_flag = move |_| {
         let sess = session.read().clone();
         let box_name = current_mailbox.read().clone();
+        let current_opt = active_message.read().clone();
         if let Some(token) = sess.token
-            && let Some(current) = active_message.read().clone()
+            && let Some(current) = current_opt
         {
             let uid = current.envelope.uid;
             let new_flagged = !current.envelope.is_flagged;
+
+            // Reatividade imediata (optimistic update)
+            if let Some(m) = active_message.write().as_mut() {
+                m.envelope.is_flagged = new_flagged;
+            }
+            if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
+                m.is_flagged = new_flagged;
+            }
+
             spawn(async move {
                 let client = HttpApiClient::new(sess.server_url);
                 if client
                     .mark_flagged(&token, &box_name, uid, new_flagged)
                     .await
-                    .is_ok()
+                    .is_err()
                 {
+                    // Rollback se falhar
+                    let rollback_flagged = !new_flagged;
                     if let Some(m) = active_message.write().as_mut() {
-                        m.envelope.is_flagged = new_flagged;
+                        m.envelope.is_flagged = rollback_flagged;
                     }
                     if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
-                        m.is_flagged = new_flagged;
+                        m.is_flagged = rollback_flagged;
                     }
                 }
             });
