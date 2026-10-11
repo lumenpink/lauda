@@ -26,8 +26,8 @@ jobs:
           cp -r target/dx/lauda-client/release/web/public/assets/* site/app/assets/
           JS_NAME=$(ls site/app/assets | grep '^lauda-client-.*\.js$' | head -n 1)
           WASM_NAME=$(ls site/app/assets | grep '^lauda-client_bg-.*\.wasm$' | head -n 1)
-          sed -i -E "s|/app/assets/lauda-client-[a-zA-Z0-9]+\.js|/app/assets/${JS_NAME}|g" site/app/index.html
-          sed -i -E "s|/app/assets/lauda-client_bg-[a-zA-Z0-9]+\.wasm|/app/assets/${WASM_NAME}|g" site/app/index.html
+          sed -i -E "s|/app/assets/lauda-client-[^\"']+\.js|/app/assets/${JS_NAME}|g" site/app/index.html
+          sed -i -E "s|/app/assets/lauda-client_bg-[^\"']+\.wasm|/app/assets/${WASM_NAME}|g" site/app/index.html
       - name: "Deploy to Cloudflare Workers"
         run: |
           if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
