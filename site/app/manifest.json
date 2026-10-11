@@ -1,0 +1,24 @@
+{
+  "name": "Lauda",
+  "short_name": "Lauda",
+  "description": "Smolclient minimalista de e-mail em texto puro e estética Trash Polka",
+  "start_url": "/app/",
+  "scope": "/app/",
+  "display": "standalone",
+  "background_color": "#f4efe6",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "/lauda-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/lauda-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

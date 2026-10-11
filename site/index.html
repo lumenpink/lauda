@@ -206,10 +206,22 @@
 </head>
 <body>
   <div class="container">
-    <header>
-      <div class="stamp">DIOXUS 0.7 // BM25 SEARCH</div>
-      <h1>LAUDA</h1>
-      <div class="subtitle">O Smolclient de Correio Minimalista</div>
+    <header style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.5rem; position: relative;">
+      <div style="display: flex; align-items: center; gap: 1.2rem;">
+        <img src="./lauda-logo.svg" alt="LAUDA Logo" style="width: 76px; height: 76px; border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); background: #f4efe6; border-radius: 16px;" />
+        <div>
+          <h1>LAUDA</h1>
+          <div class="subtitle">O Smolclient de Correio Minimalista</div>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.8rem;">
+        <div style="border: 2px dashed var(--crimson); color: var(--crimson); padding: 0.3rem 0.8rem; font-family: 'Special Elite', cursive; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 2px;">
+          DIOXUS 0.7 // WEB &amp; NDK
+        </div>
+        <a href="/app" style="background: var(--ink); color: var(--paper); padding: 0.6rem 1.2rem; text-decoration: none; font-weight: bold; font-size: 0.95rem; border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--crimson); text-transform: uppercase;">
+          ⚡ ABRIR WEBAPP (/app)
+        </a>
+      </div>
     </header>
 
     <div class="manifesto">

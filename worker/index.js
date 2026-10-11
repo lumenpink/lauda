@@ -62,7 +62,19 @@ export default {
       return new Response(object.body, { headers });
     }
 
-    // Todas as outras rotas (landing page, version.json, version-nightly.json) são servidas via Assets estáticos
+    // Roteamento da WebApp SPA (/app e /app/)
+    if (url.pathname === "/app" || url.pathname === "/app/") {
+      const appIndexUrl = new URL("/app/index.html", request.url);
+      return env.ASSETS.fetch(new Request(appIndexUrl, request));
+    }
+
+    // Se for rota sob /app/* mas não for asset direto (sem extensão de arquivo), faz fallback para /app/index.html
+    if (url.pathname.startsWith("/app/") && !url.pathname.includes(".")) {
+      const appIndexUrl = new URL("/app/index.html", request.url);
+      return env.ASSETS.fetch(new Request(appIndexUrl, request));
+    }
+
+    // Todas as outras rotas (landing page, assets, version.json, version-nightly.json) são servidas via Assets estáticos
     return env.ASSETS.fetch(request);
   },
 };

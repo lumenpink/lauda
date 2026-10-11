@@ -158,6 +158,45 @@ cat <<EOF > "$SITE_DIR/version.json"
 }
 EOF
 
+# 7. Compilar WebApp WebAssembly (Dioxus Web) e atualizar site/app
+echo "-> Compilando WebApp WebAssembly com dx (target web)..."
+(cd "$REPO_ROOT/lauda-client" && $DX_BIN build --platform web --release)
+mkdir -p "$SITE_DIR/app"
+cp -r "$REPO_ROOT/target/dx/lauda-client/release/web/public/"* "$SITE_DIR/app/"
+
+# Ajustar index.html para caminhos relativos ao /app/ e registrar PWA Service Worker
+python3 -c "
+with open('$SITE_DIR/app/index.html', 'r') as f:
+    html = f.read()
+html_fixed = html.replace('/./assets/', '/app/assets/')
+html_fixed = html_fixed.replace('dioxus | ⛺', 'LAUDA // Smolclient')
+head_insert = '''    <link rel=\"manifest\" href=\"/app/manifest.json\">
+    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/lauda-logo.svg\">
+    <meta name=\"theme-color\" content=\"#0a0a0a\">
+    <style>
+      body { margin: 0; padding: 0; background-color: #f4efe6; font-family: monospace; }
+    </style>
+'''
+if '<link rel=\"manifest\"' not in html_fixed:
+    html_fixed = html_fixed.replace('</head>', f'{head_insert}</head>')
+
+sw_register = '''
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/app/sw.js', { scope: '/app/' }).catch(() => {});
+    });
+  }
+</script>
+'''
+if 'serviceWorker' not in html_fixed:
+    html_fixed = html_fixed.replace('</body>', f'{sw_register}</body>')
+
+with open('$SITE_DIR/app/index.html', 'w') as f:
+    f.write(html_fixed)
+"
+echo "✅ WebApp atualizada em $SITE_DIR/app"
+
 # 8. Upload dos APKs para o Bucket Cloudflare R2
 echo "-> Enviando APKs para o bucket R2: $BUCKET_NAME..."
 npx wrangler r2 object put "$BUCKET_NAME/lauda-nightly.apk" \

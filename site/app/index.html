@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>LAUDA // Smolclient</title>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="UTF-8" />
+  <link rel="preload" as="script" href="/app/assets/lauda-client-dec06a3049e0769d.js" crossorigin><link rel="preload" as="fetch" type="application/wasm" href="/app/assets/lauda-client_bg-d5d9ce46f983a64a.wasm" crossorigin>    <link rel="manifest" href="/app/manifest.json">
+    <link rel="icon" type="image/svg+xml" href="/lauda-logo.svg">
+    <meta name="theme-color" content="#0a0a0a">
+    <style>
+      body { margin: 0; padding: 0; background-color: #f4efe6; font-family: monospace; }
+    </style>
+</head>
+  <body>
+    <div id="main"></div>
+  <script>
+            // We can't use a module script here because we need to start the script immediately when streaming
+            import("/app/assets/lauda-client-dec06a3049e0769d.js").then(
+                ({ default: init }) => {
+                init("/app/assets/lauda-client_bg-d5d9ce46f983a64a.wasm").then((wasm) => {
+                    if (wasm.__wbindgen_start == undefined) {
+                    wasm.main();
+                    }
+                });
+                }
+            );
+            </script>
+            
+            
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/app/sw.js', { scope: '/app/' }).catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
