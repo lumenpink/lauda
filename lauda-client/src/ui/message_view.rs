@@ -285,16 +285,6 @@ pub fn MessageView(
                         "🗑 EXCLUIR"
                     }
                 }
-
-                // Alternador Trifocal no Leitor (Botão Único Rotativo)
-                button {
-                    style: "background: #0a0a0a; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #dc143c; white-space: nowrap;",
-                    onclick: move |_| {
-                        let next_mode = current_view_mode.read().next();
-                        current_view_mode.set(next_mode);
-                    },
-                    "{current_view_mode.read().label()}"
-                }
             }
 
             // Metadados do Envelope
@@ -319,10 +309,6 @@ pub fn MessageView(
                         div { span { style: "font-weight: bold; color: #0a0a0a;", "CC: " } "{cc}" }
                     }
                     div { span { style: "font-weight: bold; color: #0a0a0a;", "DATA: " } "{envelope.date}" }
-                    div {
-                        style: "margin-top: 0.3rem; font-size: 0.8rem; font-weight: bold; color: #8b0000;",
-                        {format!("MODO ATIVO: {:?}", *current_view_mode.read())}
-                    }
                 }
             }
 
