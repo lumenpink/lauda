@@ -20,6 +20,7 @@ pub fn LoginView(
     let mut password_input = use_signal(String::new);
     let mut is_loading = use_signal(|| false);
     let mut error_msg = use_signal(|| None::<String>);
+    let mut show_server_config = use_signal(|| false);
 
     let handle_login = move |_| {
         let server = server_input.read().trim().to_string();
@@ -108,21 +109,43 @@ pub fn LoginView(
 
             div {
                 style: "display: flex; flex-direction: column; gap: 1rem;",
+                // Servidor Conectado: Selo Trash Polka compacto com botão de expansão discreto
                 div {
-                    label {
-                        r#for: "server_url",
-                        style: "display: block; font-weight: bold; font-size: 0.85rem; margin-bottom: 0.3rem;",
-                        "SERVIDOR LAUDA (URL):"
+                    style: "border: 1px solid #0a0a0a; background: #faf9f6; padding: 0.5rem 0.8rem; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;",
+                    div {
+                        style: "display: flex; align-items: center; gap: 0.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;",
+                        span { style: "color: #dc143c; font-weight: bold; font-size: 0.75rem;", "SERVIDOR:" }
+                        span { style: "font-family: monospace; font-size: 0.85rem; font-weight: bold; color: #0a0a0a; overflow: hidden; text-overflow: ellipsis;", "{server_input}" }
                     }
-                    input {
-                        id: "server_url",
-                        name: "server_url",
-                        autocomplete: "url",
-                        style: "width: 100%; box-sizing: border-box; padding: 0.6rem; border: 2px solid #0a0a0a; font-family: monospace; font-size: 1rem;",
-                        value: "{server_input}",
-                        oninput: move |evt| server_input.set(evt.value()),
-                        onchange: move |evt| server_input.set(evt.value()),
-                        placeholder: "http://127.0.0.1:8432",
+                    button {
+                        style: "background: none; border: none; cursor: pointer; color: #555; font-size: 0.75rem; text-decoration: underline; font-family: monospace; white-space: nowrap; padding: 0.2rem;",
+                        r#type: "button",
+                        onclick: move |_| {
+                            let curr = *show_server_config.read();
+                            show_server_config.set(!curr);
+                        },
+                        if *show_server_config.read() { "OCULTAR" } else { "ALTERAR" }
+                    }
+                }
+
+                if *show_server_config.read() {
+                    div {
+                        style: "border-left: 3px solid #dc143c; padding-left: 0.8rem; margin-top: -0.3rem;",
+                        label {
+                            r#for: "server_url",
+                            style: "display: block; font-weight: bold; font-size: 0.8rem; margin-bottom: 0.3rem; color: #555;",
+                            "URL DO SERVIDOR:"
+                        }
+                        input {
+                            id: "server_url",
+                            name: "server_url",
+                            autocomplete: "url",
+                            style: "width: 100%; box-sizing: border-box; padding: 0.5rem; border: 2px solid #0a0a0a; font-family: monospace; font-size: 0.9rem;",
+                            value: "{server_input}",
+                            oninput: move |evt| server_input.set(evt.value()),
+                            onchange: move |evt| server_input.set(evt.value()),
+                            placeholder: "https://lauda.lohn.in",
+                        }
                     }
                 }
 

@@ -27,6 +27,8 @@ pub fn InboxView(
     let mut is_refreshing = use_signal(|| false);
     let mut search_query = use_signal(String::new);
     let mut active_filter = use_signal(|| InboxFilter::All);
+    let mut error_msg = use_signal(|| None::<String>);
+    let mut loading_uid = use_signal(|| None::<u32>);
 
     let handle_refresh = move |_| {
         let sess = session.read().clone();
@@ -106,6 +108,18 @@ pub fn InboxView(
     rsx! {
         div {
             style: "display: flex; flex-direction: column; gap: 1rem;",
+
+            if let Some(ref err) = *error_msg.read() {
+                div {
+                    style: "border: 2px solid #dc143c; background: #ffebee; color: #b71c1c; padding: 0.8rem 1rem; font-weight: bold; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center;",
+                    span { "⚠ {err}" }
+                    button {
+                        style: "background: none; border: none; font-weight: bold; cursor: pointer; color: #b71c1c;",
+                        onclick: move |_| error_msg.set(None),
+                        "✕"
+                    }
+                }
+            }
 
             // Barra de Controle e Ações
             div {
@@ -273,24 +287,32 @@ pub fn InboxView(
                                     let sess = session.read().clone();
                                     let box_name = current_mailbox.read().clone();
                                     if let Some(token) = sess.token.clone() {
+                                        loading_uid.set(Some(uid));
+                                        error_msg.set(None);
                                         spawn(async move {
                                             let client = HttpApiClient::new(sess.server_url.clone());
-                                            if let Ok(msg) = client.get_message(&token, &box_name, uid).await {
-                                                let is_unread = !msg.envelope.is_read;
-                                                active_message.set(Some(msg));
-                                                screen.set(Screen::MessageDetail(uid));
-                                                if is_unread {
-                                                    let client_read = HttpApiClient::new(sess.server_url);
-                                                    if client_read.mark_read(&token, &box_name, uid, true).await.is_ok() {
-                                                        if let Some(m) = active_message.write().as_mut() {
-                                                            m.envelope.is_read = true;
-                                                        }
-                                                        if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
-                                                            m.is_read = true;
+                                            match client.get_message(&token, &box_name, uid).await {
+                                                Ok(msg) => {
+                                                    let is_unread = !msg.envelope.is_read;
+                                                    active_message.set(Some(msg));
+                                                    screen.set(Screen::MessageDetail(uid));
+                                                    if is_unread {
+                                                        let client_read = HttpApiClient::new(sess.server_url);
+                                                        if client_read.mark_read(&token, &box_name, uid, true).await.is_ok() {
+                                                            if let Some(m) = active_message.write().as_mut() {
+                                                                m.envelope.is_read = true;
+                                                            }
+                                                            if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
+                                                                m.is_read = true;
+                                                            }
                                                         }
                                                     }
                                                 }
+                                                Err(e) => {
+                                                    error_msg.set(Some(format!("Falha ao abrir mensagem #{}: {}", uid, e)));
+                                                }
                                             }
+                                            loading_uid.set(None);
                                         });
                                     }
                                 },
@@ -312,6 +334,9 @@ pub fn InboxView(
                                         }
                                         if is_flagged {
                                             span { style: "color: #dc143c; font-size: 0.95rem; font-weight: bold;", "★" }
+                                        }
+                                        if *loading_uid.read() == Some(uid) {
+                                            span { style: "color: #dc143c; font-size: 0.8rem; font-weight: bold; animation: pulse 1s infinite;", "CARREGANDO..." }
                                         }
                                         span { style: "font-size: 0.8rem; color: #666; margin-left: 0.3rem;", "{date}" }
                                     }

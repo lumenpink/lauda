@@ -10,15 +10,48 @@ pub struct SessionConfig {
     pub token: Option<String>,
 }
 
+/// Obtém a URL padrão do servidor Lauda baseando-se no ambiente de execução.
+pub fn detect_default_server_url() -> String {
+    #[cfg(target_arch = "wasm32")]
+    {
+        if let Some(win) = web_sys::window()
+            && let Ok(loc) = win.location().origin()
+            && !loc.is_empty()
+            && loc != "null"
+        {
+            // Se estiver rodando em lauda.lohn.in ou lauda.2lp.in
+            if loc.contains("lohn.in") {
+                return "https://lauda.lohn.in".to_string();
+            }
+            if loc.contains("2lp.in") {
+                return "https://lauda.lohn.in".to_string();
+            }
+            return loc;
+        }
+        "https://lauda.lohn.in".to_string()
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        if let Ok(env_url) = std::env::var("LAUDA_SERVER_URL")
+            && !env_url.is_empty()
+        {
+            return env_url;
+        }
+        #[cfg(target_os = "android")]
+        {
+            "https://lauda.lohn.in".to_string()
+        }
+        #[cfg(not(target_os = "android"))]
+        {
+            "http://127.0.0.1:8432".to_string()
+        }
+    }
+}
+
 impl Default for SessionConfig {
     fn default() -> Self {
-        #[cfg(target_os = "android")]
-        let default_server = "http://10.0.2.2:8432".to_string();
-        #[cfg(not(target_os = "android"))]
-        let default_server = "http://127.0.0.1:8432".to_string();
-
         Self {
-            server_url: default_server,
+            server_url: detect_default_server_url(),
             username: "lumen".to_string(),
             token: None,
         }

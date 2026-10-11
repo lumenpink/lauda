@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lauda-pwa-v2';
+const CACHE_NAME = 'lauda-pwa-v4';
 const ASSETS_TO_CACHE = [
   '/app/',
   '/app/index.html',

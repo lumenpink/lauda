@@ -126,10 +126,17 @@ impl MailApiClient for HttpApiClient {
             .map_err(|e| ClientError::Network(e.to_string()))?;
 
         match resp.status() {
-            StatusCode::OK => resp
-                .json::<Message>()
-                .await
-                .map_err(|e| ClientError::Network(format!("Erro ao deserializar mensagem: {}", e))),
+            StatusCode::OK => {
+                let text = resp
+                    .text()
+                    .await
+                    .map_err(|e| ClientError::Network(format!("Erro ao ler corpo da mensagem: {}", e)))?;
+                serde_json::from_str::<Message>(&text).map_err(|e| {
+                    #[cfg(target_arch = "wasm32")]
+                    web_sys::console::error_1(&format!("Erro ao deserializar mensagem UID {}: {} (body snippet: {})", uid, e, &text[..text.len().min(200)]).into());
+                    ClientError::Network(format!("Erro ao deserializar mensagem: {}", e))
+                })
+            }
             StatusCode::UNAUTHORIZED => Err(ClientError::AuthFailed),
             StatusCode::NOT_FOUND => Err(ClientError::NotFound),
             status => Err(ClientError::Network(format!(
