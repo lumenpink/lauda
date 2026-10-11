@@ -341,5 +341,6 @@ pub fn app_router(backend: Arc<dyn MailBackend>, jwt_secret: impl Into<String>) 
             get(get_attachment_handler),
         )
         .route("/compose", post(compose_handler))
+        .layer(tower_http::cors::CorsLayer::permissive())
         .with_state(state)
 }
