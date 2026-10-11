@@ -30,6 +30,7 @@ O **`lauda`** é um cliente de e-mail ultraleve focado em leitura pura e redaç�
 ```text
 lauda/
 ├── lauda-types/       # Contratos de dados serde compartilhados
+├── lauda-index/       # Motor nativo de busca com parser Gmail, BM25 e fuzzy search
 ├── lauda-server/      # Micro-daemon HTTP axum + ponte IMAP Dovecot
 └── lauda-client/      # App Dioxus Mobile (Android NDK) + Desktop (x86_64)
 ```

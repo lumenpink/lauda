@@ -165,16 +165,30 @@
       font-size: 0.9rem;
     }
 
-    footer {
-      border-top: 2px solid var(--ink);
-      padding-top: 1.5rem;
+    .site-footer {
+      border-top: 1px solid var(--ink);
+      padding: 2rem 1rem 0 1rem;
       margin-top: 3rem;
-      display: flex;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 1rem;
+      text-align: center;
       font-size: 0.85rem;
-      font-weight: 700;
+      line-height: 1.6;
+    }
+
+    .footer-canonical {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .footer-line-identity {
+      font-weight: 500;
+    }
+
+    .footer-line-metadata {
+      color: #666;
+      font-size: 0.8rem;
     }
 
     a {
@@ -189,71 +203,51 @@
       text-decoration: none;
     }
   </style>
-
-  <style>
-    .site-footer {
-      border-top: 1px solid var(--border, #333);
-      padding: 2rem 1rem;
-      margin-top: 3rem;
-      text-align: center;
-      font-size: 0.85rem;
-      line-height: 1.6;
-    }
-    .footer-canonical {
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-      align-items: center;
-      justify-content: center;
-    }
-    .footer-line-identity {
-      font-weight: 500;
-    }
-    .footer-line-metadata {
-      color: var(--text-muted, #888);
-      font-size: 0.8rem;
-    }
-    .site-footer a {
-      color: var(--accent, #ff79c6);
-      text-decoration: none;
-    }
-    .site-footer a:hover {
-      text-decoration: underline;
-    }
-  </style>
-
 </head>
 <body>
   <div class="container">
     <header>
-      <div class="stamp">DIOXUS // SMOLCLIENT</div>
+      <div class="stamp">DIOXUS 0.7 // BM25 SEARCH</div>
       <h1>LAUDA</h1>
       <div class="subtitle">O Smolclient de Correio Minimalista</div>
     </header>
 
     <div class="manifesto">
-      Interface ultraleve para leitura em texto puro e redação rápida sem a sobrecarga de clientes IMAP/SMTP tradicionais. Compilação nativa Android NDK e Linux desktop via Dioxus, consumindo micro-API segura sobre rede fechada.
+      Interface ultraleve para leitura em texto puro e redação rápida sem a sobrecarga de clientes IMAP/SMTP tradicionais. Compilação nativa Android NDK e Linux desktop via Dioxus, com resiliência offline completa, outbox assíncrona, sincronização SWR e motor de busca BM25 nativo em Rust puro.
     </div>
 
     <div class="grid">
       <div class="card">
         <h3>01. VISÕES TRIFÁSICAS</h3>
-        <p>Alternador nativo entre <code>txt auto</code> (Markdown processado), <code>txt original</code> (texto cru com espaçamento fixo) e <code>html</code> (container sandboxed).</p>
+        <p>Alternador nativo entre <code>txt auto</code> (Markdown processado), <code>txt original</code> (texto cru com espaçamento fixo) e <code>html</code> (container sandboxed para envelopes gráficos).</p>
       </div>
       <div class="card">
-        <h3>02. REDAÇÃO SEM TRAVAS</h3>
-        <p>Campo <code>From</code> livre com autocompletar de aliases favoritos e composição ágil em fonte monoespaçada.</p>
+        <h3>02. SUPERBUSCA COM BM25</h3>
+        <p>Motor <code>lauda-index</code> em Rust puro com sintaxe Gmail (<code>from:</code>, <code>subject:</code>, <code>has:attachment</code>, <code>is:unread</code>, <code>OR</code>, <code>-not</code>) e fuzzy matching tolerante a erros de digitação.</p>
       </div>
       <div class="card">
-        <h3>03. NDK DESDE O DIA ZERO</h3>
-        <p>Arquitetura compilada para Android NDK e desktop Linux com a mesma árvore declarativa Dioxus.</p>
+        <h3>03. CACHE OFFLINE & SWR</h3>
+        <p>Carregamento imediato em 0ms via cache local particionado, retenção de mensagens por 90 dias e reconciliação automática de ações offline.</p>
+      </div>
+      <div class="card">
+        <h3>04. OUTBOX ASSÍNCRONA</h3>
+        <p>Optimistic UI: clique em Enviar e volte imediatamente para a caixa de entrada. O envio ocorre em segundo plano com persistência atômica e retentativas.</p>
+      </div>
+      <div class="card">
+        <h3>05. NDK DESDE O DIA ZERO</h3>
+        <p>Arquitetura compilada para Android NDK (ARM64 & x86_64) e desktop Linux com a mesma árvore declarativa Dioxus e suporte a gestos de navegação nativos.</p>
+      </div>
+      <div class="card">
+        <h3>06. REDAÇÃO SEM TRAVAS</h3>
+        <p>Campo <code>From</code> livre com autocompletar de aliases favoritos, suporte a múltiplos anexos e composição monoespaçada limpa.</p>
       </div>
     </div>
 
     <h2 style="font-family: 'Special Elite', cursive; text-transform: uppercase; margin-top: 2rem;">ARQUITETURA DO WORKSPACE</h2>
     <pre>lauda/
 ├── lauda-types/    # Contratos serde de dados compartilhados
-├── lauda-server/   # Micro-daemon HTTP axum + ponte Dovecot
+├── lauda-index/    # Motor nativo de busca com parser Gmail, BM25 e fuzzy search
+├── lauda-server/   # Micro-daemon HTTP axum conectado ao Maildir/Dovecot
 └── lauda-client/   # App Dioxus Mobile (Android NDK) + Desktop</pre>
 
     <div class="card" style="margin-top: 2rem; border: 3px solid var(--crimson); background: #fdfaf6;">
@@ -284,15 +278,15 @@
     </div>
 
     <footer class="site-footer">
-    <div class="footer-canonical">
-      <div class="footer-line footer-line-identity">
-        Orgulhosamente produzido por uma <a href="https://travesti.2lp.in/pt/" target="_blank" rel="noopener">travesti latina</a> 🏳️‍⚧️ :)
+      <div class="footer-canonical">
+        <div class="footer-line footer-line-identity">
+          Orgulhosamente produzido por uma <a href="https://travesti.2lp.in/pt/" target="_blank" rel="noopener">travesti latina</a> 🏳️‍⚧️ :)
+        </div>
+        <div class="footer-line footer-line-metadata">
+          lauda v0.2.0 • por <a href="https://lumen.pink" target="_blank" rel="noopener">Lumen Pink</a> • Brasil 🇧🇷 • <a href="https://codeberg.org/lumenpink/lauda/src/branch/main/LICENSE" target="_blank" rel="noopener">GPL-3.0</a>
+        </div>
       </div>
-      <div class="footer-line footer-line-metadata">
-        lauda v0.2.0 • por <a href="https://lumen.pink" target="_blank" rel="noopener">Lumen Pink</a> • Brasil 🇧🇷 • <a href="LICENSE" target="_blank" rel="noopener">GPL-3.0</a>
-      </div>
-    </div>
-  </footer>
+    </footer>
   </div>
 </body>
 </html>
