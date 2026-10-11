@@ -17,7 +17,8 @@ pub enum ClientError {
 }
 
 /// Porta de comunicação com a API remota do Lauda.
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 pub trait MailApiClient: Send + Sync {
     async fn login(&self, req: &LoginRequest) -> Result<TokenResponse, ClientError>;
     async fn list_mailboxes(&self, token: &str) -> Result<Vec<MailboxInfo>, ClientError>;

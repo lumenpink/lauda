@@ -38,6 +38,7 @@ impl OutboxQueue {
     }
 
     /// Escreve atomicamente no arquivo da fila.
+    #[allow(dead_code)]
     fn write_atomic(dest: &Path, content: &[u8]) -> std::io::Result<()> {
         if let Some(parent) = dest.parent() {
             std::fs::create_dir_all(parent)?;
@@ -58,24 +59,54 @@ impl OutboxQueue {
 
     /// Retorna todos os itens da fila ordenados por data de criação.
     pub fn list(&self) -> std::io::Result<Vec<OutboxItem>> {
-        if !self.queue_path.exists() {
-            return Ok(Vec::new());
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Some(window) = web_sys::window()
+                && let Ok(Some(storage)) = window.local_storage()
+                && let Ok(Some(content)) = storage.get_item("lauda_outbox_queue")
+            {
+                let mut items: Vec<OutboxItem> = serde_json::from_str(&content)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                items.sort_by_key(|item| item.created_at_unix);
+                Ok(items)
+            } else {
+                Ok(Vec::new())
+            }
         }
-        let content = std::fs::read(&self.queue_path)?;
-        if content.is_empty() {
-            return Ok(Vec::new());
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if !self.queue_path.exists() {
+                return Ok(Vec::new());
+            }
+            let content = std::fs::read(&self.queue_path)?;
+            if content.is_empty() {
+                return Ok(Vec::new());
+            }
+            let mut items: Vec<OutboxItem> = serde_json::from_slice(&content)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            items.sort_by_key(|item| item.created_at_unix);
+            Ok(items)
         }
-        let mut items: Vec<OutboxItem> = serde_json::from_slice(&content)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        items.sort_by_key(|item| item.created_at_unix);
-        Ok(items)
     }
 
     /// Grava a lista completa de itens de volta para a fila.
     fn save_all(&self, items: &[OutboxItem]) -> std::io::Result<()> {
-        let json = serde_json::to_vec_pretty(items)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Self::write_atomic(&self.queue_path, &json)
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Some(window) = web_sys::window()
+                && let Ok(Some(storage)) = window.local_storage()
+                && let Ok(json) = serde_json::to_string(items)
+            {
+                let _ = storage.set_item("lauda_outbox_queue", &json);
+            }
+            Ok(())
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let json = serde_json::to_vec_pretty(items)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            Self::write_atomic(&self.queue_path, &json)
+        }
     }
 
     /// Adiciona uma nova mensagem à fila com status Pending.

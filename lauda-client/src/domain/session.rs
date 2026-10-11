@@ -60,51 +60,89 @@ pub fn get_default_session_path() -> PathBuf {
     }
 }
 
-/// Carrega a sessão do disco. Retorna None se o arquivo não existir ou for inválido.
+/// Carrega a sessão do disco ou localStorage (em WASM). Retorna None se não existir ou for inválido.
 pub fn load_session(path: Option<&Path>) -> Option<SessionConfig> {
-    let resolved_path = match path {
-        Some(p) => p.to_path_buf(),
-        None => get_default_session_path(),
-    };
-
-    if !resolved_path.exists() {
-        return None;
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = path;
+        let window = web_sys::window()?;
+        let storage = window.local_storage().ok()??;
+        let content = storage.get_item("lauda_session").ok()??;
+        serde_json::from_str(&content).ok()
     }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let resolved_path = match path {
+            Some(p) => p.to_path_buf(),
+            None => get_default_session_path(),
+        };
 
-    let content = std::fs::read_to_string(&resolved_path).ok()?;
-    serde_json::from_str(&content).ok()
+        if !resolved_path.exists() {
+            return None;
+        }
+
+        let content = std::fs::read_to_string(&resolved_path).ok()?;
+        serde_json::from_str(&content).ok()
+    }
 }
 
-/// Grava a sessão no disco de forma determinística.
+/// Grava a sessão no disco de forma determinística ou no localStorage (em WASM).
 pub fn save_session(config: &SessionConfig, path: Option<&Path>) -> Result<(), std::io::Error> {
-    let resolved_path = match path {
-        Some(p) => p.to_path_buf(),
-        None => get_default_session_path(),
-    };
-
-    if let Some(parent) = resolved_path.parent()
-        && !parent.exists()
+    #[cfg(target_arch = "wasm32")]
     {
-        std::fs::create_dir_all(parent)?;
+        let _ = path;
+        if let Some(window) = web_sys::window()
+            && let Ok(Some(storage)) = window.local_storage()
+            && let Ok(json) = serde_json::to_string(config)
+        {
+            let _ = storage.set_item("lauda_session", &json);
+        }
+        Ok(())
     }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let resolved_path = match path {
+            Some(p) => p.to_path_buf(),
+            None => get_default_session_path(),
+        };
 
-    let json = serde_json::to_string_pretty(config)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-    std::fs::write(&resolved_path, json)?;
-    Ok(())
+        if let Some(parent) = resolved_path.parent()
+            && !parent.exists()
+        {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let json = serde_json::to_string_pretty(config)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        std::fs::write(&resolved_path, json)?;
+        Ok(())
+    }
 }
 
 /// Remove a sessão persistida (ex: ao fazer logout).
 pub fn clear_session(path: Option<&Path>) -> Result<(), std::io::Error> {
-    let resolved_path = match path {
-        Some(p) => p.to_path_buf(),
-        None => get_default_session_path(),
-    };
-
-    if resolved_path.exists() {
-        std::fs::remove_file(resolved_path)?;
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = path;
+        if let Some(window) = web_sys::window()
+            && let Ok(Some(storage)) = window.local_storage()
+        {
+            let _ = storage.remove_item("lauda_session");
+        }
+        Ok(())
     }
-    Ok(())
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let resolved_path = match path {
+            Some(p) => p.to_path_buf(),
+            None => get_default_session_path(),
+        };
+
+        if resolved_path.exists() {
+            std::fs::remove_file(resolved_path)?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

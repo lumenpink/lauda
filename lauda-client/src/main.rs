@@ -1,14 +1,24 @@
 use lauda_client::App;
 
 fn main() {
-    #[cfg(any(feature = "desktop", feature = "mobile"))]
+    #[cfg(any(
+        feature = "desktop",
+        feature = "mobile",
+        feature = "web",
+        target_arch = "wasm32"
+    ))]
     {
         dioxus::launch(App);
     }
 
-    #[cfg(not(any(feature = "desktop", feature = "mobile")))]
+    #[cfg(not(any(
+        feature = "desktop",
+        feature = "mobile",
+        feature = "web",
+        target_arch = "wasm32"
+    )))]
     {
-        println!("Lauda Smolclient — compile com --features desktop ou --features mobile.");
+        println!("Lauda Smolclient — compile com --features desktop, mobile ou web.");
         let _ = App;
     }
 }

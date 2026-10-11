@@ -38,6 +38,7 @@ impl ActionsQueue {
     }
 
     /// Escreve atomicamente no arquivo da fila de ações.
+    #[allow(dead_code)]
     fn write_atomic(dest: &Path, content: &[u8]) -> std::io::Result<()> {
         if let Some(parent) = dest.parent() {
             std::fs::create_dir_all(parent)?;
@@ -58,24 +59,54 @@ impl ActionsQueue {
 
     /// Retorna todas as ações pendentes na fila por ordem cronológica.
     pub fn list(&self) -> std::io::Result<Vec<QueuedAction>> {
-        if !self.queue_path.exists() {
-            return Ok(Vec::new());
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Some(window) = web_sys::window()
+                && let Ok(Some(storage)) = window.local_storage()
+                && let Ok(Some(content)) = storage.get_item("lauda_actions_queue")
+            {
+                let mut actions: Vec<QueuedAction> = serde_json::from_str(&content)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                actions.sort_by_key(|a| a.created_at_unix);
+                Ok(actions)
+            } else {
+                Ok(Vec::new())
+            }
         }
-        let content = std::fs::read(&self.queue_path)?;
-        if content.is_empty() {
-            return Ok(Vec::new());
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if !self.queue_path.exists() {
+                return Ok(Vec::new());
+            }
+            let content = std::fs::read(&self.queue_path)?;
+            if content.is_empty() {
+                return Ok(Vec::new());
+            }
+            let mut actions: Vec<QueuedAction> = serde_json::from_slice(&content)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            actions.sort_by_key(|a| a.created_at_unix);
+            Ok(actions)
         }
-        let mut actions: Vec<QueuedAction> = serde_json::from_slice(&content)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        actions.sort_by_key(|a| a.created_at_unix);
-        Ok(actions)
     }
 
     /// Salva toda a coleção de ações atomicamente.
     fn save_all(&self, actions: &[QueuedAction]) -> std::io::Result<()> {
-        let json = serde_json::to_vec_pretty(actions)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Self::write_atomic(&self.queue_path, &json)
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Some(window) = web_sys::window()
+                && let Ok(Some(storage)) = window.local_storage()
+                && let Ok(json) = serde_json::to_string(actions)
+            {
+                let _ = storage.set_item("lauda_actions_queue", &json);
+            }
+            Ok(())
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let json = serde_json::to_vec_pretty(actions)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            Self::write_atomic(&self.queue_path, &json)
+        }
     }
 
     /// Enfileira uma nova ação atômica.

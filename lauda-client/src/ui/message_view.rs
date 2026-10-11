@@ -407,11 +407,19 @@ pub fn MessageView(
                                                                 let client = HttpApiClient::new(sess.server_url);
                                                                 match client.fetch_attachment(&token, &box_name, uid, att_id).await {
                                                                     Ok((_name, _ct, bytes)) => {
-                                                                        let target = resolve_download_dir().join(&fname);
-                                                                        if std::fs::write(&target, bytes).is_ok() {
-                                                                            download_status.set(Some((att_id, format!("✓ Salvo em {}", target.display()))));
-                                                                        } else {
-                                                                            download_status.set(Some((att_id, "Erro ao gravar arquivo no disco".to_string())));
+                                                                        #[cfg(target_arch = "wasm32")]
+                                                                        {
+                                                                            let _ = bytes;
+                                                                            download_status.set(Some((att_id, format!("✓ Use o botão LINK para salvar {}", fname))));
+                                                                        }
+                                                                        #[cfg(not(target_arch = "wasm32"))]
+                                                                        {
+                                                                            let target = resolve_download_dir().join(&fname);
+                                                                            if std::fs::write(&target, bytes).is_ok() {
+                                                                                download_status.set(Some((att_id, format!("✓ Salvo em {}", target.display()))));
+                                                                            } else {
+                                                                                download_status.set(Some((att_id, "Erro ao gravar arquivo no disco".to_string())));
+                                                                            }
                                                                         }
                                                                     }
                                                                     Err(e) => {
@@ -451,6 +459,7 @@ pub fn MessageView(
     }
 }
 
+#[allow(dead_code)]
 fn resolve_download_dir() -> std::path::PathBuf {
     if let Ok(home) = std::env::var("HOME") {
         let p = std::path::PathBuf::from(home).join("Downloads");

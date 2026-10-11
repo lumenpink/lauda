@@ -52,6 +52,7 @@ impl LocalMessageCache {
 
     /// Escreve um arquivo de forma atômica utilizando escrita em arquivo temporário (.tmp)
     /// seguida de renomeação atômica pelo sistema operacional.
+    #[allow(dead_code)]
     fn write_atomic(dest: &Path, content: &[u8]) -> std::io::Result<()> {
         if let Some(parent) = dest.parent() {
             std::fs::create_dir_all(parent)?;
@@ -70,27 +71,57 @@ impl LocalMessageCache {
         Ok(())
     }
 
-    /// Grava a lista de caixas de correio de forma atômica no disco.
+    /// Grava a lista de caixas de correio de forma atômica no disco ou localStorage (WASM).
     pub fn save_mailboxes(&self, mailboxes: &[MailboxInfo]) -> std::io::Result<()> {
-        let path = self.base_dir.join("mailboxes.json");
-        let json = serde_json::to_vec_pretty(mailboxes)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Self::write_atomic(&path, &json)
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Some(window) = web_sys::window()
+                && let Ok(Some(storage)) = window.local_storage()
+                && let Ok(json) = serde_json::to_string(mailboxes)
+            {
+                let _ = storage.set_item("lauda_cache_mailboxes", &json);
+            }
+            Ok(())
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let path = self.base_dir.join("mailboxes.json");
+            let json = serde_json::to_vec_pretty(mailboxes)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            Self::write_atomic(&path, &json)
+        }
     }
 
     /// Lê a lista de caixas de correio em cache. Retorna None se não existir.
     pub fn load_mailboxes(&self) -> std::io::Result<Option<Vec<MailboxInfo>>> {
-        let path = self.base_dir.join("mailboxes.json");
-        if !path.exists() {
-            return Ok(None);
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Some(window) = web_sys::window()
+                && let Ok(Some(storage)) = window.local_storage()
+                && let Ok(Some(content)) = storage.get_item("lauda_cache_mailboxes")
+            {
+                let mailboxes = serde_json::from_str(&content)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                Ok(Some(mailboxes))
+            } else {
+                Ok(None)
+            }
         }
-        let content = std::fs::read(&path)?;
-        let mailboxes = serde_json::from_slice(&content)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Ok(Some(mailboxes))
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let path = self.base_dir.join("mailboxes.json");
+            if !path.exists() {
+                return Ok(None);
+            }
+            let content = std::fs::read(&path)?;
+            let mailboxes = serde_json::from_slice(&content)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            Ok(Some(mailboxes))
+        }
     }
 
     /// Retorna o diretório raiz de uma caixa específica.
+    #[allow(dead_code)]
     fn mailbox_dir(&self, mailbox: &str) -> PathBuf {
         let slug = Self::sanitize_slug(mailbox);
         self.base_dir.join("mailboxes").join(slug)
@@ -102,25 +133,57 @@ impl LocalMessageCache {
         mailbox: &str,
         envelopes: &[MessageEnvelope],
     ) -> std::io::Result<()> {
-        let path = self.mailbox_dir(mailbox).join("envelopes.json");
-        let json = serde_json::to_vec_pretty(envelopes)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Self::write_atomic(&path, &json)
+        #[cfg(target_arch = "wasm32")]
+        {
+            let key = format!("lauda_cache_envelopes_{}", Self::sanitize_slug(mailbox));
+            if let Some(window) = web_sys::window()
+                && let Ok(Some(storage)) = window.local_storage()
+                && let Ok(json) = serde_json::to_string(envelopes)
+            {
+                let _ = storage.set_item(&key, &json);
+            }
+            Ok(())
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let path = self.mailbox_dir(mailbox).join("envelopes.json");
+            let json = serde_json::to_vec_pretty(envelopes)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            Self::write_atomic(&path, &json)
+        }
     }
 
     /// Lê a lista de envelopes de uma caixa de correio em cache.
     pub fn load_envelopes(&self, mailbox: &str) -> std::io::Result<Option<Vec<MessageEnvelope>>> {
-        let path = self.mailbox_dir(mailbox).join("envelopes.json");
-        if !path.exists() {
-            return Ok(None);
+        #[cfg(target_arch = "wasm32")]
+        {
+            let key = format!("lauda_cache_envelopes_{}", Self::sanitize_slug(mailbox));
+            if let Some(window) = web_sys::window()
+                && let Ok(Some(storage)) = window.local_storage()
+                && let Ok(Some(content)) = storage.get_item(&key)
+            {
+                let envelopes = serde_json::from_str(&content)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                Ok(Some(envelopes))
+            } else {
+                Ok(None)
+            }
         }
-        let content = std::fs::read(&path)?;
-        let envelopes = serde_json::from_slice(&content)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Ok(Some(envelopes))
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let path = self.mailbox_dir(mailbox).join("envelopes.json");
+            if !path.exists() {
+                return Ok(None);
+            }
+            let content = std::fs::read(&path)?;
+            let envelopes = serde_json::from_slice(&content)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            Ok(Some(envelopes))
+        }
     }
 
     /// Caminho do arquivo de corpo de uma mensagem individual.
+    #[allow(dead_code)]
     fn message_path(&self, mailbox: &str, uid: u32) -> PathBuf {
         self.mailbox_dir(mailbox)
             .join("messages")
@@ -129,22 +192,57 @@ impl LocalMessageCache {
 
     /// Grava o corpo completo de uma mensagem individual de forma atômica.
     pub fn save_message(&self, mailbox: &str, msg: &Message) -> std::io::Result<()> {
-        let path = self.message_path(mailbox, msg.envelope.uid);
-        let json = serde_json::to_vec_pretty(msg)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Self::write_atomic(&path, &json)
+        #[cfg(target_arch = "wasm32")]
+        {
+            let key = format!(
+                "lauda_cache_msg_{}_{}",
+                Self::sanitize_slug(mailbox),
+                msg.envelope.uid
+            );
+            if let Some(window) = web_sys::window()
+                && let Ok(Some(storage)) = window.local_storage()
+                && let Ok(json) = serde_json::to_string(msg)
+            {
+                let _ = storage.set_item(&key, &json);
+            }
+            Ok(())
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let path = self.message_path(mailbox, msg.envelope.uid);
+            let json = serde_json::to_vec_pretty(msg)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            Self::write_atomic(&path, &json)
+        }
     }
 
     /// Carrega o corpo completo de uma mensagem individual em cache.
     pub fn load_message(&self, mailbox: &str, uid: u32) -> std::io::Result<Option<Message>> {
-        let path = self.message_path(mailbox, uid);
-        if !path.exists() {
-            return Ok(None);
+        #[cfg(target_arch = "wasm32")]
+        {
+            let key = format!("lauda_cache_msg_{}_{}", Self::sanitize_slug(mailbox), uid);
+            if let Some(window) = web_sys::window()
+                && let Ok(Some(storage)) = window.local_storage()
+                && let Ok(Some(content)) = storage.get_item(&key)
+            {
+                let msg = serde_json::from_str(&content)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                Ok(Some(msg))
+            } else {
+                Ok(None)
+            }
         }
-        let content = std::fs::read(&path)?;
-        let msg = serde_json::from_slice(&content)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        Ok(Some(msg))
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let path = self.message_path(mailbox, uid);
+            if !path.exists() {
+                return Ok(None);
+            }
+            let content = std::fs::read(&path)?;
+            let msg = serde_json::from_slice(&content)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            Ok(Some(msg))
+        }
     }
 
     /// Parser minimalista para timestamps ISO-8601 UTC (ex: "2026-10-10T12:00:00Z" ou "2026-10-10 12:00:00").
@@ -275,6 +373,10 @@ impl LocalMessageCache {
 
 /// Obtém o caminho padrão de diretório de cache conforme a plataforma.
 pub fn get_default_cache_dir() -> PathBuf {
+    #[cfg(target_arch = "wasm32")]
+    {
+        PathBuf::from("web_cache")
+    }
     #[cfg(target_os = "android")]
     {
         if let Ok(home) = std::env::var("HOME")
@@ -287,7 +389,7 @@ pub fn get_default_cache_dir() -> PathBuf {
         }
         PathBuf::from("/data/data/in.twolp.lauda/cache")
     }
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
     {
         if let Ok(path) = std::env::var("LAUDA_CACHE_PATH")
             && !path.is_empty()

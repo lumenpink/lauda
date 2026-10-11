@@ -33,7 +33,8 @@ impl HttpApiClient {
     }
 }
 
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl MailApiClient for HttpApiClient {
     async fn login(&self, req: &LoginRequest) -> Result<TokenResponse, ClientError> {
         let url = format!("{}/auth/login", self.base_url);
