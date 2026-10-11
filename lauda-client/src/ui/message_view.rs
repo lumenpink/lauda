@@ -337,10 +337,23 @@ pub fn MessageView(
                                     "{txt_original_body}"
                                 }
                             },
-                            ViewMode::Html => rsx! {
-                                div {
-                                    style: "line-height: 1.5; font-size: 0.95rem; color: #0a0a0a; background: transparent; padding: 0; overflow-x: auto; width: 100%;",
-                                    dangerous_inner_html: "{html_body}",
+                            ViewMode::Html => {
+                                let styled_html_body = format!(
+                                    r#"<style>
+.lauda-html-body .paper-sheet > table {{
+    min-height: 848px !important;
+    height: 100% !important;
+}}
+.lauda-html-body .paper-sheet > table > tbody > tr > td {{
+    height: 100% !important;
+}}
+</style><div class="lauda-html-body">{html_body}</div>"#
+                                );
+                                rsx! {
+                                    div {
+                                        style: "line-height: 1.5; font-size: 0.95rem; color: #0a0a0a; background: transparent; padding: 0; overflow-x: auto; width: 100%;",
+                                        dangerous_inner_html: "{styled_html_body}",
+                                    }
                                 }
                             },
                         }
