@@ -274,10 +274,22 @@ pub fn InboxView(
                                     let box_name = current_mailbox.read().clone();
                                     if let Some(token) = sess.token.clone() {
                                         spawn(async move {
-                                            let client = HttpApiClient::new(sess.server_url);
+                                            let client = HttpApiClient::new(sess.server_url.clone());
                                             if let Ok(msg) = client.get_message(&token, &box_name, uid).await {
+                                                let is_unread = !msg.envelope.is_read;
                                                 active_message.set(Some(msg));
                                                 screen.set(Screen::MessageDetail(uid));
+                                                if is_unread {
+                                                    let client_read = HttpApiClient::new(sess.server_url);
+                                                    if client_read.mark_read(&token, &box_name, uid, true).await.is_ok() {
+                                                        if let Some(m) = active_message.write().as_mut() {
+                                                            m.envelope.is_read = true;
+                                                        }
+                                                        if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
+                                                            m.is_read = true;
+                                                        }
+                                                    }
+                                                }
                                             }
                                         });
                                     }

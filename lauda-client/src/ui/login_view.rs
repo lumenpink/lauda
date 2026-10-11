@@ -22,14 +22,20 @@ pub fn LoginView(
     let mut error_msg = use_signal(|| None::<String>);
 
     let handle_login = move |_| {
-        let server = server_input.read().clone();
-        let user = username_input.read().clone();
-        let pass = password_input.read().clone();
+        let server = server_input.read().trim().to_string();
+        let user = username_input.read().trim().to_string();
+        let pass = password_input.read().trim().to_string();
 
-        if server.trim().is_empty() || user.trim().is_empty() || pass.trim().is_empty() {
-            error_msg.set(Some(
-                "Preencha todos os campos para autenticar.".to_string(),
-            ));
+        if server.is_empty() {
+            error_msg.set(Some("Preencha o campo: SERVIDOR LAUDA (URL)".to_string()));
+            return;
+        }
+        if user.is_empty() {
+            error_msg.set(Some("Preencha o campo: USUÁRIO / CONTA".to_string()));
+            return;
+        }
+        if pass.is_empty() {
+            error_msg.set(Some("Preencha o campo: SENHA".to_string()));
             return;
         }
 
@@ -104,40 +110,55 @@ pub fn LoginView(
                 style: "display: flex; flex-direction: column; gap: 1rem;",
                 div {
                     label {
+                        r#for: "server_url",
                         style: "display: block; font-weight: bold; font-size: 0.85rem; margin-bottom: 0.3rem;",
                         "SERVIDOR LAUDA (URL):"
                     }
                     input {
+                        id: "server_url",
+                        name: "server_url",
+                        autocomplete: "url",
                         style: "width: 100%; box-sizing: border-box; padding: 0.6rem; border: 2px solid #0a0a0a; font-family: monospace; font-size: 1rem;",
                         value: "{server_input}",
                         oninput: move |evt| server_input.set(evt.value()),
+                        onchange: move |evt| server_input.set(evt.value()),
                         placeholder: "http://127.0.0.1:8432",
                     }
                 }
 
                 div {
                     label {
+                        r#for: "username",
                         style: "display: block; font-weight: bold; font-size: 0.85rem; margin-bottom: 0.3rem;",
                         "USUÁRIO / CONTA:"
                     }
                     input {
+                        id: "username",
+                        name: "username",
+                        autocomplete: "username",
                         style: "width: 100%; box-sizing: border-box; padding: 0.6rem; border: 2px solid #0a0a0a; font-family: monospace; font-size: 1rem;",
                         value: "{username_input}",
                         oninput: move |evt| username_input.set(evt.value()),
+                        onchange: move |evt| username_input.set(evt.value()),
                         placeholder: "lumen",
                     }
                 }
 
                 div {
                     label {
+                        r#for: "password",
                         style: "display: block; font-weight: bold; font-size: 0.85rem; margin-bottom: 0.3rem;",
                         "SENHA:"
                     }
                     input {
+                        id: "password",
+                        name: "password",
+                        autocomplete: "current-password",
                         style: "width: 100%; box-sizing: border-box; padding: 0.6rem; border: 2px solid #0a0a0a; font-family: monospace; font-size: 1rem;",
                         r#type: "password",
                         value: "{password_input}",
                         oninput: move |evt| password_input.set(evt.value()),
+                        onchange: move |evt| password_input.set(evt.value()),
                         placeholder: "••••••••",
                     }
                 }
