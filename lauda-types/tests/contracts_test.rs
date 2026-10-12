@@ -138,3 +138,38 @@ fn test_view_mode_cycle() {
     assert_eq!(ViewMode::Html.label(), "HTML ⟳");
     assert_eq!(ViewMode::TxtOriginal.label(), "ORIGINAL ⟳");
 }
+
+#[test]
+fn test_contact_entry_and_sync_contracts_roundtrip() {
+    let entry = lauda_types::contact::ContactEntry {
+        id: "c-test-1".to_string(),
+        username: "lumen".to_string(),
+        display_name: Some("Comrade".to_string()),
+        primary_email: "comrade@2lp.in".to_string(),
+        secondary_emails: vec!["c2@2lp.in".to_string()],
+        phone_numbers: vec!["123".to_string()],
+        notes: Some("Notas".to_string()),
+        vcard_raw: "VCARD".to_string(),
+        has_autocrypt: true,
+        autocrypt_fingerprint: Some("FP".to_string()),
+        etag: "ETAG".to_string(),
+        version: 1,
+        created_at: 100,
+        updated_at: 200,
+        deleted_at: None,
+    };
+    let json = serde_json::to_string(&entry).unwrap();
+    let decoded: lauda_types::contact::ContactEntry = serde_json::from_str(&json).unwrap();
+    assert_eq!(entry, decoded);
+
+    let sync_resp = lauda_types::contact::ContactSyncResponse {
+        sync_token: "ts:200".to_string(),
+        updated: vec![entry],
+        deleted_ids: vec!["deleted-1".to_string()],
+        has_more: false,
+    };
+    let sync_json = serde_json::to_string(&sync_resp).unwrap();
+    let sync_decoded: lauda_types::contact::ContactSyncResponse =
+        serde_json::from_str(&sync_json).unwrap();
+    assert_eq!(sync_resp, sync_decoded);
+}

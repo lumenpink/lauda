@@ -1,13 +1,12 @@
-use lauda_types::contact::{ContactEntry, ContactSyncRequest};
 use lauda_server::adapters::sqlite_contacts::SqliteContactsStore;
+use lauda_types::contact::{ContactEntry, ContactSyncRequest};
 
 #[tokio::test]
 async fn test_sqlite_contacts_crud_and_incremental_sync() {
     let temp_dir = tempfile::tempdir().expect("Criar tempdir");
     let db_path = temp_dir.path().join("contacts.db");
 
-    let store = SqliteContactsStore::open(&db_path)
-        .expect("Inicializar banco SQLite de contatos");
+    let store = SqliteContactsStore::open(&db_path).expect("Inicializar banco SQLite de contatos");
 
     // 1. Inserir ou atualizar contato
     let contact1 = ContactEntry {
@@ -43,7 +42,9 @@ async fn test_sqlite_contacts_crud_and_incremental_sync() {
         sync_token: None,
         limit: Some(100),
     };
-    let initial_sync = store.sync_contacts("lumen", &sync_req_initial).expect("Sync inicial");
+    let initial_sync = store
+        .sync_contacts("lumen", &sync_req_initial)
+        .expect("Sync inicial");
     assert_eq!(initial_sync.updated.len(), 1);
     assert_eq!(initial_sync.deleted_ids.len(), 0);
     let token_1 = initial_sync.sync_token;
@@ -73,20 +74,30 @@ async fn test_sqlite_contacts_crud_and_incremental_sync() {
         sync_token: Some(token_1.clone()),
         limit: Some(100),
     };
-    let inc_sync = store.sync_contacts("lumen", &sync_req_inc).expect("Sync incremental");
-    assert_eq!(inc_sync.updated.len(), 1, "Apenas contato 2 deve vir como novo/alterado");
+    let inc_sync = store
+        .sync_contacts("lumen", &sync_req_inc)
+        .expect("Sync incremental");
+    assert_eq!(
+        inc_sync.updated.len(),
+        1,
+        "Apenas contato 2 deve vir como novo/alterado"
+    );
     assert_eq!(inc_sync.updated[0].id, "c2-uuid-5678");
     let token_2 = inc_sync.sync_token;
 
     // 6. Soft-delete contato 1
-    store.delete_contact("lumen", "c1-uuid-1234", 1728700100).expect("Soft-delete contato 1");
+    store
+        .delete_contact("lumen", "c1-uuid-1234", 1728700100)
+        .expect("Soft-delete contato 1");
 
     // 7. Sync Incremental detectando tombstone
     let sync_req_tombstone = ContactSyncRequest {
         sync_token: Some(token_2),
         limit: Some(100),
     };
-    let tombstone_sync = store.sync_contacts("lumen", &sync_req_tombstone).expect("Sync tombstone");
+    let tombstone_sync = store
+        .sync_contacts("lumen", &sync_req_tombstone)
+        .expect("Sync tombstone");
     assert_eq!(tombstone_sync.updated.len(), 0);
     assert_eq!(tombstone_sync.deleted_ids, vec!["c1-uuid-1234".to_string()]);
 }

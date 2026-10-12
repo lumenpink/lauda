@@ -6,6 +6,6 @@ pub mod message;
 
 pub use auth::{LoginRequest, TokenResponse};
 pub use compose::{AttachmentUpload, ComposeForm};
-pub use contact::ContactInfo;
+pub use contact::{ContactEntry, ContactInfo, ContactSyncRequest, ContactSyncResponse};
 pub use mailbox::MailboxInfo;
 pub use message::{AttachmentMeta, Message, MessageEnvelope, ViewMode};
