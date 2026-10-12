@@ -131,6 +131,29 @@ impl SqliteContactsStore {
         }
     }
 
+    /// Busca um contato ativo pelo ID e usuário proprietário.
+    pub fn get_contact_by_id(
+        &self,
+        username: &str,
+        id: &str,
+    ) -> Result<Option<ContactEntry>, rusqlite::Error> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, username, display_name, primary_email, secondary_emails, phone_numbers,
+                    notes, vcard_raw, has_autocrypt, autocrypt_fingerprint, etag, version,
+                    created_at, updated_at, deleted_at
+             FROM contacts
+             WHERE username = ?1 AND id = ?2 AND deleted_at IS NULL",
+        )?;
+
+        let mut rows = stmt.query(params![username, id])?;
+        if let Some(row) = rows.next()? {
+            Ok(Some(Self::map_row(row)?))
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Realiza a sincronização incremental a partir de um sync_token anterior.
     pub fn sync_contacts(
         &self,
