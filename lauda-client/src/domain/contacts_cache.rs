@@ -342,3 +342,67 @@ impl LocalContactsCache {
         })
     }
 }
+
+static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+/// Cria um novo registro ContactEntry com vCard 4.0 a partir dos dados do formulário.
+pub fn create_local_contact(
+    username: &str,
+    name: Option<&str>,
+    email: &str,
+    notes: Option<&str>,
+) -> ContactEntry {
+    let now = crate::domain::time::current_unix_timestamp();
+    let seq = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let id = format!("c-{now:x}-{seq:x}");
+    let clean_email = email.trim().to_lowercase();
+    let clean_name = name.map(|n| n.trim().to_string()).filter(|n| !n.is_empty());
+    let clean_notes = notes
+        .map(|n| n.trim().to_string())
+        .filter(|n| !n.is_empty());
+
+    let mut vcard = String::new();
+    vcard.push_str("BEGIN:VCARD\r\nVERSION:4.0\r\n");
+    if let Some(ref n) = clean_name {
+        vcard.push_str(&format!("FN:{n}\r\n"));
+    } else {
+        vcard.push_str(&format!("FN:{clean_email}\r\n"));
+    }
+    vcard.push_str(&format!("EMAIL:{clean_email}\r\n"));
+    if let Some(ref note) = clean_notes {
+        vcard.push_str(&format!("NOTE:{note}\r\n"));
+    }
+    vcard.push_str("END:VCARD\r\n");
+
+    let etag = format!("etag-{now:x}-{seq:x}");
+
+    ContactEntry {
+        id,
+        username: username.to_string(),
+        display_name: clean_name,
+        primary_email: clean_email,
+        secondary_emails: vec![],
+        phone_numbers: vec![],
+        notes: clean_notes,
+        vcard_raw: vcard,
+        has_autocrypt: false,
+        autocrypt_fingerprint: None,
+        etag,
+        version: 1,
+        created_at: now,
+        updated_at: now,
+        deleted_at: None,
+    }
+}
+
+/// Formata o contato como `Nome <email>` se houver nome, ou apenas `email`.
+pub fn format_contact_recipient(display_name: Option<&str>, email: &str) -> String {
+    let email_clean = email.trim();
+    if let Some(name) = display_name {
+        let name_clean = name.trim();
+        if !name_clean.is_empty() {
+            return format!("{name_clean} <{email_clean}>");
+        }
+    }
+    email_clean.to_string()
+}
