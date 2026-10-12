@@ -1,5 +1,5 @@
 use lauda_client::domain::contacts_cache::{
-    create_local_contact, format_contact_recipient, LocalContactsCache,
+    LocalContactsCache, create_local_contact, format_contact_recipient,
 };
 use tempfile::tempdir;
 
@@ -36,7 +36,7 @@ fn test_contacts_ui_autocomplete_helpers_and_crud() {
 
     // Persistir contato
     cache
-        .apply_sync_delta(&[entry.clone()], &[], "ts:local-1")
+        .apply_sync_delta(std::slice::from_ref(&entry), &[], "ts:local-1")
         .expect("persist contact");
 
     assert_eq!(cache.count_contacts().unwrap(), 1);

@@ -30,6 +30,7 @@ pub fn ComposeView(
     let mut subject_input = use_signal(|| reply_subject.unwrap_or_default());
     let mut body_input = use_signal(|| initial_body.unwrap_or_default());
     let mut attached_files = use_signal(Vec::<lauda_types::AttachmentUpload>::new);
+    let mut to_suggestions = use_signal(Vec::<lauda_types::contact::ContactEntry>::new);
 
     let is_sending = use_signal(|| false);
     let mut error_msg = use_signal(|| None::<String>);
@@ -172,8 +173,58 @@ pub fn ComposeView(
                     input {
                         style: "width: 100%; box-sizing: border-box; padding: 0.5rem; border: 2px solid #0a0a0a; font-family: monospace;",
                         value: "{to_input}",
-                        oninput: move |evt| to_input.set(evt.value()),
+                        oninput: move |evt| {
+                            let val = evt.value();
+                            to_input.set(val.clone());
+                            let cache_dir = crate::domain::cache::get_default_cache_dir();
+                            if let Ok(cache) = crate::domain::contacts_cache::LocalContactsCache::open(&cache_dir) {
+                                if !val.trim().is_empty() {
+                                    let matches = cache.search_contacts(val.trim(), 5).unwrap_or_default();
+                                    to_suggestions.set(matches);
+                                } else {
+                                    to_suggestions.set(Vec::new());
+                                }
+                            }
+                        },
                         placeholder: "destinatario@dominio.com",
+                    }
+                    if !to_suggestions.read().is_empty() {
+                        div {
+                            style: "border: 2px solid #0a0a0a; background: #fff; box-shadow: 4px 4px 0 #0a0a0a; display: flex; flex-direction: column; margin-top: 0.2rem; max-height: 180px; overflow-y: auto;",
+                            for c in to_suggestions.read().clone() {
+                                {
+                                    let c_id = c.id.clone();
+                                    let name = c.display_name.clone();
+                                    let email = c.primary_email.clone();
+                                    let email_display = format!("<{email}>");
+                                    let has_auto = c.has_autocrypt;
+                                    let recipient = crate::domain::contacts_cache::format_contact_recipient(name.as_deref(), &email);
+                                    rsx! {
+                                        button {
+                                            key: "{c_id}",
+                                            style: "background: #fff; border: none; border-bottom: 1px solid #ddd; padding: 0.5rem 0.8rem; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center;",
+                                            onclick: move |_| {
+                                                to_input.set(recipient.clone());
+                                                to_suggestions.set(Vec::new());
+                                            },
+                                            div {
+                                                style: "display: flex; gap: 0.5rem; align-items: center;",
+                                                if let Some(ref n) = name {
+                                                    span { style: "font-weight: bold; color: #0a0a0a;", "{n}" }
+                                                }
+                                                span { style: "font-family: monospace; color: #555; font-size: 0.85rem;", "{email_display}" }
+                                            }
+                                            if has_auto {
+                                                span {
+                                                    style: "background: #2e8b57; color: #fff; font-size: 0.75rem; padding: 0.15rem 0.4rem; font-weight: bold;",
+                                                    "🔒 PGP"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 div {
