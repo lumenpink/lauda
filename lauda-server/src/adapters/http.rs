@@ -21,6 +21,7 @@ pub struct AppState {
     pub backend: Arc<dyn MailBackend>,
     pub jwt_secret: String,
     pub events_tx: tokio::sync::broadcast::Sender<String>,
+    pub contacts_store: Option<Arc<crate::adapters::sqlite_contacts::SqliteContactsStore>>,
 }
 
 pub struct AuthUser(pub String);
@@ -315,9 +316,30 @@ pub fn app_router(backend: Arc<dyn MailBackend>, jwt_secret: impl Into<String>) 
         backend,
         jwt_secret: jwt_secret.into(),
         events_tx,
+        contacts_store: None,
     };
 
-    Router::new()
+    build_router(state)
+}
+
+pub fn app_router_with_contacts(
+    backend: Arc<dyn MailBackend>,
+    jwt_secret: impl Into<String>,
+    contacts_store: crate::adapters::sqlite_contacts::SqliteContactsStore,
+) -> Router {
+    let (events_tx, _) = tokio::sync::broadcast::channel(128);
+    let state = AppState {
+        backend,
+        jwt_secret: jwt_secret.into(),
+        events_tx,
+        contacts_store: Some(Arc::new(contacts_store)),
+    };
+
+    build_router(state)
+}
+
+fn build_router(state: AppState) -> Router {
+    let base = Router::new()
         .route("/auth/login", post(login_handler))
         .route("/events", get(events_handler))
         .route("/contacts", get(list_contacts_handler))
@@ -341,6 +363,9 @@ pub fn app_router(backend: Arc<dyn MailBackend>, jwt_secret: impl Into<String>) 
             get(get_attachment_handler),
         )
         .route("/compose", post(compose_handler))
-        .layer(tower_http::cors::CorsLayer::permissive())
-        .with_state(state)
+        .layer(tower_http::cors::CorsLayer::permissive());
+
+    let dav = crate::adapters::carddav::carddav_routes();
+
+    base.merge(dav).with_state(state)
 }
