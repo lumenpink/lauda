@@ -66,7 +66,10 @@ fn test_contacts_local_cache_lifecycle_and_search() {
 
     let loaded = cache.load_contacts().unwrap();
     assert_eq!(loaded.len(), 1);
-    assert_eq!(loaded[0].display_name.as_deref(), Some("Maria Firmina dos Reis"));
+    assert_eq!(
+        loaded[0].display_name.as_deref(),
+        Some("Maria Firmina dos Reis")
+    );
 
     // c2 não deve mais aparecer em buscas
     let search_deleted = cache.search_contacts("machado", 10).unwrap();

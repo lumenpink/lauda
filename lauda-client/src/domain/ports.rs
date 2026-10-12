@@ -69,4 +69,9 @@ pub trait MailApiClient: Send + Sync {
         &self,
         token: &str,
     ) -> Result<Vec<lauda_types::ContactInfo>, ClientError>;
+    async fn sync_contacts(
+        &self,
+        token: &str,
+        req: &lauda_types::contact::ContactSyncRequest,
+    ) -> Result<lauda_types::contact::ContactSyncResponse, ClientError>;
 }

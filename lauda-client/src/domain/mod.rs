@@ -1,4 +1,5 @@
 pub mod cache;
+pub mod contacts_cache;
 pub mod outbox;
 pub mod ports;
 pub mod session;
@@ -8,6 +9,7 @@ pub mod update;
 pub mod view;
 
 pub use cache::{LocalMessageCache, get_default_cache_dir};
+pub use contacts_cache::LocalContactsCache;
 pub use outbox::{OutboxItem, OutboxQueue, OutboxStatus};
 pub use ports::{ClientError, MailApiClient};
 pub use session::{

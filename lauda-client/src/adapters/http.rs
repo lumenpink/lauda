@@ -392,4 +392,33 @@ impl MailApiClient for HttpApiClient {
             ))),
         }
     }
+
+    async fn sync_contacts(
+        &self,
+        token: &str,
+        req: &lauda_types::contact::ContactSyncRequest,
+    ) -> Result<lauda_types::contact::ContactSyncResponse, ClientError> {
+        let url = format!("{}/contacts/sync", self.base_url);
+        let headers = Self::auth_headers(token)?;
+        let resp = self
+            .client
+            .post(&url)
+            .headers(headers)
+            .json(req)
+            .send()
+            .await
+            .map_err(|e| ClientError::Network(e.to_string()))?;
+
+        match resp.status() {
+            StatusCode::OK => resp
+                .json::<lauda_types::contact::ContactSyncResponse>()
+                .await
+                .map_err(|e| ClientError::Network(format!("Erro ao deserializar sync: {}", e))),
+            StatusCode::UNAUTHORIZED => Err(ClientError::AuthFailed),
+            status => Err(ClientError::Network(format!(
+                "Status inesperado no sync de contatos: {}",
+                status
+            ))),
+        }
+    }
 }
