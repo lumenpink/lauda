@@ -421,3 +421,86 @@ async fn test_mua_flag_move_and_attachment_endpoints() {
         "text/event-stream"
     );
 }
+
+#[tokio::test]
+async fn test_contacts_sync_endpoint_and_client_cache_reconciliation() {
+    let temp_server = tempfile::tempdir().expect("tempdir server");
+    let contacts_store = lauda_server::adapters::sqlite_contacts::SqliteContactsStore::open(
+        temp_server.path().join("contacts.db"),
+    )
+    .expect("open contacts store");
+
+    let backend = setup_test_backend();
+    let app = lauda_server::app_router_with_contacts(
+        backend.clone(),
+        TEST_SECRET,
+        contacts_store.clone(),
+    );
+
+    let (token, _) = lauda_server::auth::create_token("lumen", TEST_SECRET, 1).unwrap();
+
+    let sample = lauda_types::contact::ContactEntry {
+        id: "c-sync-1".to_string(),
+        username: "lumen".to_string(),
+        display_name: Some("Rosa Luxemburgo".to_string()),
+        primary_email: "rosa@revolucao.org".to_string(),
+        secondary_emails: vec![],
+        phone_numbers: vec![],
+        notes: None,
+        vcard_raw: "BEGIN:VCARD\r\nFN:Rosa Luxemburgo\r\nEND:VCARD".to_string(),
+        has_autocrypt: true,
+        autocrypt_fingerprint: Some("FP123".to_string()),
+        etag: "etag1".to_string(),
+        version: 1,
+        created_at: 1000,
+        updated_at: 1000,
+        deleted_at: None,
+    };
+    contacts_store.upsert_contact(&sample).unwrap();
+
+    // 1. Chamar POST /contacts/sync
+    let sync_req = lauda_types::contact::ContactSyncRequest {
+        sync_token: None,
+        limit: Some(10),
+    };
+    let req = Request::builder()
+        .method("POST")
+        .uri("/contacts/sync")
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(serde_json::to_string(&sync_req).unwrap()))
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+    let sync_resp: lauda_types::contact::ContactSyncResponse =
+        serde_json::from_slice(&body_bytes).unwrap();
+
+    assert_eq!(sync_resp.updated.len(), 1);
+    assert_eq!(sync_resp.updated[0].id, "c-sync-1");
+    assert_eq!(sync_resp.deleted_ids.len(), 0);
+
+    // 2. Reconciliar no LocalContactsCache do cliente
+    let temp_client = tempfile::tempdir().expect("tempdir client");
+    let client_cache =
+        lauda_client::domain::contacts_cache::LocalContactsCache::open(temp_client.path()).unwrap();
+
+    client_cache
+        .apply_sync_delta(
+            &sync_resp.updated,
+            &sync_resp.deleted_ids,
+            &sync_resp.sync_token,
+        )
+        .unwrap();
+
+    assert_eq!(client_cache.count_contacts().unwrap(), 1);
+    assert_eq!(
+        client_cache.get_sync_token().unwrap().as_deref(),
+        Some(sync_resp.sync_token.as_str())
+    );
+
+    let found = client_cache.search_contacts("luxemburgo", 5).unwrap();
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].primary_email, "rosa@revolucao.org");
+}

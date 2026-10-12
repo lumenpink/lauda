@@ -229,4 +229,17 @@ impl MailApiClient for InMemoryApiClient {
         contacts.sort_by_key(|c| std::cmp::Reverse(c.message_count));
         Ok(contacts)
     }
+
+    async fn sync_contacts(
+        &self,
+        _token: &str,
+        _req: &lauda_types::contact::ContactSyncRequest,
+    ) -> Result<lauda_types::contact::ContactSyncResponse, ClientError> {
+        Ok(lauda_types::contact::ContactSyncResponse {
+            sync_token: "ts:in-memory".to_string(),
+            updated: vec![],
+            deleted_ids: vec![],
+            has_more: false,
+        })
+    }
 }

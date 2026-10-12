@@ -310,6 +310,21 @@ async fn list_contacts_handler(
     Ok(Json(contacts))
 }
 
+async fn sync_contacts_handler(
+    State(state): State<AppState>,
+    AuthUser(username): AuthUser,
+    Json(payload): Json<lauda_types::contact::ContactSyncRequest>,
+) -> Result<Json<lauda_types::contact::ContactSyncResponse>, (StatusCode, String)> {
+    let store = state.contacts_store.as_ref().ok_or((
+        StatusCode::NOT_IMPLEMENTED,
+        "Contacts store não configurado".to_string(),
+    ))?;
+    let resp = store
+        .sync_contacts(&username, &payload)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(resp))
+}
+
 pub fn app_router(backend: Arc<dyn MailBackend>, jwt_secret: impl Into<String>) -> Router {
     let (events_tx, _) = tokio::sync::broadcast::channel(128);
     let state = AppState {
@@ -343,6 +358,7 @@ fn build_router(state: AppState) -> Router {
         .route("/auth/login", post(login_handler))
         .route("/events", get(events_handler))
         .route("/contacts", get(list_contacts_handler))
+        .route("/contacts/sync", post(sync_contacts_handler))
         .route("/mailboxes", get(list_mailboxes_handler))
         .route("/messages", get(list_messages_handler))
         .route(
