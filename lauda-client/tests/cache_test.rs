@@ -54,6 +54,7 @@ fn test_cache_atomic_envelopes_roundtrip() {
             is_flagged: true,
             cc: None,
             has_attachments: false,
+            crypto_meta: None,
         },
         MessageEnvelope {
             uid: 102,
@@ -64,6 +65,7 @@ fn test_cache_atomic_envelopes_roundtrip() {
             is_flagged: false,
             cc: Some("equipe@example.com".to_string()),
             has_attachments: true,
+            crypto_meta: None,
         },
     ];
 
@@ -98,6 +100,7 @@ fn test_cache_atomic_message_roundtrip() {
             is_flagged: false,
             cc: None,
             has_attachments: false,
+            crypto_meta: None,
         },
         txt_auto: Some("Corpo formatado em Markdown".to_string()),
         txt_original: Some("Corpo cru em texto".to_string()),
@@ -134,6 +137,7 @@ fn test_cache_purge_90_day_retention() {
             is_flagged: false,
             cc: None,
             has_attachments: false,
+            crypto_meta: None,
         },
         txt_auto: Some("Conteúdo recente".to_string()),
         txt_original: None,
@@ -151,6 +155,7 @@ fn test_cache_purge_90_day_retention() {
             is_flagged: false,
             cc: None,
             has_attachments: false,
+            crypto_meta: None,
         },
         txt_auto: Some("Conteúdo antigo que deve ser purgado".to_string()),
         txt_original: None,

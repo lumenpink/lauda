@@ -106,6 +106,7 @@ async fn test_in_memory_api_client() {
                 has_attachments: false,
                 is_read: false,
                 is_flagged: false,
+                crypto_meta: None,
             },
             attachments: Vec::new(),
             txt_auto: Some("# Teste".to_string()),
@@ -164,6 +165,7 @@ async fn test_in_memory_api_client() {
                 has_attachments: true,
                 is_read: false,
                 is_flagged: false,
+                crypto_meta: None,
             },
             attachments: vec![lauda_types::AttachmentMeta {
                 id: 0,

@@ -1,5 +1,5 @@
 use dioxus::prelude::*;
-use lauda_types::{MailboxInfo, Message, MessageEnvelope};
+use lauda_types::{MailboxInfo, Message, MessageEnvelope, message::SignatureStatus};
 
 use crate::adapters::HttpApiClient;
 use crate::domain::ports::MailApiClient;
@@ -346,7 +346,26 @@ pub fn InboxView(
                                         span { style: "font-weight: bold; font-size: 0.95rem; color: #0a0a0a;", "{sender}" }
                                     }
                                     div {
-                                        style: "display: flex; align-items: center; gap: 0.4rem;",
+                                        style: "display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;",
+                                        if let Some(ref crypto) = env.crypto_meta {
+                                            if crypto.is_encrypted {
+                                                span {
+                                                    style: "background: #0a0a0a; color: #fff; font-size: 0.75rem; font-weight: bold; padding: 0.1rem 0.35rem; border: 1px solid #0a0a0a; letter-spacing: 0.05em;",
+                                                    "[🔒]"
+                                                }
+                                            }
+                                            if crypto.signature_status == SignatureStatus::Valid {
+                                                span {
+                                                    style: "background: #d1fae5; color: #047857; font-size: 0.75rem; font-weight: bold; padding: 0.1rem 0.35rem; border: 1px solid #059669; letter-spacing: 0.05em;",
+                                                    "[✓ PGP]"
+                                                }
+                                            } else if crypto.signature_status == SignatureStatus::Invalid {
+                                                span {
+                                                    style: "background: #fee2e2; color: #dc2626; font-size: 0.75rem; font-weight: bold; padding: 0.1rem 0.35rem; border: 1px solid #dc2626; letter-spacing: 0.05em;",
+                                                    "[⚠ INVÁLIDA]"
+                                                }
+                                            }
+                                        }
                                         if has_att {
                                             span { style: "font-size: 0.85rem; color: #444;", "📎" }
                                         }

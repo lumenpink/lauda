@@ -314,6 +314,7 @@ async fn test_e2e_apk_mobile_client_live_server_full_loop() {
                 has_attachments: false,
                 is_read: false,
                 is_flagged: false,
+                crypto_meta: None,
             },
             attachments: Vec::new(),
             txt_auto: Some(sample_md.to_string()),

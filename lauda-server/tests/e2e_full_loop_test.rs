@@ -103,6 +103,7 @@ Content-Type: text/html; charset=utf-8\r\n\
                 has_attachments: false,
                 is_read: false,
                 is_flagged: false,
+                crypto_meta: None,
             },
             attachments: Vec::new(),
             txt_auto: Some(txt_auto.clone()),

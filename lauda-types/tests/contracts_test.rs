@@ -48,6 +48,7 @@ fn test_message_envelope_roundtrip() {
         is_flagged: true,
         cc: None,
         has_attachments: false,
+        crypto_meta: None,
     };
     let json = serde_json::to_string(&envelope).unwrap();
     let decoded: MessageEnvelope = serde_json::from_str(&json).unwrap();
@@ -66,6 +67,7 @@ fn test_message_with_optional_bodies() {
             is_flagged: false,
             cc: Some("equipe@2lp.in".to_string()),
             has_attachments: false,
+            crypto_meta: None,
         },
         txt_auto: Some("# Titulo\nTexto limpo.".to_string()),
         txt_original: Some("Titulo\nTexto limpo.".to_string()),

@@ -21,6 +21,7 @@ fn mock_message(
             is_flagged: flagged,
             cc: None,
             has_attachments: attachments,
+            crypto_meta: None,
         },
         txt_auto: Some(body.to_string()),
         txt_original: None,

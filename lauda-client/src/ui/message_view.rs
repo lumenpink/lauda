@@ -1,5 +1,5 @@
 use dioxus::prelude::*;
-use lauda_types::{MailboxInfo, Message, MessageEnvelope, ViewMode};
+use lauda_types::{MailboxInfo, Message, MessageEnvelope, ViewMode, message::SignatureStatus};
 
 use crate::adapters::HttpApiClient;
 use crate::domain::ports::MailApiClient;
@@ -19,6 +19,7 @@ pub fn MessageView(
 ) -> Element {
     let msg = active_message.read().clone();
     let mut download_status = use_signal(|| None::<(usize, String)>);
+    let mut crypto_drawer_open = use_signal(|| false);
 
     if msg.is_none() {
         return rsx! {
@@ -347,6 +348,79 @@ pub fn MessageView(
                         div { span { style: "font-weight: bold; color: #0a0a0a;", "CC: " } "{cc}" }
                     }
                     div { span { style: "font-weight: bold; color: #0a0a0a;", "DATA: " } "{envelope.date}" }
+                }
+
+                if let Some(ref crypto) = envelope.crypto_meta {
+                    div {
+                        style: "margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid #e5e7eb;",
+                        div {
+                            style: "display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;",
+                            div {
+                                style: "display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;",
+                                if crypto.is_encrypted {
+                                    span {
+                                        style: "background: #0a0a0a; color: #fff; font-size: 0.75rem; font-weight: bold; padding: 0.2rem 0.5rem; border: 1px solid #0a0a0a;",
+                                        "[🔒 CRIPTOGRAFADO]"
+                                    }
+                                }
+                                if crypto.signature_status == SignatureStatus::Valid {
+                                    span {
+                                        style: "background: #d1fae5; color: #047857; font-size: 0.75rem; font-weight: bold; padding: 0.2rem 0.5rem; border: 1px solid #059669;",
+                                        "[✓ PGP VÁLIDO]"
+                                    }
+                                } else if crypto.signature_status == SignatureStatus::Invalid {
+                                    span {
+                                        style: "background: #fee2e2; color: #dc2626; font-size: 0.75rem; font-weight: bold; padding: 0.2rem 0.5rem; border: 1px solid #dc2626;",
+                                        "[⚠ ASSINATURA INVÁLIDA]"
+                                    }
+                                }
+                            }
+                            button {
+                                style: "background: #faf9f6; border: 1px solid #0a0a0a; font-size: 0.75rem; font-weight: bold; padding: 0.2rem 0.6rem; cursor: pointer;",
+                                onclick: move |_| {
+                                    let current = *crypto_drawer_open.read();
+                                    crypto_drawer_open.set(!current);
+                                },
+                                if *crypto_drawer_open.read() { "▲ FECHAR DETALHES CRIPTO" } else { "▼ DETALHES TÉCNICOS CRIPTO" }
+                            }
+                        }
+
+                        if *crypto_drawer_open.read() {
+                            div {
+                                style: "margin-top: 0.6rem; background: #faf9f6; border: 2px solid #0a0a0a; padding: 0.8rem; font-size: 0.8rem; font-family: monospace; display: flex; flex-direction: column; gap: 0.3rem;",
+                                div {
+                                    span { style: "font-weight: bold; color: #0a0a0a;", "Status da Criptografia: " }
+                                    if crypto.is_encrypted { "PGP/MIME ou Autocrypt decifrado pelo Ishcondidim" } else { "Não criptografado" }
+                                }
+                                div {
+                                    span { style: "font-weight: bold; color: #0a0a0a;", "Validade da Assinatura: " }
+                                    match crypto.signature_status {
+                                        SignatureStatus::Valid => "VÁLIDA (Assinatura digital confirmada)",
+                                        SignatureStatus::Invalid => "INVÁLIDA (Falha na verificação)",
+                                        SignatureStatus::None => "Sem assinatura",
+                                    }
+                                }
+                                if let Some(ref sender) = crypto.verified_sender {
+                                    div {
+                                        span { style: "font-weight: bold; color: #0a0a0a;", "Remetente Verificado: " }
+                                        "{sender}"
+                                    }
+                                }
+                                if let Some(ref key_id) = crypto.signer_key_id {
+                                    div {
+                                        span { style: "font-weight: bold; color: #0a0a0a;", "ID/Fingerprint da Chave: " }
+                                        "{key_id}"
+                                    }
+                                }
+                                if let Some(ref word) = crypto.security_word {
+                                    div {
+                                        span { style: "font-weight: bold; color: #047857;", "Palavra Secreta de Autenticidade: " }
+                                        "[{word}]"
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

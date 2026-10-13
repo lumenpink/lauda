@@ -21,6 +21,7 @@ async fn test_swr_and_offline_sync_reconciliation() {
         is_flagged: false,
         cc: None,
         has_attachments: false,
+        crypto_meta: None,
     };
     cache
         .save_envelopes("INBOX", std::slice::from_ref(&initial_env))

@@ -343,6 +343,7 @@ async fn test_live_tcp_lauda_server_client_trifocal_and_compose() {
             has_attachments: false,
             is_read: false,
             is_flagged: false,
+            crypto_meta: None,
         },
         attachments: Vec::new(),
         txt_auto: Some(
@@ -611,6 +612,7 @@ Content-Type: text/html; charset=utf-8\r\n\
                 has_attachments: false,
                 is_read: false,
                 is_flagged: true,
+                crypto_meta: None,
             },
             attachments: Vec::new(),
             txt_auto: Some(txt_auto.clone()),

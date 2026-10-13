@@ -3,7 +3,13 @@ use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
 use async_trait::async_trait;
-use lauda_types::{ComposeForm, MailboxInfo, Message, MessageEnvelope};
+use lauda_types::{
+    ComposeForm, MailboxInfo, Message, MessageEnvelope,
+    message::{
+        CryptoMeta, SignatureStatus, clean_ishcondidim_preamble_html,
+        clean_ishcondidim_preamble_text,
+    },
+};
 use mail_parser::{Address, MessageParser, MimeHeaders};
 
 use crate::domain::ports::{BackendError, MailBackend};
@@ -220,6 +226,60 @@ impl MaildirBackend {
         result
     }
 
+    fn extract_crypto_meta_from_headers(parsed: &mail_parser::Message) -> Option<CryptoMeta> {
+        let mut is_encrypted = false;
+        let mut signature_status = SignatureStatus::None;
+        let signer_key_id = None;
+        let mut has_crypto_headers = false;
+
+        for header in parsed.headers() {
+            let name = header.name();
+            let val = header.value().as_text().unwrap_or_default();
+            if name.eq_ignore_ascii_case("X-Ixcondidim-Decrypted")
+                || name.eq_ignore_ascii_case("X-Ishcondidim-Decrypted")
+            {
+                has_crypto_headers = true;
+                is_encrypted = true;
+                if val.contains("verified=pass") || val.contains("verified=true") {
+                    signature_status = SignatureStatus::Valid;
+                } else if val.contains("verified=fail") || val.contains("verified=invalid") {
+                    signature_status = SignatureStatus::Invalid;
+                }
+            } else if name.eq_ignore_ascii_case("X-Ixcondidim-Status")
+                || name.eq_ignore_ascii_case("X-Ishcondidim-Status")
+            {
+                has_crypto_headers = true;
+                if val.contains("decrypted-and-verified") {
+                    is_encrypted = true;
+                    signature_status = SignatureStatus::Valid;
+                } else if val.contains("decrypted") {
+                    is_encrypted = true;
+                }
+            } else if name.eq_ignore_ascii_case("Autocrypt") {
+                has_crypto_headers = true;
+            } else if name.eq_ignore_ascii_case("X-GPG-Status") {
+                has_crypto_headers = true;
+                if val.contains("GOODSIG") || val.contains("VALIDSIG") {
+                    signature_status = SignatureStatus::Valid;
+                } else if val.contains("BADSIG") || val.contains("ERRSIG") {
+                    signature_status = SignatureStatus::Invalid;
+                }
+            }
+        }
+
+        if has_crypto_headers {
+            Some(CryptoMeta {
+                is_encrypted,
+                signature_status,
+                signer_key_id,
+                verified_sender: None,
+                security_word: None,
+            })
+        } else {
+            None
+        }
+    }
+
     fn dispatch_sendmail(raw_email: &str) -> Result<(), String> {
         if let Ok(custom_cmd) = std::env::var("LAUDA_SENDMAIL_CMD") {
             let mut child = std::process::Command::new("sh")
@@ -413,6 +473,8 @@ impl MailBackend for MaildirBackend {
                             })
                             .unwrap_or(false);
 
+                        let crypto_meta = Self::extract_crypto_meta_from_headers(&parsed);
+
                         envelopes.push(MessageEnvelope {
                             uid,
                             subject,
@@ -422,6 +484,7 @@ impl MailBackend for MaildirBackend {
                             is_flagged,
                             cc,
                             has_attachments,
+                            crypto_meta,
                         });
                     }
                 }
@@ -465,8 +528,44 @@ impl MailBackend for MaildirBackend {
             .unwrap_or_else(|| "2026-10-05T00:00:00Z".to_string());
         let cc = parsed.cc().map(Self::format_address);
 
-        let txt_original = parsed.body_text(0).map(|s| s.to_string());
-        let html_sanitized = parsed.body_html(0).map(|s| s.to_string());
+        let mut crypto_meta = Self::extract_crypto_meta_from_headers(&parsed);
+
+        let (txt_original, meta_from_txt) = match parsed.body_text(0) {
+            Some(txt) => {
+                let (cleaned, meta) = clean_ishcondidim_preamble_text(&txt);
+                (Some(cleaned), meta)
+            }
+            None => (None, None),
+        };
+
+        let (html_sanitized, meta_from_html) = match parsed.body_html(0) {
+            Some(html) => {
+                let (cleaned, meta) = clean_ishcondidim_preamble_html(&html);
+                (Some(cleaned), meta)
+            }
+            None => (None, None),
+        };
+
+        // Mesclar metadados: prioriza o mais completo (preâmbulo costuma ter key id e sender)
+        if let Some(m) = meta_from_txt.or(meta_from_html) {
+            if let Some(existing) = crypto_meta.as_mut() {
+                existing.is_encrypted = existing.is_encrypted || m.is_encrypted;
+                if m.signature_status != SignatureStatus::None {
+                    existing.signature_status = m.signature_status;
+                }
+                if m.signer_key_id.is_some() {
+                    existing.signer_key_id = m.signer_key_id;
+                }
+                if m.verified_sender.is_some() {
+                    existing.verified_sender = m.verified_sender;
+                }
+                if m.security_word.is_some() {
+                    existing.security_word = m.security_word;
+                }
+            } else {
+                crypto_meta = Some(m);
+            }
+        }
 
         let txt_auto = txt_original
             .as_deref()
@@ -518,6 +617,7 @@ impl MailBackend for MaildirBackend {
             is_flagged,
             cc,
             has_attachments,
+            crypto_meta,
         };
 
         Ok(Message {

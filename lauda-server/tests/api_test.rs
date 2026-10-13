@@ -38,6 +38,7 @@ fn setup_test_backend() -> Arc<InMemoryMailBackend> {
                 has_attachments: false,
                 is_read: false,
                 is_flagged: true,
+                crypto_meta: None,
             },
             attachments: Vec::new(),
             txt_auto: Some("# Bem-vindo\nLeitura em texto puro rápida.".to_string()),
@@ -267,6 +268,7 @@ async fn test_mua_flag_move_and_attachment_endpoints() {
                 has_attachments: true,
                 is_read: false,
                 is_flagged: false,
+                crypto_meta: None,
             },
             attachments: vec![lauda_types::AttachmentMeta {
                 id: 0,
