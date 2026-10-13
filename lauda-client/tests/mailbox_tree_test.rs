@@ -89,7 +89,10 @@ fn test_build_folder_tree_nested_slash_and_dot_hierarchy() {
     assert_eq!(inbox.depth, 0);
     assert_eq!(inbox.role, FolderRole::Inbox);
 
-    let projetos = tree.iter().find(|n| n.raw_name == "INBOX/Projetos").unwrap();
+    let projetos = tree
+        .iter()
+        .find(|n| n.raw_name == "INBOX/Projetos")
+        .unwrap();
     assert_eq!(projetos.depth, 1);
     assert_eq!(projetos.display_name, "Projetos");
     assert_eq!(projetos.role, FolderRole::Custom);
@@ -133,4 +136,47 @@ fn test_folder_node_badge_labels() {
     };
     assert_eq!(node_read.badge_text(), "18");
     assert!(!node_read.has_unread());
+}
+
+#[test]
+fn test_build_folder_tree_custom_folders_alphabetical_and_mixed_delimiters() {
+    let raw_mailboxes = vec![
+        MailboxInfo {
+            name: "Zeta".to_string(),
+            total_messages: 1,
+            unread_messages: 0,
+        },
+        MailboxInfo {
+            name: "Alpha/Sub2".to_string(),
+            total_messages: 5,
+            unread_messages: 0,
+        },
+        MailboxInfo {
+            name: "Alpha/Sub1".to_string(),
+            total_messages: 2,
+            unread_messages: 1,
+        },
+        MailboxInfo {
+            name: "Beta.Child".to_string(),
+            total_messages: 3,
+            unread_messages: 0,
+        },
+    ];
+
+    let tree = build_folder_tree(&raw_mailboxes);
+
+    // Todas são Custom, devem respeitar ordenação alfabética
+    let names: Vec<&str> = tree.iter().map(|n| n.raw_name.as_str()).collect();
+    assert_eq!(
+        names,
+        vec!["Alpha/Sub1", "Alpha/Sub2", "Beta.Child", "Zeta"]
+    );
+
+    let sub1 = tree.iter().find(|n| n.raw_name == "Alpha/Sub1").unwrap();
+    assert_eq!(sub1.display_name, "Sub1");
+    assert_eq!(sub1.depth, 1);
+
+    let zeta = tree.iter().find(|n| n.raw_name == "Zeta").unwrap();
+    assert_eq!(zeta.display_name, "Zeta");
+    assert_eq!(zeta.depth, 0);
 }

@@ -5,6 +5,7 @@ pub mod compose_view;
 pub mod contacts_view;
 pub mod inbox_view;
 pub mod login_view;
+pub mod mailbox_nav;
 pub mod message_view;
 pub mod state;
 
@@ -250,6 +251,11 @@ pub fn App() -> Element {
     rsx! {
         div {
             style: "background-color: #f4efe6; color: #0a0a0a; font-family: monospace; min-height: 100vh; padding: 1rem; box-sizing: border-box;",
+
+            // Estilos Responsivos Trash Polka
+            style {
+                "@media (min-width: 820px) {{ .desktop-mailbox-sidebar {{ display: flex !important; }} }}"
+            }
 
             // Header Principal Trash Polka com Alternador Trifocal
             header {
