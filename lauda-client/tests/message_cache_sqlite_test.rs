@@ -1,6 +1,6 @@
 use lauda_client::domain::cache::LocalMessageCache;
-use lauda_types::message::{CryptoMeta, Message, MessageEnvelope, SignatureStatus};
 use lauda_types::MailboxInfo;
+use lauda_types::message::{CryptoMeta, Message, MessageEnvelope, SignatureStatus};
 use std::time::Duration;
 use tempfile::tempdir;
 
@@ -66,7 +66,9 @@ fn test_sqlite_message_cache_lifecycle() {
         },
     ];
 
-    cache.save_envelopes("INBOX", &envelopes).expect("save envelopes");
+    cache
+        .save_envelopes("INBOX", &envelopes)
+        .expect("save envelopes");
     let loaded_envs = cache
         .load_envelopes("INBOX")
         .expect("load envelopes")
@@ -115,14 +117,22 @@ fn test_sqlite_message_cache_lifecycle() {
         html_sanitized: None,
         attachments: vec![],
     };
-    cache.save_envelopes("INBOX", &[envelopes[0].clone(), envelopes[1].clone(), old_env]).expect("save with old");
+    cache
+        .save_envelopes(
+            "INBOX",
+            &[envelopes[0].clone(), envelopes[1].clone(), old_env],
+        )
+        .expect("save with old");
     cache.save_message("INBOX", &old_msg).expect("save old msg");
 
     // Purga de mensagens com mais de 90 dias
     let purged = cache
         .purge_older_than(Duration::from_secs(90 * 86400))
         .expect("purge");
-    assert!(purged >= 1, "Deveria ter purgado pelo menos a mensagem antiga");
+    assert!(
+        purged >= 1,
+        "Deveria ter purgado pelo menos a mensagem antiga"
+    );
 
     // A mensagem antiga não deve mais existir no cache
     let old_loaded = cache.load_message("INBOX", 999).expect("load old");

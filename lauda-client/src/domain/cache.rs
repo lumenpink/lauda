@@ -2,29 +2,116 @@ use lauda_types::{MailboxInfo, Message, MessageEnvelope};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-/// Motor de persistência de cache local no disco.
+#[cfg(not(target_arch = "wasm32"))]
+use rusqlite::{Connection, params};
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::{Arc, Mutex};
+
+/// Motor de persistência de cache local de mensagens.
 ///
-/// Estrutura no disco:
-/// ```text
-/// <cache_dir>/
-/// ├── mailboxes.json
-/// └── mailboxes/
-///     └── <mailbox_slug>/
-///         ├── envelopes.json
-///         └── messages/
-///             ├── <uid>.json
-///             └── ...
-/// ```
-#[derive(Clone, Debug)]
+/// Suporta:
+/// - Desktop & Android (Native): Banco de dados SQLite local (`messages.db`) de alta performance com modo WAL.
+/// - Web (WASM): Persistência assíncrona/estruturada via localStorage/IndexedDB.
+#[derive(Clone)]
 pub struct LocalMessageCache {
     base_dir: PathBuf,
+    #[cfg(not(target_arch = "wasm32"))]
+    conn: Arc<Mutex<Connection>>,
+}
+
+impl std::fmt::Debug for LocalMessageCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LocalMessageCache")
+            .field("base_dir", &self.base_dir)
+            .finish()
+    }
 }
 
 impl LocalMessageCache {
-    /// Cria uma nova instância de cache apontando para o diretório informado.
-    pub fn new<P: AsRef<Path>>(base_dir: P) -> Self {
-        Self {
+    /// Abre ou cria o banco de cache SQLite no diretório base especificado.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn open<P: AsRef<Path>>(base_dir: P) -> std::io::Result<Self> {
+        let base_path = base_dir.as_ref().to_path_buf();
+        std::fs::create_dir_all(&base_path)?;
+
+        let db_path = base_path.join("messages.db");
+        let conn = Connection::open(&db_path).map_err(|e| std::io::Error::other(e.to_string()))?;
+
+        // Configuração de alto desempenho para leituras e escritas seguras
+        let _ = conn.execute_batch(
+            "PRAGMA journal_mode = WAL;
+             PRAGMA synchronous = NORMAL;
+             PRAGMA foreign_keys = ON;
+             PRAGMA temp_store = MEMORY;",
+        );
+
+        // Criação de tabelas
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS cache_mailboxes (
+                name TEXT PRIMARY KEY,
+                total_messages INTEGER NOT NULL,
+                unread_messages INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS cache_envelopes (
+                mailbox TEXT NOT NULL,
+                uid INTEGER NOT NULL,
+                envelope_json TEXT NOT NULL,
+                date_unix INTEGER NOT NULL,
+                sort_order INTEGER NOT NULL,
+                PRIMARY KEY (mailbox, uid)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_envelopes_box_sort ON cache_envelopes (mailbox, sort_order ASC);
+            CREATE INDEX IF NOT EXISTS idx_envelopes_box_uid ON cache_envelopes (mailbox, uid DESC);
+            CREATE INDEX IF NOT EXISTS idx_envelopes_box_date ON cache_envelopes (mailbox, date_unix DESC);
+
+            CREATE TABLE IF NOT EXISTS cache_messages (
+                mailbox TEXT NOT NULL,
+                uid INTEGER NOT NULL,
+                message_json TEXT NOT NULL,
+                date_unix INTEGER NOT NULL,
+                cached_at INTEGER NOT NULL,
+                PRIMARY KEY (mailbox, uid)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_messages_date ON cache_messages (date_unix);",
+        )
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+        Ok(Self {
+            base_dir: base_path,
+            conn: Arc::new(Mutex::new(conn)),
+        })
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn open<P: AsRef<Path>>(base_dir: P) -> std::io::Result<Self> {
+        Ok(Self {
             base_dir: base_dir.as_ref().to_path_buf(),
+        })
+    }
+
+    /// Cria uma nova instância de cache apontando para o diretório informado.
+    /// No ambiente nativo, inicializa o banco SQLite via `open`.
+    pub fn new<P: AsRef<Path>>(base_dir: P) -> Self {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            Self::open(&base_dir).unwrap_or_else(|_| {
+                // Fallback em memória caso falhe o acesso ao diretório
+                let conn = Connection::open_in_memory().expect("sqlite in-memory fallback");
+                Self {
+                    base_dir: base_dir.as_ref().to_path_buf(),
+                    conn: Arc::new(Mutex::new(conn)),
+                }
+            })
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            Self {
+                base_dir: base_dir.as_ref().to_path_buf(),
+            }
         }
     }
 
@@ -33,7 +120,8 @@ impl LocalMessageCache {
         &self.base_dir
     }
 
-    /// Sanitiza o nome da caixa de correio para uso seguro no sistema de arquivos.
+    /// Sanitiza o nome da caixa de correio para uso seguro como chave.
+    #[allow(dead_code)]
     fn sanitize_slug(mailbox: &str) -> String {
         let mut slug = String::with_capacity(mailbox.len());
         for c in mailbox.chars() {
@@ -50,25 +138,7 @@ impl LocalMessageCache {
         }
     }
 
-    /// Escreve um arquivo de forma atômica utilizando escrita em arquivo temporário (.tmp)
-    /// seguida de renomeação atômica pelo sistema operacional.
-    #[allow(dead_code)]
-    fn write_atomic(dest: &Path, content: &[u8]) -> std::io::Result<()> {
-        if let Some(parent) = dest.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
-        let tmp_file = dest.with_extension(format!(
-            "tmp.{}",
-            crate::domain::time::current_unix_timestamp()
-        ));
-
-        std::fs::write(&tmp_file, content)?;
-        std::fs::rename(&tmp_file, dest)?;
-        Ok(())
-    }
-
-    /// Grava a lista de caixas de correio de forma atômica no disco ou localStorage (WASM).
+    /// Grava a lista de caixas de correio de forma atômica no SQLite ou storage Web.
     pub fn save_mailboxes(&self, mailboxes: &[MailboxInfo]) -> std::io::Result<()> {
         #[cfg(target_arch = "wasm32")]
         {
@@ -82,10 +152,38 @@ impl LocalMessageCache {
         }
         #[cfg(not(target_arch = "wasm32"))]
         {
-            let path = self.base_dir.join("mailboxes.json");
-            let json = serde_json::to_vec_pretty(mailboxes)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-            Self::write_atomic(&path, &json)
+            let mut conn = self
+                .conn
+                .lock()
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+            let tx = conn
+                .transaction()
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            let now = crate::domain::time::current_unix_timestamp() as i64;
+            tx.execute("DELETE FROM cache_mailboxes", [])
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            {
+                let mut stmt = tx.prepare(
+                    "INSERT INTO cache_mailboxes (name, total_messages, unread_messages, updated_at)
+                     VALUES (?1, ?2, ?3, ?4)",
+                ).map_err(|e| std::io::Error::other(e.to_string()))?;
+
+                for mb in mailboxes {
+                    stmt.execute(params![
+                        mb.name,
+                        mb.total_messages as i64,
+                        mb.unread_messages as i64,
+                        now
+                    ])
+                    .map_err(|e| std::io::Error::other(e.to_string()))?;
+                }
+            }
+
+            tx.commit()
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+            Ok(())
         }
     }
 
@@ -106,22 +204,38 @@ impl LocalMessageCache {
         }
         #[cfg(not(target_arch = "wasm32"))]
         {
-            let path = self.base_dir.join("mailboxes.json");
-            if !path.exists() {
-                return Ok(None);
-            }
-            let content = std::fs::read(&path)?;
-            let mailboxes = serde_json::from_slice(&content)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-            Ok(Some(mailboxes))
-        }
-    }
+            let conn = self
+                .conn
+                .lock()
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+            let mut stmt = conn.prepare(
+                "SELECT name, total_messages, unread_messages FROM cache_mailboxes ORDER BY name ASC",
+            ).map_err(|e| std::io::Error::other(e.to_string()))?;
 
-    /// Retorna o diretório raiz de uma caixa específica.
-    #[allow(dead_code)]
-    fn mailbox_dir(&self, mailbox: &str) -> PathBuf {
-        let slug = Self::sanitize_slug(mailbox);
-        self.base_dir.join("mailboxes").join(slug)
+            let rows = stmt
+                .query_map([], |row| {
+                    let name: String = row.get(0)?;
+                    let total: i64 = row.get(1)?;
+                    let unread: i64 = row.get(2)?;
+                    Ok(MailboxInfo {
+                        name,
+                        total_messages: total as u32,
+                        unread_messages: unread as u32,
+                    })
+                })
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            let mut list = Vec::new();
+            for r in rows {
+                list.push(r.map_err(|e| std::io::Error::other(e.to_string()))?);
+            }
+
+            if list.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(list))
+            }
+        }
     }
 
     /// Grava a lista de envelopes de uma caixa de correio de forma atômica.
@@ -143,10 +257,45 @@ impl LocalMessageCache {
         }
         #[cfg(not(target_arch = "wasm32"))]
         {
-            let path = self.mailbox_dir(mailbox).join("envelopes.json");
-            let json = serde_json::to_vec_pretty(envelopes)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-            Self::write_atomic(&path, &json)
+            let mut conn = self
+                .conn
+                .lock()
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+            let tx = conn
+                .transaction()
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            tx.execute(
+                "DELETE FROM cache_envelopes WHERE mailbox = ?1",
+                params![mailbox],
+            )
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            {
+                let mut stmt = tx.prepare(
+                    "INSERT INTO cache_envelopes (mailbox, uid, envelope_json, date_unix, sort_order)
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
+                ).map_err(|e| std::io::Error::other(e.to_string()))?;
+
+                for (idx, env) in envelopes.iter().enumerate() {
+                    let json = serde_json::to_string(env)
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                    let date_unix = Self::parse_iso_date_to_unix(&env.date).unwrap_or(0) as i64;
+
+                    stmt.execute(params![
+                        mailbox,
+                        env.uid as i64,
+                        json,
+                        date_unix,
+                        idx as i64,
+                    ])
+                    .map_err(|e| std::io::Error::other(e.to_string()))?;
+                }
+            }
+
+            tx.commit()
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+            Ok(())
         }
     }
 
@@ -168,26 +317,38 @@ impl LocalMessageCache {
         }
         #[cfg(not(target_arch = "wasm32"))]
         {
-            let path = self.mailbox_dir(mailbox).join("envelopes.json");
-            if !path.exists() {
-                return Ok(None);
+            let conn = self
+                .conn
+                .lock()
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+            let mut stmt = conn.prepare(
+                "SELECT envelope_json FROM cache_envelopes WHERE mailbox = ?1 ORDER BY sort_order ASC",
+            ).map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            let rows = stmt
+                .query_map(params![mailbox], |row| {
+                    let json: String = row.get(0)?;
+                    Ok(json)
+                })
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            let mut list = Vec::new();
+            for r in rows {
+                let json = r.map_err(|e| std::io::Error::other(e.to_string()))?;
+                let env: MessageEnvelope = serde_json::from_str(&json)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                list.push(env);
             }
-            let content = std::fs::read(&path)?;
-            let envelopes = serde_json::from_slice(&content)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-            Ok(Some(envelopes))
+
+            if list.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(list))
+            }
         }
     }
 
-    /// Caminho do arquivo de corpo de uma mensagem individual.
-    #[allow(dead_code)]
-    fn message_path(&self, mailbox: &str, uid: u32) -> PathBuf {
-        self.mailbox_dir(mailbox)
-            .join("messages")
-            .join(format!("{}.json", uid))
-    }
-
-    /// Grava o corpo completo de uma mensagem individual de forma atômica.
+    /// Grava o corpo completo de uma mensagem individual de forma atômica no SQLite ou storage Web.
     pub fn save_message(&self, mailbox: &str, msg: &Message) -> std::io::Result<()> {
         #[cfg(target_arch = "wasm32")]
         {
@@ -206,10 +367,28 @@ impl LocalMessageCache {
         }
         #[cfg(not(target_arch = "wasm32"))]
         {
-            let path = self.message_path(mailbox, msg.envelope.uid);
-            let json = serde_json::to_vec_pretty(msg)
+            let conn = self
+                .conn
+                .lock()
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            let json = serde_json::to_string(msg)
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-            Self::write_atomic(&path, &json)
+            let date_unix = Self::parse_iso_date_to_unix(&msg.envelope.date).unwrap_or(0) as i64;
+            let now = crate::domain::time::current_unix_timestamp() as i64;
+
+            conn.execute(
+                "INSERT INTO cache_messages (mailbox, uid, message_json, date_unix, cached_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5)
+                 ON CONFLICT(mailbox, uid) DO UPDATE SET
+                     message_json = excluded.message_json,
+                     date_unix = excluded.date_unix,
+                     cached_at = excluded.cached_at",
+                params![mailbox, msg.envelope.uid as i64, json, date_unix, now],
+            )
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            Ok(())
         }
     }
 
@@ -231,21 +410,37 @@ impl LocalMessageCache {
         }
         #[cfg(not(target_arch = "wasm32"))]
         {
-            let path = self.message_path(mailbox, uid);
-            if !path.exists() {
-                return Ok(None);
+            let conn = self
+                .conn
+                .lock()
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            let mut stmt = conn
+                .prepare("SELECT message_json FROM cache_messages WHERE mailbox = ?1 AND uid = ?2")
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            let mut rows = stmt
+                .query(params![mailbox, uid as i64])
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            if let Some(row) = rows
+                .next()
+                .map_err(|e| std::io::Error::other(e.to_string()))?
+            {
+                let json: String = row
+                    .get(0)
+                    .map_err(|e| std::io::Error::other(e.to_string()))?;
+                let msg: Message = serde_json::from_str(&json)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                Ok(Some(msg))
+            } else {
+                Ok(None)
             }
-            let content = std::fs::read(&path)?;
-            let msg = serde_json::from_slice(&content)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-            Ok(Some(msg))
         }
     }
 
     /// Parser minimalista para timestamps ISO-8601 UTC (ex: "2026-10-10T12:00:00Z" ou "2026-10-10 12:00:00").
-    /// Não depende de crates externas de data/hora (hermético em Rust std).
     fn parse_iso_date_to_unix(date_str: &str) -> Option<u64> {
-        // Formato esperado: YYYY-MM-DD[T| ]HH:MM:SS
         let parts: Vec<&str> = date_str.split(&['T', ' '][..]).collect();
         if parts.is_empty() {
             return None;
@@ -260,40 +455,42 @@ impl LocalMessageCache {
         let month: u64 = date_parts[1].parse().ok()?;
         let day: u64 = date_parts[2].parse().ok()?;
 
-        let (hour, min, sec) = if parts.len() > 1 {
-            let time_clean = parts[1].trim_end_matches('Z');
-            let time_parts: Vec<&str> = time_clean.split(':').collect();
-            if time_parts.len() >= 3 {
-                (
-                    time_parts[0].parse().unwrap_or(0),
-                    time_parts[1].parse().unwrap_or(0),
-                    time_parts[2]
-                        .split('.')
-                        .next()
-                        .unwrap_or("0")
-                        .parse()
-                        .unwrap_or(0),
-                )
-            } else {
-                (0, 0, 0)
-            }
+        let time_part = if parts.len() > 1 {
+            parts[1].trim_end_matches('Z')
         } else {
-            (0, 0, 0)
+            "00:00:00"
         };
+        let time_parts: Vec<&str> = time_part.split(':').collect();
+        let hour: u64 = time_parts.first().and_then(|s| s.parse().ok()).unwrap_or(0);
+        let min: u64 = time_parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+        let sec: u64 = time_parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(0);
 
-        // Algoritmo de dias julianos simplificado para conversão Unix Timestamp UTC
-        // Dias desde 1970-01-01
-        let mut y = year;
-        let mut m = month as i64;
-        if m <= 2 {
-            y -= 1;
-            m += 12;
+        let mut days: i64 = 0;
+        for y in 1970..year {
+            let is_leap = (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0);
+            days += if is_leap { 366 } else { 365 };
         }
-        let era = y.div_euclid(400);
-        let yoe = y.rem_euclid(400);
-        let doy = (153 * (m - 3) + 2) / 5 + (day as i64) - 1;
-        let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-        let days = era * 146097 + doe - 719468;
+
+        let is_current_leap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+        let month_days = [
+            31,
+            if is_current_leap { 29 } else { 28 },
+            31,
+            30,
+            31,
+            30,
+            31,
+            31,
+            30,
+            31,
+            30,
+            31,
+        ];
+
+        for m in 1..month {
+            days += month_days[(m - 1) as usize];
+        }
+        days += (day as i64) - 1;
 
         if days < 0 {
             return None;
@@ -303,7 +500,14 @@ impl LocalMessageCache {
         Some(secs)
     }
 
-    /// Executa a purga de retenção: remove arquivos de corpo completo de mensagens
+    /// Executa purga de mensagens anteriores a uma determinada duração (ex: 90 dias)
+    /// com base na data do sistema atual.
+    pub fn purge_older_than(&self, max_age: Duration) -> std::io::Result<usize> {
+        let now_unix = crate::domain::time::current_unix_timestamp();
+        self.purge_expired_messages(max_age, now_unix)
+    }
+
+    /// Executa a purga de retenção: remove mensagens completas
     /// cuja data no envelope seja anterior ao limite (ex: 90 dias).
     /// Retorna o número de mensagens expurgadas.
     pub fn purge_expired_messages(
@@ -315,56 +519,29 @@ impl LocalMessageCache {
         if now_unix < max_age_secs {
             return Ok(0);
         }
-        let cutoff_unix = now_unix - max_age_secs;
+        let cutoff_unix = (now_unix - max_age_secs) as i64;
 
-        let mailboxes_dir = self.base_dir.join("mailboxes");
-        if !mailboxes_dir.exists() {
-            return Ok(0);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let conn = self
+                .conn
+                .lock()
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            let purged = conn
+                .execute(
+                    "DELETE FROM cache_messages WHERE date_unix < ?1",
+                    params![cutoff_unix],
+                )
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            Ok(purged)
         }
-
-        let mut purged_count = 0;
-
-        for entry in std::fs::read_dir(mailboxes_dir)? {
-            let entry = entry?;
-            let box_path = entry.path();
-            if !box_path.is_dir() {
-                continue;
-            }
-
-            // Ler envelopes da caixa
-            let envelopes_file = box_path.join("envelopes.json");
-            if !envelopes_file.exists() {
-                continue;
-            }
-
-            let content = match std::fs::read(&envelopes_file) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
-
-            let envelopes: Vec<MessageEnvelope> = match serde_json::from_slice(&content) {
-                Ok(envs) => envs,
-                Err(_) => continue,
-            };
-
-            let messages_dir = box_path.join("messages");
-            if !messages_dir.exists() {
-                continue;
-            }
-
-            for env in envelopes {
-                if let Some(msg_unix) = Self::parse_iso_date_to_unix(&env.date)
-                    && msg_unix < cutoff_unix
-                {
-                    let msg_file = messages_dir.join(format!("{}.json", env.uid));
-                    if msg_file.exists() && std::fs::remove_file(msg_file).is_ok() {
-                        purged_count += 1;
-                    }
-                }
-            }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = cutoff_unix;
+            Ok(0)
         }
-
-        Ok(purged_count)
     }
 }
 
