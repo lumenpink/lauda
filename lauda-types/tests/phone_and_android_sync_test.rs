@@ -134,3 +134,76 @@ fn test_android_sync_tombstone_operation() {
     assert_eq!(tombstone.source_id, "c7e2ecd0-0000-4000-8000-000000000001");
     assert!(matches!(tombstone.operations.as_slice(), [AndroidRawContactOp::DeleteRawContact { .. }]));
 }
+
+#[test]
+fn test_phone_normalizer_edge_cases_and_error_handling() {
+    // DDD inválido (ex: 05 ou 00)
+    assert!(PhoneNormalizer::normalize_br("05 99123-4567", None).is_err());
+    assert!(PhoneNormalizer::normalize_br("00 99123-4567", None).is_err());
+
+    // Número curto demais
+    assert!(PhoneNormalizer::normalize_br("12345", None).is_err());
+
+    // Número com pontuação estranha e prefixo internacional já existente
+    let p1 = PhoneNormalizer::normalize_br("+55 (048) 9-8888-7777", None).expect("deve limpar formato");
+    assert_eq!(p1.e164, "+5548988887777");
+    assert_eq!(p1.formatted, "+55 (48) 98888-7777");
+
+    // Operadora de MG (031)
+    let p2 = PhoneNormalizer::normalize_br("031 31 99999-1111", None).expect("deve limpar CSP 031");
+    assert_eq!(p2.e164, "+5531999991111");
+
+    // Celular antigo com 8 dígitos começado em 7
+    let p3 = PhoneNormalizer::normalize_br("61 7123-4567", None).expect("deve adicionar nono dígito");
+    assert_eq!(p3.e164, "+5561971234567");
+    assert_eq!(p3.kind, PhoneKind::Mobile);
+}
+
+#[test]
+fn test_contact_deduplication_similarity_score() {
+    let c1 = ContactEntry {
+        id: "c1".to_string(),
+        username: "lumen".to_string(),
+        display_name: Some("Ada Lovelace".to_string()),
+        primary_email: "ada@lovelace.org".to_string(),
+        secondary_emails: vec!["ada.secondary@math.org".to_string()],
+        phone_numbers: vec!["021 (48) 99123-4567".to_string()],
+        birthday: Some("1815-12-10".to_string()),
+        notes: None,
+        vcard_raw: "".to_string(),
+        has_autocrypt: false,
+        autocrypt_fingerprint: None,
+        etag: "".to_string(),
+        version: 1,
+        created_at: 0,
+        updated_at: 0,
+        deleted_at: None,
+    };
+
+    let mut c2 = c1.clone();
+    c2.id = "c2".to_string();
+    c2.display_name = Some("Ada Augusta Lovelace".to_string());
+    c2.primary_email = "outra_coisa@exemplo.com".to_string();
+    c2.secondary_emails = vec![];
+    // O telefone coincide mesmo digitado de forma diferente!
+    c2.phone_numbers = vec!["48 99123-4567".to_string()];
+
+    // Como o telefone normalizado E.164 coincide, score deve ser 1.0!
+    assert_eq!(c1.similarity_score(&c2), 1.0);
+
+    // Agora c3 sem mesmo telefone, mas com email secundário que bate
+    let mut c3 = c1.clone();
+    c3.id = "c3".to_string();
+    c3.phone_numbers = vec!["11 3222-1234".to_string()];
+    c3.primary_email = "ada.secondary@math.org".to_string();
+    assert_eq!(c1.similarity_score(&c3), 1.0);
+
+    // c4 apenas com mesmo nome
+    let mut c4 = c1.clone();
+    c4.id = "c4".to_string();
+    c4.primary_email = "totalmente_diferente@org.br".to_string();
+    c4.secondary_emails = vec![];
+    c4.phone_numbers = vec![];
+    assert_eq!(c1.similarity_score(&c4), 0.9);
+}
+

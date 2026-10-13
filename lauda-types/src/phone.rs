@@ -50,6 +50,30 @@ impl std::error::Error for PhoneError {}
 pub struct PhoneNormalizer;
 
 impl PhoneNormalizer {
+    /// Relação oficial de DDDs ativos no Brasil conforme Plano de Numeração da ANATEL.
+    pub const VALID_DDDS: &'static [u8] = &[
+        11, 12, 13, 14, 15, 16, 17, 18, 19, // SP
+        21, 22, 24,                         // RJ
+        27, 28,                             // ES
+        31, 32, 33, 34, 35, 37, 38,         // MG
+        41, 42, 43, 44, 45, 46,             // PR
+        47, 48, 49,                         // SC
+        51, 53, 54, 55,                     // RS
+        61, 62, 63, 64, 65, 66, 67, 68, 69, // DF / GO / TO / MT / MS / AC / RO
+        71, 73, 74, 75, 77, 79,             // BA / SE
+        81, 82, 83, 84, 85, 86, 87, 88, 89, // PE / AL / PB / RN / CE / PI
+        91, 92, 93, 94, 95, 96, 97, 98, 99, // PA / AM / RR / AP / MA
+    ];
+
+    /// Verifica se uma sequência de 2 dígitos representa um DDD válido no Brasil.
+    pub fn is_valid_ddd(ddd_str: &str) -> bool {
+        if let Ok(val) = ddd_str.parse::<u8>() {
+            Self::VALID_DDDS.contains(&val)
+        } else {
+            false
+        }
+    }
+
     /// Normaliza um número de telefone brasileiro para o formato internacional E.164
     /// e formato de apresentação, aplicando remoção de CSP (operadoras) e inclusão
     /// do 9º dígito móvel onde aplicável.
@@ -64,7 +88,12 @@ impl PhoneNormalizer {
 
         let mut digits = raw_digits.as_str();
 
-        // 1. Remoção de Código de Seleção de Prestadora (CSP) ou 0 de longa distância
+        // 1. Remoção do DDI brasileiro (+55) se presente no início
+        if digits.starts_with("55") && digits.len() >= 12 {
+            digits = &digits[2..];
+        }
+
+        // 2. Remoção de Código de Seleção de Prestadora (CSP) ou 0 de longa distância
         // Ex: 02148991234567 (14 dig) -> CSP 21, remove 3 dig
         // Ex: 0214832221234  (13 dig) -> CSP 21, remove 3 dig
         // Ex: 048991234567   (12 dig) -> 0 + DDD + cel, remove 1 dig
@@ -74,14 +103,13 @@ impl PhoneNormalizer {
                 // Remove '0' + 2 dígitos de CSP
                 digits = &digits[3..];
             } else if digits.len() == 11 || digits.len() == 12 {
-                // Remove prefixo '0' do DDD
-                digits = &digits[1..];
+                let candidate_ddd = &digits[1..3];
+                if Self::is_valid_ddd(candidate_ddd) {
+                    digits = &digits[1..];
+                } else {
+                    return Err(PhoneError::InvalidDdd(candidate_ddd.to_string()));
+                }
             }
-        }
-
-        // 2. Remoção do DDI brasileiro (+55) se presente
-        if digits.starts_with("55") && (digits.len() == 12 || digits.len() == 13) {
-            digits = &digits[2..];
         }
 
         // 3. Extração de DDD e Assinante
@@ -94,9 +122,8 @@ impl PhoneNormalizer {
             _ => return Err(PhoneError::InvalidLength),
         };
 
-        // Validação de DDD (deve ter 2 dígitos entre 11 e 99)
-        let ddd_val: u8 = ddd.parse().map_err(|_| PhoneError::InvalidDdd(ddd.to_string()))?;
-        if !(11..=99).contains(&ddd_val) {
+        // Validação estrita do DDD segundo normas da ANATEL
+        if !Self::is_valid_ddd(ddd) {
             return Err(PhoneError::InvalidDdd(ddd.to_string()));
         }
 

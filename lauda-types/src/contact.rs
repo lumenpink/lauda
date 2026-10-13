@@ -64,6 +64,55 @@ pub struct ContactEntry {
     pub deleted_at: Option<u64>,
 }
 
+impl ContactEntry {
+    /// Calcula a similaridade entre dois registros para detecção de duplicatas (0.0 a 1.0).
+    pub fn similarity_score(&self, other: &Self) -> f32 {
+        // 1. Identificadores exatos de e-mail (Score 1.0)
+        let s_email = self.primary_email.trim().to_lowercase();
+        let o_email = other.primary_email.trim().to_lowercase();
+        if !s_email.is_empty() && s_email == o_email {
+            return 1.0;
+        }
+
+        // Match em e-mails secundários
+        for e in &self.secondary_emails {
+            let clean = e.trim().to_lowercase();
+            if !clean.is_empty() && (clean == o_email || other.secondary_emails.iter().any(|oe| oe.trim().eq_ignore_ascii_case(&clean))) {
+                return 1.0;
+            }
+        }
+
+        // 2. Telefones normalizados coincidentes (Score 1.0)
+        for sp in &self.phone_numbers {
+            if let Ok(snorm) = crate::phone::PhoneNormalizer::normalize_br(sp, None) {
+                for op in &other.phone_numbers {
+                    if let Ok(onorm) = crate::phone::PhoneNormalizer::normalize_br(op, None)
+                        && snorm.e164 == onorm.e164
+                    {
+                        return 1.0;
+                    }
+                }
+            }
+        }
+
+        // 3. Similaridade de nome completo
+        if let (Some(sn), Some(on)) = (&self.display_name, &other.display_name) {
+            let sn_clean = sn.trim().to_lowercase();
+            let on_clean = on.trim().to_lowercase();
+            if !sn_clean.is_empty() && sn_clean == on_clean {
+                return 0.9;
+            }
+
+            // Substring / nome contido
+            if sn_clean.contains(&on_clean) || on_clean.contains(&sn_clean) {
+                return 0.75;
+            }
+        }
+
+        0.0
+    }
+}
+
 /// Requisição de sincronização incremental.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ContactSyncRequest {
