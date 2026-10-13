@@ -20,12 +20,7 @@ async fn test_caldav_full_lifecycle_and_sync() {
     let backend = Arc::new(InMemoryMailBackend::new());
     backend.add_user("lumen", "senha123");
 
-    let app = app_router_with_calendar(
-        backend,
-        "test-secret",
-        contacts_store,
-        calendar_store,
-    );
+    let app = app_router_with_calendar(backend, "test-secret", contacts_store, calendar_store);
 
     let auth_header = format!(
         "Basic {}",
@@ -50,10 +45,7 @@ async fn test_caldav_full_lifecycle_and_sync() {
         .unwrap();
     let resp = app.clone().oneshot(req).await.unwrap();
     assert_eq!(resp.status(), StatusCode::MOVED_PERMANENTLY);
-    assert_eq!(
-        resp.headers().get("location").unwrap(),
-        "/dav/calendars/"
-    );
+    assert_eq!(resp.headers().get("location").unwrap(), "/dav/calendars/");
 
     // 2. OPTIONS no root deve anunciar calendar-access
     let req = Request::builder()

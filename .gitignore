@@ -11,8 +11,9 @@
 *.log
 .DS_Store
 
-# Metadados de agentes locais e wrangler
+# Metadados de agentes locais, GOST compilado e wrangler
 .antigravity/
+.gost/
 .wrangler/
 
 # Artefatos Android e Sessões Locais

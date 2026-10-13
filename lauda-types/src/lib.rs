@@ -26,4 +26,3 @@ pub use sieve::{
     ConditionField, MatchType, SieveAction, SieveCondition, SieveRule, SieveScriptBundle,
     generate_sieve_script, parse_sieve_script, predict_rule_from_envelope,
 };
-

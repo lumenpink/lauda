@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 use lauda_types::{MailboxInfo, Message, MessageEnvelope, ViewMode};
 
+pub mod calendar_view;
 pub mod compose_view;
 pub mod contacts_view;
 pub mod inbox_view;
@@ -10,6 +11,7 @@ pub mod message_view;
 pub mod rules_view;
 pub mod state;
 
+use calendar_view::CalendarView;
 use compose_view::ComposeView;
 use contacts_view::ContactsView;
 use inbox_view::InboxView;
@@ -67,6 +69,7 @@ pub fn App() -> Element {
                         Screen::MessageDetail(_)
                         | Screen::Compose { .. }
                         | Screen::Contacts
+                        | Screen::Calendar
                         | Screen::Rules { .. } => {
                             screen.set(Screen::Inbox);
                         }
@@ -85,6 +88,7 @@ pub fn App() -> Element {
             Screen::MessageDetail(_)
                 | Screen::Compose { .. }
                 | Screen::Contacts
+                | Screen::Calendar
                 | Screen::Rules { .. }
         );
         let js = if is_subscreen {
@@ -388,6 +392,12 @@ pub fn App() -> Element {
                     },
                     Screen::Contacts => rsx! {
                         ContactsView {
+                            screen,
+                            session,
+                        }
+                    },
+                    Screen::Calendar => rsx! {
+                        CalendarView {
                             screen,
                             session,
                         }

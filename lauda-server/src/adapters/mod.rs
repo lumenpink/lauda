@@ -13,4 +13,3 @@ pub use in_memory::InMemoryMailBackend;
 pub use maildir::MaildirBackend;
 pub use sqlite_calendar::SqliteCalendarStore;
 pub use sqlite_contacts::SqliteContactsStore;
-

@@ -1,4 +1,5 @@
 pub mod cache;
+pub mod calendar_cache;
 pub mod contacts_cache;
 pub mod folders;
 pub mod outbox;
@@ -10,7 +11,9 @@ pub mod update;
 pub mod view;
 
 pub use cache::{LocalMessageCache, get_default_cache_dir};
+pub use calendar_cache::{LocalCalendarCache, detect_ics_invite};
 pub use contacts_cache::{LocalContactsCache, create_local_contact, format_contact_recipient};
+
 pub use folders::{FolderNode, FolderRole, build_folder_tree};
 pub use outbox::{OutboxItem, OutboxQueue, OutboxStatus};
 pub use ports::{ClientError, MailApiClient};

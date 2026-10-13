@@ -17,6 +17,8 @@ pub enum Screen {
     },
     /// Painel de contatos e chaves criptográficas Autocrypt.
     Contacts,
+    /// Agenda soberana com Quick-Add bar e Timeline Stream.
+    Calendar,
     /// Editor duplo de regras de correio ManageSieve.
     Rules {
         initial_rule: Option<lauda_types::sieve::SieveRule>,

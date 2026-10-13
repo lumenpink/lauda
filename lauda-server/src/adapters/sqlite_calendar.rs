@@ -240,9 +240,8 @@ impl SqliteCalendarStore {
              ORDER BY deleted_at ASC",
         )?;
 
-        let deleted_rows = stmt_deleted.query_map(params![username, since_ts], |row| {
-            row.get::<_, String>(0)
-        })?;
+        let deleted_rows =
+            stmt_deleted.query_map(params![username, since_ts], |row| row.get::<_, String>(0))?;
 
         let mut deleted_ids = Vec::new();
         for item in deleted_rows {

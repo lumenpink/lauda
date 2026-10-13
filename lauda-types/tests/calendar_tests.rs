@@ -19,11 +19,9 @@ fn sample_ref_time() -> CalendarReferenceTime {
 #[test]
 fn test_parse_simple_time_and_summary() {
     let ref_time = sample_ref_time();
-    let parsed = CalendarIntentParser::parse(
-        "Almoço com Marcelo amanhã às 12h30 no Fasano",
-        &ref_time,
-    )
-    .expect("parsing failed");
+    let parsed =
+        CalendarIntentParser::parse("Almoço com Marcelo amanhã às 12h30 no Fasano", &ref_time)
+            .expect("parsing failed");
 
     assert_eq!(parsed.summary, "Almoço com Marcelo");
     assert_eq!(parsed.location.as_deref(), Some("Fasano"));
@@ -89,18 +87,14 @@ fn test_parse_recurring_weekly() {
 #[test]
 fn test_parse_biweekly_and_monthly() {
     let ref_time = sample_ref_time();
-    let parsed_bi = CalendarIntentParser::parse(
-        "Sincronização a cada 15 dias às 10h",
-        &ref_time,
-    )
-    .expect("parsing biweekly failed");
+    let parsed_bi = CalendarIntentParser::parse("Sincronização a cada 15 dias às 10h", &ref_time)
+        .expect("parsing biweekly failed");
     let rrule_bi = parsed_bi.rrule.expect("esperava rrule biweekly");
     assert_eq!(rrule_bi.freq, RecurrenceFreq::Weekly);
     assert_eq!(rrule_bi.interval, 2);
 
-    let parsed_month =
-        CalendarIntentParser::parse("Fechamento mensal todo mês dia 5", &ref_time)
-            .expect("parsing monthly failed");
+    let parsed_month = CalendarIntentParser::parse("Fechamento mensal todo mês dia 5", &ref_time)
+        .expect("parsing monthly failed");
     let rrule_month = parsed_month.rrule.expect("esperava rrule mensal");
     assert_eq!(rrule_month.freq, RecurrenceFreq::Monthly);
 }
@@ -164,11 +158,8 @@ fn test_ical_serialization_roundtrip() {
 #[test]
 fn test_parse_overnight_span() {
     let ref_time = sample_ref_time();
-    let parsed = CalendarIntentParser::parse(
-        "Plantão no Hospital das 19h às 07h",
-        &ref_time,
-    )
-    .expect("parsing failed");
+    let parsed = CalendarIntentParser::parse("Plantão no Hospital das 19h às 07h", &ref_time)
+        .expect("parsing failed");
 
     assert_eq!(parsed.summary, "Plantão");
     assert_eq!(parsed.location.as_deref(), Some("Hospital"));
@@ -210,4 +201,3 @@ fn test_parse_empty_input_error() {
     let result = CalendarIntentParser::parse("   ", &ref_time);
     assert!(result.is_err());
 }
-

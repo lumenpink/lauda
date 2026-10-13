@@ -1,7 +1,9 @@
 use dioxus::prelude::*;
+use lauda_types::calendar::{EventTime, timestamp_to_utc_parts};
 use lauda_types::{MailboxInfo, Message, MessageEnvelope, ViewMode, message::SignatureStatus};
 
 use crate::adapters::HttpApiClient;
+use crate::domain::calendar_cache::LocalCalendarCache;
 use crate::domain::ports::MailApiClient;
 use crate::domain::session::SessionConfig;
 use crate::domain::view::{clean_comment_tags, parse_markdown_to_html};
@@ -20,6 +22,7 @@ pub fn MessageView(
     let msg = active_message.read().clone();
     let mut download_status = use_signal(|| None::<(usize, String)>);
     let mut crypto_drawer_open = use_signal(|| false);
+    let mut rsvp_feedback = use_signal(|| None::<String>);
 
     if msg.is_none() {
         return rsx! {
@@ -55,6 +58,16 @@ pub fn MessageView(
         .as_deref()
         .or(message.txt_auto.as_deref())
         .unwrap_or("");
+    let detected_invite = message
+        .txt_original
+        .as_deref()
+        .and_then(crate::domain::calendar_cache::detect_ics_invite)
+        .or_else(|| {
+            message
+                .txt_auto
+                .as_deref()
+                .and_then(crate::domain::calendar_cache::detect_ics_invite)
+        });
     let body_quote_source = clean_comment_tags(raw_quote_source);
     let quoted_lines = body_quote_source
         .lines()
@@ -436,6 +449,116 @@ pub fn MessageView(
                     }
                 }
             }
+
+            // Cartão de Convite iCalendar / RSVP em 1 Toque
+            if let Some(ref invite) = detected_invite {
+                {
+                    let invite_summary = invite.summary.clone();
+                    let invite_loc = invite.location.clone();
+                    let time_display = match &invite.start {
+                        EventTime::DateTimeUtc(ts) => {
+                            let (y, m, d, h, min, _) = timestamp_to_utc_parts(*ts);
+                            format!("{d:02}/{m:02}/{y} às {h:02}:{min:02} UTC")
+                        }
+                        EventTime::DateOnly { year, month, day } => {
+                            format!("{day:02}/{month:02}/{year} (Dia Inteiro)")
+                        }
+                    };
+
+                    rsx! {
+                        div {
+                            style: "border: 2px solid #0a0a0a; background: #fff; padding: 1rem 1.2rem; box-shadow: 4px 4px 0 #dc143c; display: flex; flex-direction: column; gap: 0.8rem;",
+
+                    div {
+                        style: "display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0a0a0a; padding-bottom: 0.4rem; flex-wrap: wrap; gap: 0.5rem;",
+                        div {
+                            style: "display: flex; align-items: center; gap: 0.6rem;",
+                            span {
+                                style: "background: #dc143c; color: #fff; font-weight: bold; font-size: 0.75rem; padding: 0.2rem 0.5rem; letter-spacing: 0.5px;",
+                                "CONVITE DE CALENDÁRIO"
+                            }
+                            span {
+                                style: "font-weight: bold; font-size: 1rem; color: #0a0a0a;",
+                                "{invite_summary}"
+                            }
+                        }
+                        span {
+                            style: "font-size: 0.85rem; font-weight: bold; color: #555;",
+                            "📅 {time_display}"
+                        }
+                    }
+
+                    if let Some(ref loc) = invite_loc {
+                        div {
+                            style: "font-size: 0.85rem; color: #333;",
+                            span { style: "font-weight: bold; color: #0a0a0a;", "Local: " }
+                            "📍 {loc}"
+                        }
+                    }
+
+                    if let Some(ref fb) = *rsvp_feedback.read() {
+                        div {
+                            style: "background: #e8f5e9; color: #2e7d32; border: 1px solid #2e7d32; padding: 0.4rem 0.8rem; font-weight: bold; font-size: 0.85rem;",
+                            "✓ {fb}"
+                        }
+                    } else {
+                        div {
+                            style: "display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;",
+                            span {
+                                style: "font-size: 0.85rem; font-weight: bold; color: #0a0a0a; margin-right: 0.4rem;",
+                                "Sua Resposta:"
+                            }
+                            button {
+                                style: "background: #2e7d32; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; font-size: 0.85rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                                onclick: {
+                                    let mut ev = invite.clone();
+                                    move |_| {
+                                        ev.status = lauda_types::calendar::EventStatus::Confirmed;
+                                        let cache_dir = crate::domain::cache::get_default_cache_dir();
+                                        if let Ok(cache) = LocalCalendarCache::open(&cache_dir) {
+                                            let _ = cache.upsert_event(&ev);
+                                        }
+                                        rsvp_feedback.set(Some("Presença confirmada! Adicionado à sua Agenda.".to_string()));
+                                    }
+                                },
+                                "✓ ACEITAR"
+                            }
+                            button {
+                                style: "background: #f57f17; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; font-size: 0.85rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                                onclick: {
+                                    let mut ev = invite.clone();
+                                    move |_| {
+                                        ev.status = lauda_types::calendar::EventStatus::Tentative;
+                                        let cache_dir = crate::domain::cache::get_default_cache_dir();
+                                        if let Ok(cache) = LocalCalendarCache::open(&cache_dir) {
+                                            let _ = cache.upsert_event(&ev);
+                                        }
+                                        rsvp_feedback.set(Some("Marcado como 'Talvez' na sua Agenda.".to_string()));
+                                    }
+                                },
+                                "? TALVEZ"
+                            }
+                            button {
+                                style: "background: #c62828; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; font-size: 0.85rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                                onclick: {
+                                    let mut ev = invite.clone();
+                                    move |_| {
+                                        ev.status = lauda_types::calendar::EventStatus::Cancelled;
+                                        let cache_dir = crate::domain::cache::get_default_cache_dir();
+                                        if let Ok(cache) = LocalCalendarCache::open(&cache_dir) {
+                                            let _ = cache.upsert_event(&ev);
+                                        }
+                                        rsvp_feedback.set(Some("Convite recusado.".to_string()));
+                                    }
+                                },
+                                "✕ RECUSAR"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
             // Corpo da Mensagem conforme o Modo Trifocal
             {

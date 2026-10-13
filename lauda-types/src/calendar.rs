@@ -330,9 +330,9 @@ impl EventTime {
         if clean.contains('T') {
             // Formato esperado: YYYYMMDDTHHMMSSZ ou YYYYMMDDTHHMMSS
             let stripped = clean.strip_suffix('Z').unwrap_or(clean);
-            let (d_part, t_part) = stripped.split_once('T').ok_or_else(|| {
-                CalendarError::InvalidFormat(format!("Horário sem T: {clean}"))
-            })?;
+            let (d_part, t_part) = stripped
+                .split_once('T')
+                .ok_or_else(|| CalendarError::InvalidFormat(format!("Horário sem T: {clean}")))?;
             if d_part.len() < 8 || t_part.len() < 4 {
                 return Err(CalendarError::InvalidFormat(format!(
                     "Data/hora curta: {clean}"
@@ -415,9 +415,10 @@ impl CalendarEvent {
         lines.push("BEGIN:VEVENT".to_string());
         lines.push(format!("UID:{}", self.uid));
 
-        let dtstamp = self
-            .updated_at
-            .unwrap_or_else(|| self.created_at.unwrap_or_else(|| self.start.to_timestamp_utc()));
+        let dtstamp = self.updated_at.unwrap_or_else(|| {
+            self.created_at
+                .unwrap_or_else(|| self.start.to_timestamp_utc())
+        });
         lines.push(format!(
             "DTSTAMP:{}",
             EventTime::DateTimeUtc(dtstamp).to_ical_string()
@@ -433,10 +434,13 @@ impl CalendarEvent {
         }
 
         match &self.start {
-            EventTime::DateTimeUtc(_) => lines.push(format!("DTSTART:{}", self.start.to_ical_string())),
-            EventTime::DateOnly { .. } => {
-                lines.push(format!("DTSTART;VALUE=DATE:{}", self.start.to_ical_string()))
+            EventTime::DateTimeUtc(_) => {
+                lines.push(format!("DTSTART:{}", self.start.to_ical_string()))
             }
+            EventTime::DateOnly { .. } => lines.push(format!(
+                "DTSTART;VALUE=DATE:{}",
+                self.start.to_ical_string()
+            )),
         }
 
         match &self.end {
@@ -519,7 +523,12 @@ impl CalendarEvent {
                 None => continue,
             };
 
-            let prop_name = full_key.split(';').next().unwrap_or("").trim().to_uppercase();
+            let prop_name = full_key
+                .split(';')
+                .next()
+                .unwrap_or("")
+                .trim()
+                .to_uppercase();
 
             match prop_name.as_str() {
                 "UID" => uid = val.trim().to_string(),
@@ -553,7 +562,12 @@ impl CalendarEvent {
                             name = Some(pv.trim().to_string());
                         }
                     }
-                    let email = val.trim().strip_prefix("mailto:").unwrap_or(val).trim().to_string();
+                    let email = val
+                        .trim()
+                        .strip_prefix("mailto:")
+                        .unwrap_or(val)
+                        .trim()
+                        .to_string();
                     organizer = Some(EventAttendee {
                         email,
                         name,
@@ -572,7 +586,12 @@ impl CalendarEvent {
                             }
                         }
                     }
-                    let email = val.trim().strip_prefix("mailto:").unwrap_or(val).trim().to_string();
+                    let email = val
+                        .trim()
+                        .strip_prefix("mailto:")
+                        .unwrap_or(val)
+                        .trim()
+                        .to_string();
                     attendees.push(EventAttendee {
                         email,
                         name,
@@ -587,7 +606,8 @@ impl CalendarEvent {
             return Err(CalendarError::ParseError("VEVENT sem UID".to_string()));
         }
 
-        let start = start.ok_or_else(|| CalendarError::ParseError("VEVENT sem DTSTART".to_string()))?;
+        let start =
+            start.ok_or_else(|| CalendarError::ParseError("VEVENT sem DTSTART".to_string()))?;
         let end = end.unwrap_or_else(|| start.clone());
 
         Ok(CalendarEvent {
@@ -609,7 +629,7 @@ impl CalendarEvent {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CalendarReferenceTime {
     pub year: i32,
     pub month: u32,
@@ -979,7 +999,10 @@ impl CalendarIntentParser {
             let (end_y, end_m, end_d) = days_to_civil(base_days + day_span);
             let end_ts = utc_parts_to_timestamp(end_y, end_m, end_d, eh, em, 0);
 
-            (EventTime::DateTimeUtc(start_ts), EventTime::DateTimeUtc(end_ts))
+            (
+                EventTime::DateTimeUtc(start_ts),
+                EventTime::DateTimeUtc(end_ts),
+            )
         };
 
         Ok(ParsedCalendarIntent {
@@ -1007,7 +1030,11 @@ fn parse_time_token(token: &str) -> Option<(u32, u32)> {
     } else if clean.contains('h') {
         let (h_str, m_str) = clean.split_once('h')?;
         let h = h_str.parse::<u32>().ok()?;
-        let m = if m_str.is_empty() { 0 } else { m_str.parse::<u32>().ok()? };
+        let m = if m_str.is_empty() {
+            0
+        } else {
+            m_str.parse::<u32>().ok()?
+        };
         if h < 24 && m < 60 {
             return Some((h, m));
         }

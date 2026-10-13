@@ -46,7 +46,7 @@ fn test_calendar_local_cache_lifecycle_and_search() {
     // 4. Aplicar delta de sincronização
     let ev2 = sample_event("ev-2", "Dentista", 1792000000);
     cache
-        .apply_sync_delta(&[ev2.clone()], &[], "ts:1792000000")
+        .apply_sync_delta(std::slice::from_ref(&ev2), &[], "ts:1792000000")
         .expect("apply delta");
     assert_eq!(cache.count_events().unwrap(), 2);
     assert_eq!(
