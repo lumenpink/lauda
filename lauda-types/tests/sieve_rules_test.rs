@@ -1,8 +1,8 @@
+use lauda_types::MessageEnvelope;
 use lauda_types::sieve::{
     ConditionField, MatchType, SieveAction, SieveCondition, SieveRule, generate_sieve_script,
     parse_sieve_script, predict_rule_from_envelope,
 };
-use lauda_types::MessageEnvelope;
 
 #[test]
 fn test_generate_and_parse_sieve_script_roundtrip() {
@@ -52,10 +52,13 @@ fn test_generate_and_parse_sieve_script_roundtrip() {
     let parsed_rules = parse_sieve_script(&script);
     assert_eq!(parsed_rules.len(), 2);
     assert_eq!(parsed_rules[0].name, "Mover Noticias");
-    assert_eq!(parsed_rules[0].actions, vec![
-        SieveAction::FileInto("Noticias".to_string()),
-        SieveAction::Stop
-    ]);
+    assert_eq!(
+        parsed_rules[0].actions,
+        vec![
+            SieveAction::FileInto("Noticias".to_string()),
+            SieveAction::Stop
+        ]
+    );
     assert_eq!(parsed_rules[1].name, "Spam por Assunto");
     assert_eq!(parsed_rules[1].conditions.len(), 2);
 }
@@ -76,11 +79,19 @@ fn test_predict_rule_from_envelope_with_prefix_subject() {
 
     let predicted = predict_rule_from_envelope(&env);
     assert_eq!(predicted.name, "Regra para [lauda-dev]");
-    assert!(predicted.conditions.iter().any(|c| c.field == ConditionField::Subject && c.value == "[lauda-dev]"));
-    assert_eq!(predicted.actions, vec![
-        SieveAction::FileInto("Listas/lauda-dev".to_string()),
-        SieveAction::Stop,
-    ]);
+    assert!(
+        predicted
+            .conditions
+            .iter()
+            .any(|c| c.field == ConditionField::Subject && c.value == "[lauda-dev]")
+    );
+    assert_eq!(
+        predicted.actions,
+        vec![
+            SieveAction::FileInto("Listas/lauda-dev".to_string()),
+            SieveAction::Stop,
+        ]
+    );
 }
 
 #[test]
@@ -101,8 +112,11 @@ fn test_predict_rule_from_envelope_sender_fallback() {
     assert_eq!(predicted.name, "Regra para chefe@empresa.com");
     assert_eq!(predicted.conditions[0].field, ConditionField::From);
     assert_eq!(predicted.conditions[0].value, "chefe@empresa.com");
-    assert_eq!(predicted.actions, vec![
-        SieveAction::FileInto("Contatos/chefe".to_string()),
-        SieveAction::Stop,
-    ]);
+    assert_eq!(
+        predicted.actions,
+        vec![
+            SieveAction::FileInto("Contatos/chefe".to_string()),
+            SieveAction::Stop,
+        ]
+    );
 }

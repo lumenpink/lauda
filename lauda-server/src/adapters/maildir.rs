@@ -967,17 +967,20 @@ impl MailBackend for MaildirBackend {
         let _ = username;
         // Caminho do script de usuário no home do Maildir ou na raiz do Maildir
         let candidates = [
-            self.base_dir.join("home").join("sieve").join("active.sieve"),
+            self.base_dir
+                .join("home")
+                .join("sieve")
+                .join("active.sieve"),
             self.base_dir.join("home").join(".dovecot.sieve"),
             self.base_dir.join(".dovecot.sieve"),
             self.base_dir.join("active.sieve"),
         ];
 
         for path in &candidates {
-            if path.exists() {
-                if let Ok(content) = std::fs::read_to_string(path) {
-                    return Ok(content);
-                }
+            if path.exists()
+                && let Ok(content) = std::fs::read_to_string(path)
+            {
+                return Ok(content);
             }
         }
 

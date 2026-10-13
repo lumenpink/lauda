@@ -323,6 +323,19 @@ pub fn MessageView(
                         onclick: handle_delete,
                         "🗑 EXCLUIR"
                     }
+                    button {
+                        style: "background: #0a0a0a; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #dc143c;",
+                        onclick: {
+                            let env = envelope.clone();
+                            move |_| {
+                                let predicted = lauda_types::sieve::predict_rule_from_envelope(&env);
+                                screen.set(Screen::Rules {
+                                    initial_rule: Some(predicted),
+                                });
+                            }
+                        },
+                        "⚡ CRIAR REGRA"
+                    }
                 }
             }
 

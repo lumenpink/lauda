@@ -74,4 +74,13 @@ pub trait MailApiClient: Send + Sync {
         token: &str,
         req: &lauda_types::contact::ContactSyncRequest,
     ) -> Result<lauda_types::contact::ContactSyncResponse, ClientError>;
+    async fn get_rules(
+        &self,
+        token: &str,
+    ) -> Result<lauda_types::sieve::SieveScriptBundle, ClientError>;
+    async fn save_rules(
+        &self,
+        token: &str,
+        bundle: &lauda_types::sieve::SieveScriptBundle,
+    ) -> Result<(), ClientError>;
 }

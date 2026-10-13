@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::MessageEnvelope;
+use serde::{Deserialize, Serialize};
 
 /// Campo de verificação para a condição da regra Sieve.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -123,7 +123,11 @@ pub fn generate_sieve_script(rules: &[SieveRule]) -> String {
             let combiner = if rule.match_all { "allof" } else { "anyof" };
             script.push_str(&format!("if {} (\n", combiner));
             for (idx, cond) in rule.conditions.iter().enumerate() {
-                let comma = if idx + 1 < rule.conditions.len() { "," } else { "" };
+                let comma = if idx + 1 < rule.conditions.len() {
+                    ","
+                } else {
+                    ""
+                };
                 script.push_str(&format!(
                     "    header {} \"{}\" \"{}\"{}\n",
                     cond.match_type.modifier(),
@@ -138,7 +142,10 @@ pub fn generate_sieve_script(rules: &[SieveRule]) -> String {
         for action in &rule.actions {
             match action {
                 SieveAction::FileInto(folder) => {
-                    script.push_str(&format!("    fileinto \"{}\";\n", escape_sieve_string(folder)));
+                    script.push_str(&format!(
+                        "    fileinto \"{}\";\n",
+                        escape_sieve_string(folder)
+                    ));
                 }
                 SieveAction::MarkRead => {
                     script.push_str("    setflag \"\\\\Seen\";\n");
@@ -186,10 +193,10 @@ pub fn parse_sieve_script(script: &str) -> Vec<SieveRule> {
                     match_all = true;
                 }
 
-                if l.contains("header") {
-                    if let Some(cond) = parse_header_condition(l) {
-                        conditions.push(cond);
-                    }
+                if l.contains("header")
+                    && let Some(cond) = parse_header_condition(l)
+                {
+                    conditions.push(cond);
                 }
 
                 if l.ends_with('{') {

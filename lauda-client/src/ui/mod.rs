@@ -7,6 +7,7 @@ pub mod inbox_view;
 pub mod login_view;
 pub mod mailbox_nav;
 pub mod message_view;
+pub mod rules_view;
 pub mod state;
 
 use compose_view::ComposeView;
@@ -14,6 +15,7 @@ use contacts_view::ContactsView;
 use inbox_view::InboxView;
 use login_view::LoginView;
 use message_view::MessageView;
+use rules_view::RulesView;
 pub use state::Screen;
 
 use crate::adapters::HttpApiClient;
@@ -62,7 +64,10 @@ pub fn App() -> Element {
                 if msg == "back" {
                     let current = screen.read().clone();
                     match current {
-                        Screen::MessageDetail(_) | Screen::Compose { .. } | Screen::Contacts => {
+                        Screen::MessageDetail(_)
+                        | Screen::Compose { .. }
+                        | Screen::Contacts
+                        | Screen::Rules { .. } => {
                             screen.set(Screen::Inbox);
                         }
                         _ => {}
@@ -77,7 +82,10 @@ pub fn App() -> Element {
         let current = screen.read().clone();
         let is_subscreen = matches!(
             current,
-            Screen::MessageDetail(_) | Screen::Compose { .. } | Screen::Contacts
+            Screen::MessageDetail(_)
+                | Screen::Compose { .. }
+                | Screen::Contacts
+                | Screen::Rules { .. }
         );
         let js = if is_subscreen {
             r#"
@@ -382,6 +390,13 @@ pub fn App() -> Element {
                         ContactsView {
                             screen,
                             session,
+                        }
+                    },
+                    Screen::Rules { initial_rule } => rsx! {
+                        RulesView {
+                            screen,
+                            session,
+                            initial_rule,
                         }
                     },
                 }

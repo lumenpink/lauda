@@ -162,6 +162,11 @@ pub fn InboxView(
                             "👥 CONTATOS"
                         }
                         button {
+                            style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                            onclick: move |_| screen.set(Screen::Rules { initial_rule: None }),
+                            "⚙ REGRAS"
+                        }
+                        button {
                             style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer;",
                             onclick: handle_refresh,
                             if *is_refreshing.read() { "..." } else { "🔄" }

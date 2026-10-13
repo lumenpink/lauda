@@ -421,4 +421,57 @@ impl MailApiClient for HttpApiClient {
             ))),
         }
     }
+
+    async fn get_rules(
+        &self,
+        token: &str,
+    ) -> Result<lauda_types::sieve::SieveScriptBundle, ClientError> {
+        let url = format!("{}/rules", self.base_url);
+        let headers = Self::auth_headers(token)?;
+        let resp = self
+            .client
+            .get(&url)
+            .headers(headers)
+            .send()
+            .await
+            .map_err(|e| ClientError::Network(e.to_string()))?;
+
+        match resp.status() {
+            StatusCode::OK => resp
+                .json::<lauda_types::sieve::SieveScriptBundle>()
+                .await
+                .map_err(|e| ClientError::Network(format!("Erro ao deserializar regras: {}", e))),
+            StatusCode::UNAUTHORIZED => Err(ClientError::AuthFailed),
+            status => Err(ClientError::Network(format!(
+                "Status inesperado ao buscar regras: {}",
+                status
+            ))),
+        }
+    }
+
+    async fn save_rules(
+        &self,
+        token: &str,
+        bundle: &lauda_types::sieve::SieveScriptBundle,
+    ) -> Result<(), ClientError> {
+        let url = format!("{}/rules", self.base_url);
+        let headers = Self::auth_headers(token)?;
+        let resp = self
+            .client
+            .put(&url)
+            .headers(headers)
+            .json(bundle)
+            .send()
+            .await
+            .map_err(|e| ClientError::Network(e.to_string()))?;
+
+        match resp.status() {
+            StatusCode::OK | StatusCode::NO_CONTENT => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(ClientError::AuthFailed),
+            status => Err(ClientError::Network(format!(
+                "Status inesperado ao salvar regras: {}",
+                status
+            ))),
+        }
+    }
 }

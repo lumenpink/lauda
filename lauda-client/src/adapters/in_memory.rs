@@ -242,4 +242,22 @@ impl MailApiClient for InMemoryApiClient {
             has_more: false,
         })
     }
+
+    async fn get_rules(
+        &self,
+        _token: &str,
+    ) -> Result<lauda_types::sieve::SieveScriptBundle, ClientError> {
+        Ok(lauda_types::sieve::SieveScriptBundle {
+            raw_script: String::new(),
+            rules: vec![],
+        })
+    }
+
+    async fn save_rules(
+        &self,
+        _token: &str,
+        _bundle: &lauda_types::sieve::SieveScriptBundle,
+    ) -> Result<(), ClientError> {
+        Ok(())
+    }
 }

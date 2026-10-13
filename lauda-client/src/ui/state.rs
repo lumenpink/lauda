@@ -17,4 +17,8 @@ pub enum Screen {
     },
     /// Painel de contatos e chaves criptográficas Autocrypt.
     Contacts,
+    /// Editor duplo de regras de correio ManageSieve.
+    Rules {
+        initial_rule: Option<lauda_types::sieve::SieveRule>,
+    },
 }
