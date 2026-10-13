@@ -506,3 +506,76 @@ async fn test_contacts_sync_endpoint_and_client_cache_reconciliation() {
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].primary_email, "rosa@revolucao.org");
 }
+
+#[tokio::test]
+async fn test_sieve_rules_endpoints() {
+    let backend = setup_test_backend();
+    let app = app_router(backend.clone(), TEST_SECRET);
+
+    // 1. Obter token
+    let login_body = serde_json::to_string(&LoginRequest {
+        username: "lumen".to_string(),
+        password: "senha123".to_string(),
+    })
+    .unwrap();
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/auth/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(login_body))
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+    let token_resp: TokenResponse = serde_json::from_slice(&body_bytes).unwrap();
+    let token = token_resp.token;
+
+    // 2. Salvar regra via PUT /rules
+    let new_rules = lauda_types::sieve::SieveScriptBundle {
+        raw_script: String::new(),
+        rules: vec![lauda_types::sieve::SieveRule {
+            id: "r1".to_string(),
+            name: "Filtrar Logs".to_string(),
+            enabled: true,
+            match_all: true,
+            conditions: vec![lauda_types::sieve::SieveCondition {
+                field: lauda_types::sieve::ConditionField::Subject,
+                match_type: lauda_types::sieve::MatchType::Contains,
+                value: "[LOG]".to_string(),
+            }],
+            actions: vec![
+                lauda_types::sieve::SieveAction::FileInto("Logs".to_string()),
+                lauda_types::sieve::SieveAction::Stop,
+            ],
+        }],
+    };
+
+    let put_req = Request::builder()
+        .method("PUT")
+        .uri("/rules")
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(serde_json::to_string(&new_rules).unwrap()))
+        .unwrap();
+
+    let put_resp = app.clone().oneshot(put_req).await.unwrap();
+    assert_eq!(put_resp.status(), StatusCode::NO_CONTENT);
+
+    // 3. Obter regras salvas via GET /rules
+    let get_req = Request::builder()
+        .method("GET")
+        .uri("/rules")
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+
+    let get_resp = app.clone().oneshot(get_req).await.unwrap();
+    assert_eq!(get_resp.status(), StatusCode::OK);
+    let get_bytes = get_resp.into_body().collect().await.unwrap().to_bytes();
+    let bundle: lauda_types::sieve::SieveScriptBundle = serde_json::from_slice(&get_bytes).unwrap();
+
+    assert!(bundle.raw_script.contains("# rule:[Filtrar Logs]"));
+    assert_eq!(bundle.rules.len(), 1);
+    assert_eq!(bundle.rules[0].name, "Filtrar Logs");
+}

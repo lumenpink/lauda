@@ -962,4 +962,41 @@ impl MailBackend for MaildirBackend {
         contacts.sort_by_key(|c| std::cmp::Reverse(c.message_count));
         Ok(contacts)
     }
+
+    async fn get_sieve_script(&self, username: &str) -> Result<String, BackendError> {
+        let _ = username;
+        // Caminho do script de usuário no home do Maildir ou na raiz do Maildir
+        let candidates = [
+            self.base_dir.join("home").join("sieve").join("active.sieve"),
+            self.base_dir.join("home").join(".dovecot.sieve"),
+            self.base_dir.join(".dovecot.sieve"),
+            self.base_dir.join("active.sieve"),
+        ];
+
+        for path in &candidates {
+            if path.exists() {
+                if let Ok(content) = std::fs::read_to_string(path) {
+                    return Ok(content);
+                }
+            }
+        }
+
+        Ok(String::new())
+    }
+
+    async fn put_sieve_script(&self, username: &str, script: &str) -> Result<(), BackendError> {
+        let _ = username;
+        let sieve_dir = self.base_dir.join("home").join("sieve");
+        let _ = std::fs::create_dir_all(&sieve_dir);
+
+        let script_path = sieve_dir.join("active.sieve");
+        std::fs::write(&script_path, script)
+            .map_err(|e| BackendError::Internal(format!("Falha ao salvar script Sieve: {}", e)))?;
+
+        // Link simbólico ou cópia para ~/.dovecot.sieve
+        let active_link = self.base_dir.join("home").join(".dovecot.sieve");
+        let _ = std::fs::write(&active_link, script);
+
+        Ok(())
+    }
 }

@@ -325,6 +325,42 @@ async fn sync_contacts_handler(
     Ok(Json(resp))
 }
 
+async fn get_rules_handler(
+    State(state): State<AppState>,
+    AuthUser(username): AuthUser,
+) -> Result<Json<lauda_types::sieve::SieveScriptBundle>, (StatusCode, String)> {
+    let script = state
+        .backend
+        .get_sieve_script(&username)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let rules = lauda_types::sieve::parse_sieve_script(&script);
+    Ok(Json(lauda_types::sieve::SieveScriptBundle {
+        raw_script: script,
+        rules,
+    }))
+}
+
+async fn put_rules_handler(
+    State(state): State<AppState>,
+    AuthUser(username): AuthUser,
+    Json(payload): Json<lauda_types::sieve::SieveScriptBundle>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let script = if payload.raw_script.trim().is_empty() {
+        lauda_types::sieve::generate_sieve_script(&payload.rules)
+    } else {
+        payload.raw_script
+    };
+
+    state
+        .backend
+        .put_sieve_script(&username, &script)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
 pub fn app_router(backend: Arc<dyn MailBackend>, jwt_secret: impl Into<String>) -> Router {
     let (events_tx, _) = tokio::sync::broadcast::channel(128);
     let state = AppState {
@@ -378,6 +414,7 @@ fn build_router(state: AppState) -> Router {
             "/messages/{uid}/attachments/{id}",
             get(get_attachment_handler),
         )
+        .route("/rules", get(get_rules_handler).put(put_rules_handler))
         .route("/compose", post(compose_handler))
         .layer(tower_http::cors::CorsLayer::permissive());
 

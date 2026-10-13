@@ -13,6 +13,7 @@ pub struct InMemoryMailBackend {
     mailboxes: RwLock<HashMap<String, Vec<MailboxInfo>>>, // username -> list of boxes
     messages: RwLock<HashMap<String, HashMap<String, Vec<Message>>>>, // username -> box -> msgs
     sent: RwLock<Vec<(String, ComposeForm)>>, // sent messages
+    sieve_scripts: RwLock<HashMap<String, String>>, // username -> script
 }
 
 impl InMemoryMailBackend {
@@ -263,5 +264,16 @@ impl MailBackend for InMemoryMailBackend {
 
         contacts.sort_by_key(|c| std::cmp::Reverse(c.message_count));
         Ok(contacts)
+    }
+
+    async fn get_sieve_script(&self, username: &str) -> Result<String, BackendError> {
+        let scripts = self.sieve_scripts.read().unwrap();
+        Ok(scripts.get(username).cloned().unwrap_or_default())
+    }
+
+    async fn put_sieve_script(&self, username: &str, script: &str) -> Result<(), BackendError> {
+        let mut scripts = self.sieve_scripts.write().unwrap();
+        scripts.insert(username.to_string(), script.to_string());
+        Ok(())
     }
 }
