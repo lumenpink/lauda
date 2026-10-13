@@ -10,6 +10,7 @@ fn make_sample_contact(id: &str, name: &str, email: &str, updated_at: u64) -> Co
         primary_email: email.to_string(),
         secondary_emails: vec![],
         phone_numbers: vec![],
+        birthday: None,
         notes: None,
         vcard_raw: format!("BEGIN:VCARD\r\nFN:{name}\r\nEMAIL:{email}\r\nEND:VCARD"),
         has_autocrypt: false,

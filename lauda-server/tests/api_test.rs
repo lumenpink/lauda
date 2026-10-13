@@ -448,6 +448,7 @@ async fn test_contacts_sync_endpoint_and_client_cache_reconciliation() {
         primary_email: "rosa@revolucao.org".to_string(),
         secondary_emails: vec![],
         phone_numbers: vec![],
+        birthday: None,
         notes: None,
         vcard_raw: "BEGIN:VCARD\r\nFN:Rosa Luxemburgo\r\nEND:VCARD".to_string(),
         has_autocrypt: true,

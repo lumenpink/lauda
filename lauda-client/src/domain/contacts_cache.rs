@@ -323,6 +323,11 @@ impl LocalContactsCache {
         let secondary_emails = serde_json::from_str(&sec_emails_str).unwrap_or_default();
         let phone_numbers = serde_json::from_str(&phones_str).unwrap_or_default();
 
+        let vcard_raw: String = row.get(7)?;
+        let birthday = vcard_raw
+            .lines()
+            .find_map(|l| l.strip_prefix("BDAY:").map(|s| s.trim().to_string()));
+
         Ok(ContactEntry {
             id: row.get(0)?,
             username: row.get(1)?,
@@ -330,8 +335,9 @@ impl LocalContactsCache {
             primary_email: row.get(3)?,
             secondary_emails,
             phone_numbers,
+            birthday,
             notes: row.get(6)?,
-            vcard_raw: row.get(7)?,
+            vcard_raw,
             has_autocrypt: has_auto_int != 0,
             autocrypt_fingerprint: row.get(9)?,
             etag: row.get(10)?,
@@ -383,6 +389,7 @@ pub fn create_local_contact(
         primary_email: clean_email,
         secondary_emails: vec![],
         phone_numbers: vec![],
+        birthday: None,
         notes: clean_notes,
         vcard_raw: vcard,
         has_autocrypt: false,

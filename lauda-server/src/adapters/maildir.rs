@@ -955,6 +955,7 @@ impl MailBackend for MaildirBackend {
                     message_count: count,
                     has_autocrypt,
                     autocrypt_fingerprint: fingerprint,
+                    birthday: None,
                 },
             )
             .collect();

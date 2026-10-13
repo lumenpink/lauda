@@ -390,6 +390,13 @@ async fn vcard_item_handler(
 
             let etag = compute_etag(vcard_str.as_bytes());
 
+            let mut birthday = None;
+            for line in vcard_str.lines() {
+                if let Some(rest) = line.strip_prefix("BDAY:") {
+                    birthday = Some(rest.trim().to_string());
+                }
+            }
+
             let entry = ContactEntry {
                 id: id.to_string(),
                 username,
@@ -397,6 +404,7 @@ async fn vcard_item_handler(
                 primary_email,
                 secondary_emails: vec![],
                 phone_numbers: vec![],
+                birthday,
                 notes: None,
                 vcard_raw: vcard_str,
                 has_autocrypt: false,

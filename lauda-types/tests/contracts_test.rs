@@ -111,6 +111,7 @@ fn test_contact_info_roundtrip() {
         message_count: 5,
         has_autocrypt: true,
         autocrypt_fingerprint: Some("ABCD 1234".to_string()),
+        birthday: Some("1990-01-01".to_string()),
     };
     let json = serde_json::to_string(&contact).unwrap();
     let decoded: lauda_types::ContactInfo = serde_json::from_str(&json).unwrap();
@@ -150,6 +151,7 @@ fn test_contact_entry_and_sync_contracts_roundtrip() {
         primary_email: "comrade@2lp.in".to_string(),
         secondary_emails: vec!["c2@2lp.in".to_string()],
         phone_numbers: vec!["123".to_string()],
+        birthday: Some("1990-01-01".to_string()),
         notes: Some("Notas".to_string()),
         vcard_raw: "VCARD".to_string(),
         has_autocrypt: true,

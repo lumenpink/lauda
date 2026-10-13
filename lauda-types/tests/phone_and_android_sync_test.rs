@@ -1,5 +1,5 @@
 use lauda_types::contact::ContactEntry;
-use lauda_types::phone::{NormalizedPhone, PhoneKind, PhoneNormalizer};
+use lauda_types::phone::{PhoneKind, PhoneNormalizer};
 use lauda_types::android_sync::{
     AndroidContactBatch, AndroidMimeType, AndroidRawContactOp, LAUDA_ACCOUNT_TYPE,
 };

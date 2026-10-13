@@ -15,6 +15,9 @@ pub struct ContactInfo {
     /// Fingerprint da chave pública Autocrypt (se disponível).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub autocrypt_fingerprint: Option<String>,
+    /// Data de aniversário (se disponível, ex: YYYY-MM-DD ou --MM-DD).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub birthday: Option<String>,
 }
 
 /// Registro completo de contato persistido e sincronizável via CardDAV.
@@ -35,6 +38,9 @@ pub struct ContactEntry {
     /// Lista de telefones de contato.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub phone_numbers: Vec<String>,
+    /// Data de aniversário (RFC 6350 BDAY, ex: "YYYY-MM-DD" ou "--MM-DD").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub birthday: Option<String>,
     /// Notas e observações livres.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub notes: Option<String>,

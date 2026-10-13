@@ -259,6 +259,7 @@ impl MailBackend for InMemoryMailBackend {
                 message_count: count,
                 has_autocrypt: false,
                 autocrypt_fingerprint: None,
+                birthday: None,
             })
             .collect();
 
