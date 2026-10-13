@@ -160,3 +160,54 @@ fn test_ical_serialization_roundtrip() {
     assert_eq!(parsed.end, event.end);
     assert_eq!(parsed.rrule, event.rrule);
 }
+
+#[test]
+fn test_parse_overnight_span() {
+    let ref_time = sample_ref_time();
+    let parsed = CalendarIntentParser::parse(
+        "Plantão no Hospital das 19h às 07h",
+        &ref_time,
+    )
+    .expect("parsing failed");
+
+    assert_eq!(parsed.summary, "Plantão");
+    assert_eq!(parsed.location.as_deref(), Some("Hospital"));
+    assert!(!parsed.is_all_day);
+
+    if let (EventTime::DateTimeUtc(start_ts), EventTime::DateTimeUtc(end_ts)) =
+        (parsed.start, parsed.end)
+    {
+        // O término deve ser exatamente 12 horas depois (19h até 07h do dia seguinte)
+        assert_eq!(end_ts - start_ts, 12 * 3600);
+    } else {
+        panic!("esperava timestamps UTC");
+    }
+}
+
+#[test]
+fn test_ical_unfolding() {
+    let raw = "BEGIN:VCALENDAR\r\n\
+VERSION:2.0\r\n\
+BEGIN:VEVENT\r\n\
+UID:unfolded-123\r\n\
+DTSTART:20261014T100000Z\r\n\
+DTEND:20261014T110000Z\r\n\
+SUMMARY:Este é um resumo muito longo que foi dobrado pelo servidor c\r\n \
+alDAV para respeitar o limite de 75 octetos da RFC 5545\r\n\
+END:VEVENT\r\n\
+END:VCALENDAR\r\n";
+
+    let event = CalendarEvent::from_ical(raw).expect("deve desdobrar linhas");
+    assert_eq!(
+        event.summary,
+        "Este é um resumo muito longo que foi dobrado pelo servidor calDAV para respeitar o limite de 75 octetos da RFC 5545"
+    );
+}
+
+#[test]
+fn test_parse_empty_input_error() {
+    let ref_time = sample_ref_time();
+    let result = CalendarIntentParser::parse("   ", &ref_time);
+    assert!(result.is_err());
+}
+
