@@ -1,3 +1,4 @@
+pub mod android_calendar_sync;
 pub mod android_sync;
 pub mod auth;
 pub mod calendar;
@@ -8,6 +9,11 @@ pub mod message;
 pub mod phone;
 pub mod sieve;
 
+pub use android_calendar_sync::{
+    AndroidCalendarBatch, AndroidCalendarOp, LAUDA_CALENDAR_AUTHORITY, STATUS_CANCELED,
+    STATUS_CONFIRMED, STATUS_TENTATIVE, build_calendar_sync_batch, event_status_to_android,
+    map_event_to_insert_op,
+};
 pub use android_sync::{
     AndroidContactBatch, AndroidMimeType, AndroidRawContactOp, LAUDA_ACCOUNT_TYPE,
 };

@@ -1,7 +1,6 @@
 use lauda_types::android_calendar_sync::{
-    AndroidCalendarBatch, AndroidCalendarOp, LAUDA_CALENDAR_AUTHORITY,
-    STATUS_CANCELED, STATUS_CONFIRMED, STATUS_TENTATIVE,
-    build_calendar_sync_batch, event_status_to_android,
+    AndroidCalendarBatch, AndroidCalendarOp, LAUDA_CALENDAR_AUTHORITY, STATUS_CANCELED,
+    STATUS_CONFIRMED, STATUS_TENTATIVE, build_calendar_sync_batch, event_status_to_android,
 };
 use lauda_types::calendar::{
     CalendarEvent, EventAttendee, EventStatus, EventTime, RecurrenceFreq, RecurrenceRule,
@@ -83,7 +82,7 @@ fn test_android_calendar_sync_batch_generation() {
             assert_eq!(*dtstart_ms, 1791968400 * 1000);
             assert_eq!(*dtend_ms, (1791968400 + 3600) * 1000);
             assert!(!all_day);
-            assert_eq!(rrule.as_deref(), Some("FREQ=WEEKLY"));
+            assert_eq!(rrule.as_deref(), Some("FREQ=WEEKLY;INTERVAL=1"));
             assert_eq!(*status, STATUS_CONFIRMED);
         }
         _ => panic!("Esperada operação InsertEvent para ev1"),
@@ -116,7 +115,78 @@ fn test_android_calendar_sync_batch_generation() {
 #[test]
 fn test_status_mapping_and_authority() {
     assert_eq!(LAUDA_CALENDAR_AUTHORITY, "com.android.calendar");
-    assert_eq!(event_status_to_android(EventStatus::Confirmed), STATUS_CONFIRMED);
-    assert_eq!(event_status_to_android(EventStatus::Tentative), STATUS_TENTATIVE);
-    assert_eq!(event_status_to_android(EventStatus::Cancelled), STATUS_CANCELED);
+    assert_eq!(
+        event_status_to_android(EventStatus::Confirmed),
+        STATUS_CONFIRMED
+    );
+    assert_eq!(
+        event_status_to_android(EventStatus::Tentative),
+        STATUS_TENTATIVE
+    );
+    assert_eq!(
+        event_status_to_android(EventStatus::Cancelled),
+        STATUS_CANCELED
+    );
+}
+
+#[test]
+fn test_android_calendar_sync_date_only_and_empty_fields() {
+    let ev = CalendarEvent {
+        uid: "ev-date-only".to_string(),
+        summary: "Feriado Nacional".to_string(),
+        description: None,
+        location: None,
+        start: EventTime::DateOnly {
+            year: 2026,
+            month: 12,
+            day: 25,
+        },
+        end: EventTime::DateOnly {
+            year: 2026,
+            month: 12,
+            day: 25,
+        },
+        is_all_day: true,
+        rrule: None,
+        status: EventStatus::Cancelled,
+        organizer: None,
+        attendees: vec![],
+        sequence: 1,
+        created_at: None,
+        updated_at: None,
+    };
+
+    let batch = build_calendar_sync_batch("lumen", 42, &[ev], &[]);
+    assert_eq!(batch.operations.len(), 1);
+
+    match &batch.operations[0] {
+        AndroidCalendarOp::InsertEvent {
+            calendar_id,
+            account_name,
+            account_type,
+            sync_id,
+            title,
+            description,
+            location,
+            dtstart_ms,
+            dtend_ms,
+            all_day,
+            rrule,
+            status,
+        } => {
+            assert_eq!(*calendar_id, 42);
+            assert_eq!(account_name, "lumen");
+            assert_eq!(account_type, "in.twolp.lauda");
+            assert_eq!(sync_id, "ev-date-only");
+            assert_eq!(title, "Feriado Nacional");
+            assert!(description.is_none());
+            assert!(location.is_none());
+            assert!(*dtstart_ms > 0);
+            assert!(*dtend_ms > *dtstart_ms);
+            assert!(*all_day);
+            assert!(rrule.is_none());
+            assert_eq!(*status, STATUS_CANCELED);
+        }
+        _ => panic!("Esperada operação InsertEvent"),
+    }
 }
