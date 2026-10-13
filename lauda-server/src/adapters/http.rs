@@ -22,6 +22,7 @@ pub struct AppState {
     pub jwt_secret: String,
     pub events_tx: tokio::sync::broadcast::Sender<String>,
     pub contacts_store: Option<Arc<crate::adapters::sqlite_contacts::SqliteContactsStore>>,
+    pub calendar_store: Option<Arc<crate::adapters::sqlite_calendar::SqliteCalendarStore>>,
 }
 
 pub struct AuthUser(pub String);
@@ -368,6 +369,7 @@ pub fn app_router(backend: Arc<dyn MailBackend>, jwt_secret: impl Into<String>) 
         jwt_secret: jwt_secret.into(),
         events_tx,
         contacts_store: None,
+        calendar_store: None,
     };
 
     build_router(state)
@@ -384,6 +386,25 @@ pub fn app_router_with_contacts(
         jwt_secret: jwt_secret.into(),
         events_tx,
         contacts_store: Some(Arc::new(contacts_store)),
+        calendar_store: None,
+    };
+
+    build_router(state)
+}
+
+pub fn app_router_with_calendar(
+    backend: Arc<dyn MailBackend>,
+    jwt_secret: impl Into<String>,
+    contacts_store: crate::adapters::sqlite_contacts::SqliteContactsStore,
+    calendar_store: crate::adapters::sqlite_calendar::SqliteCalendarStore,
+) -> Router {
+    let (events_tx, _) = tokio::sync::broadcast::channel(128);
+    let state = AppState {
+        backend,
+        jwt_secret: jwt_secret.into(),
+        events_tx,
+        contacts_store: Some(Arc::new(contacts_store)),
+        calendar_store: Some(Arc::new(calendar_store)),
     };
 
     build_router(state)
@@ -418,7 +439,8 @@ fn build_router(state: AppState) -> Router {
         .route("/compose", post(compose_handler))
         .layer(tower_http::cors::CorsLayer::permissive());
 
-    let dav = crate::adapters::carddav::carddav_routes();
+    let carddav = crate::adapters::carddav::carddav_routes();
+    let caldav = crate::adapters::caldav::caldav_routes();
 
-    base.merge(dav).with_state(state)
+    base.merge(carddav).merge(caldav).with_state(state)
 }
