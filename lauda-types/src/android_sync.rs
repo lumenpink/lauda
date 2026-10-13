@@ -52,9 +52,7 @@ pub enum AndroidRawContactOp {
         value4: Option<String>,
     },
     /// Remoção de contato (Tombstone reconciliado).
-    DeleteRawContact {
-        source_id: String,
-    },
+    DeleteRawContact { source_id: String },
 }
 
 /// Lote atômico de operações preparado para execução via ContentResolver.applyBatch.

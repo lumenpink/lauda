@@ -7,7 +7,9 @@ pub mod message;
 pub mod phone;
 pub mod sieve;
 
-pub use android_sync::{AndroidContactBatch, AndroidMimeType, AndroidRawContactOp, LAUDA_ACCOUNT_TYPE};
+pub use android_sync::{
+    AndroidContactBatch, AndroidMimeType, AndroidRawContactOp, LAUDA_ACCOUNT_TYPE,
+};
 pub use auth::{LoginRequest, TokenResponse};
 pub use compose::{AttachmentUpload, ComposeForm};
 pub use contact::{ContactEntry, ContactInfo, ContactSyncRequest, ContactSyncResponse};
@@ -18,4 +20,3 @@ pub use sieve::{
     ConditionField, MatchType, SieveAction, SieveCondition, SieveRule, SieveScriptBundle,
     generate_sieve_script, parse_sieve_script, predict_rule_from_envelope,
 };
-

@@ -77,7 +77,13 @@ impl ContactEntry {
         // Match em e-mails secundários
         for e in &self.secondary_emails {
             let clean = e.trim().to_lowercase();
-            if !clean.is_empty() && (clean == o_email || other.secondary_emails.iter().any(|oe| oe.trim().eq_ignore_ascii_case(&clean))) {
+            if !clean.is_empty()
+                && (clean == o_email
+                    || other
+                        .secondary_emails
+                        .iter()
+                        .any(|oe| oe.trim().eq_ignore_ascii_case(&clean)))
+            {
                 return 1.0;
             }
         }

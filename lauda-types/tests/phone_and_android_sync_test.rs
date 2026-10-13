@@ -1,13 +1,14 @@
-use lauda_types::contact::ContactEntry;
-use lauda_types::phone::{PhoneKind, PhoneNormalizer};
 use lauda_types::android_sync::{
     AndroidContactBatch, AndroidMimeType, AndroidRawContactOp, LAUDA_ACCOUNT_TYPE,
 };
+use lauda_types::contact::ContactEntry;
+use lauda_types::phone::{PhoneKind, PhoneNormalizer};
 
 #[test]
 fn test_phone_normalizer_brazilian_mobile_and_ninth_digit() {
     // Celular já com 9 dígitos e DDD
-    let p1 = PhoneNormalizer::normalize_br("(48) 99123-4567", None).expect("deve normalizar celular");
+    let p1 =
+        PhoneNormalizer::normalize_br("(48) 99123-4567", None).expect("deve normalizar celular");
     assert_eq!(p1.e164, "+5548991234567");
     assert_eq!(p1.formatted, "+55 (48) 99123-4567");
     assert_eq!(p1.ddd, "48");
@@ -20,7 +21,8 @@ fn test_phone_normalizer_brazilian_mobile_and_ninth_digit() {
     assert_eq!(p2.kind, PhoneKind::Mobile);
 
     // Celular antigo com 8 dígitos começado em 8 (ex: SP)
-    let p3 = PhoneNormalizer::normalize_br("(11) 8765-4321", None).expect("deve adicionar 9º dígito");
+    let p3 =
+        PhoneNormalizer::normalize_br("(11) 8765-4321", None).expect("deve adicionar 9º dígito");
     assert_eq!(p3.e164, "+5511987654321");
     assert_eq!(p3.formatted, "+55 (11) 98765-4321");
     assert_eq!(p3.kind, PhoneKind::Mobile);
@@ -29,17 +31,20 @@ fn test_phone_normalizer_brazilian_mobile_and_ninth_digit() {
 #[test]
 fn test_phone_normalizer_csp_carrier_selection_removal() {
     // Número com CSP da Claro (021)
-    let p1 = PhoneNormalizer::normalize_br("021 (48) 99123-4567", None).expect("deve remover CSP 021");
+    let p1 =
+        PhoneNormalizer::normalize_br("021 (48) 99123-4567", None).expect("deve remover CSP 021");
     assert_eq!(p1.e164, "+5548991234567");
     assert_eq!(p1.ddd, "48");
 
     // Número com CSP da Vivo (015)
-    let p2 = PhoneNormalizer::normalize_br("015 11 98888-7777", None).expect("deve remover CSP 015");
+    let p2 =
+        PhoneNormalizer::normalize_br("015 11 98888-7777", None).expect("deve remover CSP 015");
     assert_eq!(p2.e164, "+5511988887777");
     assert_eq!(p2.ddd, "11");
 
     // Número com CSP da TIM (041)
-    let p3 = PhoneNormalizer::normalize_br("041 21 97777-6666", None).expect("deve remover CSP 041");
+    let p3 =
+        PhoneNormalizer::normalize_br("041 21 97777-6666", None).expect("deve remover CSP 041");
     assert_eq!(p3.e164, "+5521977776666");
     assert_eq!(p3.ddd, "21");
 }
@@ -53,7 +58,8 @@ fn test_phone_normalizer_landline_never_adds_ninth_digit() {
     assert_eq!(p1.kind, PhoneKind::Landline);
 
     // Telefone fixo comercial (iniciado com 2)
-    let p2 = PhoneNormalizer::normalize_br("(11) 2345-6789", None).expect("deve normalizar fixo comercial");
+    let p2 = PhoneNormalizer::normalize_br("(11) 2345-6789", None)
+        .expect("deve normalizar fixo comercial");
     assert_eq!(p2.e164, "+551123456789");
     assert_eq!(p2.formatted, "+55 (11) 2345-6789");
     assert_eq!(p2.kind, PhoneKind::Landline);
@@ -62,13 +68,15 @@ fn test_phone_normalizer_landline_never_adds_ninth_digit() {
 #[test]
 fn test_phone_normalizer_default_ddd_fallback() {
     // Número sem DDD usando fallback de Florianópolis ("48")
-    let p1 = PhoneNormalizer::normalize_br("99123-4567", Some("48")).expect("deve usar default DDD");
+    let p1 =
+        PhoneNormalizer::normalize_br("99123-4567", Some("48")).expect("deve usar default DDD");
     assert_eq!(p1.e164, "+5548991234567");
     assert_eq!(p1.ddd, "48");
     assert_eq!(p1.kind, PhoneKind::Mobile);
 
     // Fixo sem DDD usando fallback
-    let p2 = PhoneNormalizer::normalize_br("3221-0000", Some("48")).expect("deve usar default DDD em fixo");
+    let p2 = PhoneNormalizer::normalize_br("3221-0000", Some("48"))
+        .expect("deve usar default DDD em fixo");
     assert_eq!(p2.e164, "+554832210000");
     assert_eq!(p2.kind, PhoneKind::Landline);
 }
@@ -84,7 +92,8 @@ fn test_android_sync_adapter_batch_operations_and_birthday() {
         phone_numbers: vec!["021 (48) 99123-4567".to_string()],
         birthday: Some("1815-12-10".to_string()),
         notes: Some("Pioneira da computação".to_string()),
-        vcard_raw: "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Ada Lovelace\r\nBDAY:1815-12-10\r\nEND:VCARD".to_string(),
+        vcard_raw: "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Ada Lovelace\r\nBDAY:1815-12-10\r\nEND:VCARD"
+            .to_string(),
         has_autocrypt: false,
         autocrypt_fingerprint: None,
         etag: "etag123".to_string(),
@@ -116,13 +125,19 @@ fn test_android_sync_adapter_batch_operations_and_birthday() {
         matches!(op, AndroidRawContactOp::InsertData { mime_type, value1, value4, .. }
             if mime_type == &AndroidMimeType::Phone && value1.as_deref() == Some("+55 (48) 99123-4567") && value4.as_deref() == Some("+5548991234567"))
     });
-    assert!(has_phone, "deve conter operação de telefone higienizado em E.164");
+    assert!(
+        has_phone,
+        "deve conter operação de telefone higienizado em E.164"
+    );
 
     let has_birthday = batch.operations.iter().any(|op| {
         matches!(op, AndroidRawContactOp::InsertData { mime_type, value1, .. }
             if mime_type == &AndroidMimeType::EventBirthday && value1.as_deref() == Some("1815-12-10"))
     });
-    assert!(has_birthday, "deve conter operação de aniversário BDAY mapeado para Event");
+    assert!(
+        has_birthday,
+        "deve conter operação de aniversário BDAY mapeado para Event"
+    );
 }
 
 #[test]
@@ -132,7 +147,10 @@ fn test_android_sync_tombstone_operation() {
         "hi@lumen.pink",
     );
     assert_eq!(tombstone.source_id, "c7e2ecd0-0000-4000-8000-000000000001");
-    assert!(matches!(tombstone.operations.as_slice(), [AndroidRawContactOp::DeleteRawContact { .. }]));
+    assert!(matches!(
+        tombstone.operations.as_slice(),
+        [AndroidRawContactOp::DeleteRawContact { .. }]
+    ));
 }
 
 #[test]
@@ -145,7 +163,8 @@ fn test_phone_normalizer_edge_cases_and_error_handling() {
     assert!(PhoneNormalizer::normalize_br("12345", None).is_err());
 
     // Número com pontuação estranha e prefixo internacional já existente
-    let p1 = PhoneNormalizer::normalize_br("+55 (048) 9-8888-7777", None).expect("deve limpar formato");
+    let p1 =
+        PhoneNormalizer::normalize_br("+55 (048) 9-8888-7777", None).expect("deve limpar formato");
     assert_eq!(p1.e164, "+5548988887777");
     assert_eq!(p1.formatted, "+55 (48) 98888-7777");
 
@@ -154,7 +173,8 @@ fn test_phone_normalizer_edge_cases_and_error_handling() {
     assert_eq!(p2.e164, "+5531999991111");
 
     // Celular antigo com 8 dígitos começado em 7
-    let p3 = PhoneNormalizer::normalize_br("61 7123-4567", None).expect("deve adicionar nono dígito");
+    let p3 =
+        PhoneNormalizer::normalize_br("61 7123-4567", None).expect("deve adicionar nono dígito");
     assert_eq!(p3.e164, "+5561971234567");
     assert_eq!(p3.kind, PhoneKind::Mobile);
 }
@@ -206,4 +226,3 @@ fn test_contact_deduplication_similarity_score() {
     c4.phone_numbers = vec![];
     assert_eq!(c1.similarity_score(&c4), 0.9);
 }
-
