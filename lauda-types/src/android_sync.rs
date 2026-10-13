@@ -4,7 +4,7 @@ use crate::contact::ContactEntry;
 use crate::phone::PhoneNormalizer;
 
 /// Tipo canônico de conta registrado pelo Lauda no AccountManager do Android.
-pub const LAUDA_ACCOUNT_TYPE: &str = "pink.lumen.lauda";
+pub const LAUDA_ACCOUNT_TYPE: &str = "in.twolp.lauda";
 
 /// Tipos MIME padronizados do ContactsProvider do Android.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

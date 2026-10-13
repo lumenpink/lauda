@@ -8,7 +8,7 @@
 
 ## 1. Visão Geral da Arquitetura
 
-O `lauda-client` atua como um cidadão de primeira classe no sistema operacional Android, registrando uma conta oficial de usuário gerenciada (`pink.lumen.lauda`) e um serviço de sincronização bidirecional (`SyncAdapter`) que conecta o `ContactsProvider` nativo do Android ao repositório incremental do `lauda-server`.
+O `lauda-client` atua como um cidadão de primeira classe no sistema operacional Android, registrando uma conta oficial de usuário gerenciada (`in.twolp.lauda`) e um serviço de sincronização bidirecional (`SyncAdapter`) que conecta o `ContactsProvider` nativo do Android ao repositório incremental do `lauda-server`.
 
 Adicionalmente, incorpora um motor soberano de normalização e higienização telefônica focado nas idiossincrasias do plano de numeração brasileiro (E.164 / ANATEL) e suporte a aniversários (`BDAY`).
 
@@ -30,7 +30,7 @@ Adicionalmente, incorpora um motor soberano de normalização e higienização t
 │  └───────────────────────────────────┬───────────────────────────────────┘  │
 │                                      │ JNI C-ABI Bridge                     │
 │  ┌───────────────────────────────────▼───────────────────────────────────┐  │
-│  │       Android SyncAdapter & AccountManager (pink.lumen.lauda)         │  │
+│  │       Android SyncAdapter & AccountManager (in.twolp.lauda)         │  │
 │  │   (LaudaAuthenticatorService, LaudaSyncAdapter, syncadapter.xml)      │  │
 │  └───────────────────────────────────┬───────────────────────────────────┘  │
 │                                      │ ContentProviderOperation.applyBatch  │
@@ -46,7 +46,7 @@ Adicionalmente, incorpora um motor soberano de normalização e higienização t
 ## 2. Metadados e Componentes Nativos do Android
 
 ### 2.1 Identificador de Conta (`AccountType`)
-- **Tipo de Conta:** `pink.lumen.lauda`
+- **Tipo de Conta:** `in.twolp.lauda`
 - **Nome da Conta:** E-mail do usuário autenticado (ex: `hi@lumen.pink` ou `lumen`)
 - **Autoridade Vinculada:** `com.android.contacts`
 
@@ -54,7 +54,7 @@ Adicionalmente, incorpora um motor soberano de normalização e higienização t
 - **`res/xml/authenticator.xml`**:
   ```xml
   <account-authenticator xmlns:android="http://schemas.android.com/apk/res/android"
-      android:accountType="pink.lumen.lauda"
+      android:accountType="in.twolp.lauda"
       android:icon="@mipmap/ic_launcher"
       android:smallIcon="@mipmap/ic_launcher"
       android:label="@string/app_name" />
@@ -63,7 +63,7 @@ Adicionalmente, incorpora um motor soberano de normalização e higienização t
   ```xml
   <sync-adapter xmlns:android="http://schemas.android.com/apk/res/android"
       android:contentAuthority="com.android.contacts"
-      android:accountType="pink.lumen.lauda"
+      android:accountType="in.twolp.lauda"
       android:userVisible="true"
       android:supportsUploading="true"
       android:allowParallelSyncs="false"
@@ -74,7 +74,7 @@ Adicionalmente, incorpora um motor soberano de normalização e higienização t
 
 ## 3. Mapeamento de Contratos (`ContactEntry` ↔ `ContactsContract`)
 
-Cada contato Lauda gera um registro correspondente em `RawContacts` marcado com `account_type = "pink.lumen.lauda"` e `account_name = "{username}"`.
+Cada contato Lauda gera um registro correspondente em `RawContacts` marcado com `account_type = "in.twolp.lauda"` e `account_name = "{username}"`.
 
 | Campo `ContactEntry` | Tabela / MimeType Android | Coluna Android | Observações / Regra |
 | :--- | :--- | :--- | :--- |
