@@ -1,16 +1,47 @@
-name: "Deploy"
+name: "CI / CD Pipeline"
 
 on:
   push:
     branches:
       - main
+      - develop
     tags:
       - "v*"
+  pull_request:
 
 jobs:
-  build-and-deploy-web:
+  test:
+    name: "Rust Test, Lint & E2E (GOST-CI)"
+    runs-on: ubuntu-latest
+    container:
+      image: codeberg.org/lumenpink/gost-ci-lauda:latest
+    steps:
+      - name: "Install Node.js Runtime for Runner Actions"
+        run: |
+          if ! command -v node >/dev/null 2>&1; then
+            apt-get update -qq && apt-get install -y -qq --no-install-recommends nodejs >/dev/null
+          fi
+      - name: "Checkout repository"
+        uses: https://github.com/actions/checkout@v4
+      - name: "Link Hermetic Dependencies"
+        run: |
+          if [ -d /opt/gost/deps ]; then
+            ln -sf /opt/gost/deps/* ../ 2>/dev/null || true
+          fi
+      - name: "Sync Version Manifests"
+        run: ./scripts/sync-version-manifests.sh
+      - name: "Format Check"
+        run: cargo fmt -- --check
+      - name: "Clippy (Zero Warnings)"
+        run: cargo clippy --workspace -- -D warnings
+      - name: "Run All Tests & E2E Suites"
+        run: cargo test --workspace
+
+  deploy-web:
     name: "Build Dioxus WebAssembly & Deploy to Cloudflare"
     runs-on: ubuntu-latest
+    needs: [test]
+    if: github.ref == 'refs/heads/main'
     container:
       image: docker.io/lumenpink/gost-ci-wasm:latest
     env:
@@ -84,9 +115,11 @@ jobs:
             git worktree remove "$WORKTREE_DIR" --force || true
           fi
 
-  build-desktop-client:
+  deploy-desktop:
     name: "Build Desktop Client (Linux Release)"
     runs-on: ubuntu-latest
+    needs: [test]
+    if: github.ref == 'refs/heads/main'
     container:
       image: docker.io/lumenpink/gost-ci-wasm:latest
     steps:
@@ -113,9 +146,11 @@ jobs:
           mkdir -p dist/desktop
           cp target/release/lauda-client dist/desktop/lauda-desktop
 
-  build-and-deploy-server:
+  deploy-server:
     name: "Build Docker Image & Update lauda-server"
     runs-on: ubuntu-latest
+    needs: [test]
+    if: github.ref == 'refs/heads/main'
     steps:
       - name: "Checkout repository"
         uses: https://github.com/actions/checkout@v4
