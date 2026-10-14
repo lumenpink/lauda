@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LAUDA // O Smolclient Minimalista</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=Special+Elite&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #0a0a0a;
+      --paper: #f4efe6;
+      --crimson: #dc143c;
+      --crimson-dark: #8b0000;
+      --halftone: rgba(10, 10, 10, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--paper);
+      color: var(--ink);
+      font-family: 'Courier Prime', monospace;
+      line-height: 1.5;
+      min-height: 100vh;
+      background-image: 
+        radial-gradient(var(--halftone) 1.5px, transparent 1.5px),
+        radial-gradient(var(--halftone) 1.5px, var(--paper) 1.5px);
+      background-size: 16px 16px;
+      background-position: 0 0, 8px 8px;
+      padding: 2rem 1rem;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Faixa diagonal vermelha Trash Polka */
+    body::before {
+      content: "";
+      position: fixed;
+      top: -100px;
+      right: -80px;
+      width: 140px;
+      height: 140vh;
+      background: var(--crimson);
+      transform: rotate(24deg);
+      z-index: 0;
+      opacity: 0.92;
+      pointer-events: none;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      top: -120px;
+      right: 90px;
+      width: 32px;
+      height: 140vh;
+      background: var(--crimson-dark);
+      transform: rotate(24deg);
+      z-index: 0;
+      opacity: 0.75;
+      pointer-events: none;
+    }
+
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      background: #faf6ee;
+      border: 3px solid var(--ink);
+      box-shadow: 12px 12px 0 var(--ink);
+      padding: 3rem 2.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    header {
+      border-bottom: 3px solid var(--ink);
+      padding-bottom: 2rem;
+      margin-bottom: 2.5rem;
+      position: relative;
+    }
+
+    .stamp {
+      position: absolute;
+      top: -10px;
+      right: 0;
+      border: 3px dashed var(--crimson);
+      color: var(--crimson);
+      padding: 0.5rem 1.2rem;
+      font-family: 'Special Elite', cursive;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      transform: rotate(-7deg);
+      pointer-events: none;
+      user-select: none;
+    }
+
+    h1 {
+      font-family: 'Special Elite', cursive;
+      font-size: 3.4rem;
+      letter-spacing: -2px;
+      text-transform: uppercase;
+      line-height: 1;
+      margin-bottom: 0.5rem;
+      text-shadow: 2px 2px 0 rgba(220, 20, 60, 0.35);
+    }
+
+    .subtitle {
+      font-size: 1.1rem;
+      font-weight: 700;
+      background: var(--ink);
+      color: var(--paper);
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .manifesto {
+      margin: 2rem 0;
+      font-size: 1.05rem;
+      border-left: 4px solid var(--crimson);
+      padding-left: 1.2rem;
+      font-style: italic;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.5rem;
+      margin: 2.5rem 0;
+    }
+
+    .card {
+      border: 2px solid var(--ink);
+      padding: 1.2rem;
+      background: #fff;
+    }
+
+    .card h3 {
+      font-family: 'Special Elite', cursive;
+      font-size: 1.2rem;
+      margin-bottom: 0.5rem;
+      color: var(--crimson-dark);
+      text-transform: uppercase;
+    }
+
+    pre, code {
+      font-family: 'Courier Prime', monospace;
+      background: #eee6d6;
+      color: var(--ink);
+    }
+
+    pre {
+      padding: 1rem;
+      border: 2px solid var(--ink);
+      overflow-x: auto;
+      margin: 1.5rem 0;
+      font-size: 0.9rem;
+    }
+
+    .site-footer {
+      border-top: 1px solid var(--ink);
+      padding: 2rem 1rem 0 1rem;
+      margin-top: 3rem;
+      text-align: center;
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+
+    .footer-canonical {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .footer-line-identity {
+      font-weight: 500;
+    }
+
+    .footer-line-metadata {
+      color: #666;
+      font-size: 0.8rem;
+    }
+
+    a {
+      color: var(--crimson);
+      text-decoration: underline;
+      font-weight: bold;
+    }
+
+    a:hover {
+      background: var(--crimson);
+      color: var(--paper);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.5rem; position: relative;">
+      <div style="display: flex; align-items: center; gap: 1.2rem;">
+        <img src="./lauda-logo.svg" alt="LAUDA Logo" style="width: 76px; height: 76px; border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); background: #f4efe6; border-radius: 16px;" />
+        <div>
+          <h1>LAUDA</h1>
+          <div class="subtitle">O Smolclient de Correio Minimalista</div>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.8rem;">
+        <div style="border: 2px dashed var(--crimson); color: var(--crimson); padding: 0.3rem 0.8rem; font-family: 'Special Elite', cursive; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 2px;">
+          DIOXUS 0.7 // WEB &amp; NDK
+        </div>
+        <a href="/app" style="background: var(--ink); color: var(--paper); padding: 0.6rem 1.2rem; text-decoration: none; font-weight: bold; font-size: 0.95rem; border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--crimson); text-transform: uppercase;">
+          ⚡ ABRIR WEBAPP (/app)
+        </a>
+      </div>
+    </header>
+
+    <div class="manifesto">
+      Interface ultraleve para leitura em texto puro e redação rápida sem a sobrecarga de clientes IMAP/SMTP tradicionais. Compilação nativa Android NDK e Linux desktop via Dioxus, com resiliência offline completa, outbox assíncrona, sincronização SWR e motor de busca BM25 nativo em Rust puro.
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>01. VISÕES TRIFÁSICAS</h3>
+        <p>Alternador nativo entre <code>txt auto</code> (Markdown processado), <code>txt original</code> (texto cru com espaçamento fixo) e <code>html</code> (container sandboxed para envelopes gráficos).</p>
+      </div>
+      <div class="card">
+        <h3>02. SUPERBUSCA COM BM25</h3>
+        <p>Motor <code>lauda-index</code> em Rust puro com sintaxe Gmail (<code>from:</code>, <code>subject:</code>, <code>has:attachment</code>, <code>is:unread</code>, <code>OR</code>, <code>-not</code>) e fuzzy matching tolerante a erros de digitação.</p>
+      </div>
+      <div class="card">
+        <h3>03. CACHE OFFLINE & SWR</h3>
+        <p>Carregamento imediato em 0ms via cache local particionado, retenção de mensagens por 90 dias e reconciliação automática de ações offline.</p>
+      </div>
+      <div class="card">
+        <h3>04. OUTBOX ASSÍNCRONA</h3>
+        <p>Optimistic UI: clique em Enviar e volte imediatamente para a caixa de entrada. O envio ocorre em segundo plano com persistência atômica e retentativas.</p>
+      </div>
+      <div class="card">
+        <h3>05. NDK DESDE O DIA ZERO</h3>
+        <p>Arquitetura compilada para Android NDK (ARM64 & x86_64) e desktop Linux com a mesma árvore declarativa Dioxus e suporte a gestos de navegação nativos.</p>
+      </div>
+      <div class="card">
+        <h3>06. REDAÇÃO SEM TRAVAS</h3>
+        <p>Campo <code>From</code> livre com autocompletar de aliases favoritos, suporte a múltiplos anexos e composição monoespaçada limpa.</p>
+      </div>
+    </div>
+
+    <h2 style="font-family: 'Special Elite', cursive; text-transform: uppercase; margin-top: 2rem;">ARQUITETURA DO WORKSPACE</h2>
+    <pre>lauda/
+├── lauda-types/    # Contratos serde de dados compartilhados
+├── lauda-index/    # Motor nativo de busca com parser Gmail, BM25 e fuzzy search
+├── lauda-server/   # Micro-daemon HTTP axum conectado ao Maildir/Dovecot
+└── lauda-client/   # App Dioxus Mobile (Android NDK) + Desktop</pre>
+
+    <div class="card" style="margin-top: 2rem; border: 3px solid var(--crimson); background: #fdfaf6;">
+      <h3 style="color: var(--crimson);">DOWNLOAD ANDROID (APK & OBTAINIUM)</h3>
+      <p style="margin-bottom: 1rem;">Instalação direta do Smolclient Lauda compilado nativamente para arquiteturas 64-bit (ARM64 e x86_64):</p>
+      <div style="display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center; margin-bottom: 1.2rem;">
+        <a href="https://lauda.2lp.in/lauda-latest.apk" style="background: var(--crimson); color: var(--paper); padding: 0.7rem 1.4rem; text-decoration: none; font-weight: bold; text-transform: uppercase; font-size: 1rem; box-shadow: 3px 3px 0 var(--ink);">
+          ⬇ BAIXAR APK DIRETO (LATEST)
+        </a>
+        <a href="https://lauda.2lp.in/version.json" style="padding: 0.6rem 1rem; border: 1px solid var(--ink); text-decoration: none; font-weight: bold;">
+          MANIFESTO VERSION.JSON
+        </a>
+      </div>
+
+      <div style="border-top: 1px dashed var(--ink); padding-top: 0.8rem; margin-top: 0.8rem; font-size: 0.9rem;">
+        <strong style="color: var(--crimson-dark); text-transform: uppercase;">🔄 Atualização Automática via Obtainium:</strong>
+        <p style="margin: 0.4rem 0 0.4rem 0; line-height: 1.5;">
+          No <strong>Obtainium</strong>, toque em <strong>+ (Adicionar App)</strong> e configure:
+        </p>
+        <ul style="margin: 0.2rem 0 0 1.2rem; line-height: 1.6;">
+          <li><strong>URL da Fonte:</strong> <code>https://lauda.2lp.in</code></li>
+          <li><strong>ID do Pacote (App ID):</strong> <code>in.twolp.lauda</code></li>
+        </ul>
+        <p style="margin: 0.6rem 0 0 0; font-size: 0.82rem; color: #555;">
+          Hospedagem 100% soberana em infraestrutura própria com suporte a streaming de alta velocidade e HTTP Range.
+        </p>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      <div class="footer-canonical">
+        <div class="footer-line footer-line-identity">
+          Orgulhosamente produzido por uma <a href="https://travesti.2lp.in/pt/" target="_blank" rel="noopener">travesti latina</a> 🏳️‍⚧️ :)
+        </div>
+        <div class="footer-line footer-line-metadata">
+          lauda v0.2.0 • por <a href="https://lumen.pink" target="_blank" rel="noopener">Lumen Pink</a> • Brasil 🇧🇷 • <a href="https://codeberg.org/lumenpink/lauda/src/branch/main/LICENSE" target="_blank" rel="noopener">GPL-3.0</a>
+        </div>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>
