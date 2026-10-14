@@ -28,6 +28,8 @@ jobs:
           if [ -d /opt/gost/deps ]; then
             ln -sf /opt/gost/deps/* ../ 2>/dev/null || true
           fi
+      - name: "Sync Version Manifests"
+        run: ./scripts/sync-version-manifests.sh
       - name: "Format Check"
         run: cargo fmt -- --check
       - name: "Clippy (Zero Warnings)"

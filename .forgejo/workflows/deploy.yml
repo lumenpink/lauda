@@ -34,6 +34,8 @@ jobs:
           if [ ! -f ../urupema/Cargo.toml ]; then
             git clone --depth 1 https://codeberg.org/lumenpink/urupema.git ../urupema
           fi
+      - name: "Sync Version Manifests"
+        run: ./scripts/sync-version-manifests.sh
       - name: "Build Dioxus Web Client (Release)"
         run: |
           dx build -p lauda-client --platform web --release
@@ -81,6 +83,35 @@ jobs:
             cd - >/dev/null
             git worktree remove "$WORKTREE_DIR" --force || true
           fi
+
+  build-desktop-client:
+    name: "Build Desktop Client (Linux Release)"
+    runs-on: ubuntu-latest
+    container:
+      image: docker.io/lumenpink/gost-ci-wasm:latest
+    steps:
+      - name: "Checkout repository"
+        uses: https://github.com/actions/checkout@v4
+      - name: "Checkout sibling dependencies"
+        run: |
+          mkdir -p ../ishcondidim ../papeli ../urupema
+          if [ -d /opt/gost/deps/ishcondidim ]; then
+            ln -sf /opt/gost/deps/* ../ 2>/dev/null || true
+          fi
+          if [ ! -f ../ishcondidim/Cargo.toml ]; then
+            git clone --depth 1 https://codeberg.org/lumenpink/ishcondidim.git ../ishcondidim
+          fi
+          if [ ! -f ../papeli/Cargo.toml ]; then
+            git clone --depth 1 https://codeberg.org/lumenpink/papeli.git ../papeli
+          fi
+          if [ ! -f ../urupema/Cargo.toml ]; then
+            git clone --depth 1 https://codeberg.org/lumenpink/urupema.git ../urupema
+          fi
+      - name: "Build Desktop Binary"
+        run: |
+          cargo build -p lauda-client --features desktop --release
+          mkdir -p dist/desktop
+          cp target/release/lauda-client dist/desktop/lauda-desktop
 
   build-and-deploy-server:
     name: "Build Docker Image & Update lauda-server"
