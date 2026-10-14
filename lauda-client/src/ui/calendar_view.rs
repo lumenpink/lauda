@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 use lauda_types::calendar::{
     CalendarEvent, CalendarIntentParser, CalendarReferenceTime, EventStatus, EventTime,
-    ParsedCalendarIntent, Weekday, timestamp_to_utc_parts,
+    ParsedCalendarIntent, Weekday, format_event_datetime_chip, timestamp_to_utc_parts,
 };
 
 use crate::domain::calendar_cache::LocalCalendarCache;
@@ -431,9 +431,16 @@ fn EventCard(event: CalendarEvent, on_delete: EventHandler<()>) -> Element {
                         "{event.summary}"
                     }
                     div {
-                        style: "display: flex; gap: 0.5rem; align-items: center; font-size: 0.8rem; color: #555;",
+                        style: "display: flex; gap: 0.5rem; align-items: center; font-size: 0.8rem; color: #555; flex-wrap: wrap;",
+                        span {
+                            style: "background: #eee; border: 1px solid #ccc; padding: 0.1rem 0.3rem; font-size: 0.7rem;",
+                            "📅 {format_event_datetime_chip(&event)}"
+                        }
                         if let Some(ref loc) = event.location {
-                            span { "📍 {loc}" }
+                            span {
+                                style: "background: #eee; border: 1px solid #ccc; padding: 0.1rem 0.3rem; font-size: 0.7rem;",
+                                "📍 {loc}"
+                            }
                         }
                         if let Some(ref rr) = event.rrule {
                             span {

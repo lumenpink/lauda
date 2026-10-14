@@ -629,6 +629,59 @@ impl CalendarEvent {
     }
 }
 
+/// Formata a data e horário do evento para exibição amigável em chips na interface visual.
+pub fn format_event_datetime_chip(event: &CalendarEvent) -> String {
+    match (&event.start, &event.end) {
+        (
+            EventTime::DateOnly {
+                year: _,
+                month,
+                day,
+            },
+            EventTime::DateOnly {
+                year: _,
+                month: end_m,
+                day: end_d,
+            },
+        ) => {
+            if month == end_m && day == end_d {
+                format!("{day:02}/{month:02} (Dia inteiro)")
+            } else {
+                format!("{day:02}/{month:02} até {end_d:02}/{end_m:02} (Dia inteiro)")
+            }
+        }
+        (
+            EventTime::DateOnly {
+                year: _,
+                month,
+                day,
+            },
+            _,
+        ) => {
+            format!("{day:02}/{month:02} (Dia inteiro)")
+        }
+        (EventTime::DateTimeUtc(start_ts), EventTime::DateTimeUtc(end_ts)) => {
+            let (_, m1, d1, h1, min1, _) = timestamp_to_utc_parts(*start_ts);
+            let (_, m2, d2, h2, min2, _) = timestamp_to_utc_parts(*end_ts);
+            if event.is_all_day {
+                format!("{d1:02}/{m1:02} (Dia inteiro)")
+            } else if m1 == m2 && d1 == d2 {
+                format!("{d1:02}/{m1:02} · {h1:02}:{min1:02} - {h2:02}:{min2:02}")
+            } else {
+                format!("{d1:02}/{m1:02} {h1:02}:{min1:02} → {d2:02}/{m2:02} {h2:02}:{min2:02}")
+            }
+        }
+        (EventTime::DateTimeUtc(start_ts), _) => {
+            let (_, m1, d1, h1, min1, _) = timestamp_to_utc_parts(*start_ts);
+            if event.is_all_day {
+                format!("{d1:02}/{m1:02} (Dia inteiro)")
+            } else {
+                format!("{d1:02}/{m1:02} às {h1:02}:{min1:02}")
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CalendarReferenceTime {
     pub year: i32,
