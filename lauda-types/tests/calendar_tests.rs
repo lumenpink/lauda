@@ -253,11 +253,9 @@ fn test_parse_colloquial_times_and_dates() {
     }
 
     // 5. Escape literal com aspas: "Clube 12 de Agosto" não vira data
-    let p5 = CalendarIntentParser::parse(
-        "Festa no \"Clube 12 de Agosto\" amanhã às 20h",
-        &ref_time,
-    )
-    .expect("p5");
+    let p5 =
+        CalendarIntentParser::parse("Festa no \"Clube 12 de Agosto\" amanhã às 20h", &ref_time)
+            .expect("p5");
     assert_eq!(p5.summary, "Festa");
     assert_eq!(p5.location.as_deref(), Some("Clube 12 de Agosto"));
     if let EventTime::DateTimeUtc(ts) = p5.start {
@@ -272,8 +270,8 @@ fn test_parse_colloquial_times_and_dates() {
     }
 
     // 6. Data ordinal: "primeiro de novembro" -> 01/11/2026
-    let p6 = CalendarIntentParser::parse("Entrega primeiro de novembro às 10h", &ref_time)
-        .expect("p6");
+    let p6 =
+        CalendarIntentParser::parse("Entrega primeiro de novembro às 10h", &ref_time).expect("p6");
     assert_eq!(p6.summary, "Entrega");
     if let EventTime::DateTimeUtc(ts) = p6.start {
         let (y, mo, d, h, m, _) = lauda_types::calendar::timestamp_to_utc_parts(ts);
@@ -321,7 +319,7 @@ fn test_parse_colloquial_times_and_dates() {
         let (y, mo, d, h, m, _) = lauda_types::calendar::timestamp_to_utc_parts(ts);
         assert_eq!(y, 2026);
         assert_eq!(mo, 10);
-        assert_eq!(d, 17);
+        assert_eq!(d, 18);
         assert_eq!(h, 12);
         assert_eq!(m, 0);
     } else {
@@ -329,3 +327,86 @@ fn test_parse_colloquial_times_and_dates() {
     }
 }
 
+#[test]
+fn test_parse_colloquial_mutation_and_edge_cases() {
+    let ref_time = sample_ref_time(); // 14/10/2026
+
+    // Minutos inversos com turno explícito: "dez pras oito da manhã" -> 07:50
+    let m1 = CalendarIntentParser::parse("Revisão dez pras oito da manhã", &ref_time).expect("m1");
+    assert_eq!(m1.summary, "Revisão");
+    if let EventTime::DateTimeUtc(ts) = m1.start {
+        let (_, _, _, h, m, _) = lauda_types::calendar::timestamp_to_utc_parts(ts);
+        assert_eq!(h, 7);
+        assert_eq!(m, 50);
+    } else {
+        panic!("esperava DateTimeUtc");
+    }
+
+    // Minutos inversos comercial: "5 pras 6" -> 17:55
+    let m2 = CalendarIntentParser::parse("Happy hour 5 pras 6", &ref_time).expect("m2");
+    assert_eq!(m2.summary, "Happy hour");
+    if let EventTime::DateTimeUtc(ts) = m2.start {
+        let (_, _, _, h, m, _) = lauda_types::calendar::timestamp_to_utc_parts(ts);
+        assert_eq!(h, 17);
+        assert_eq!(m, 55);
+    } else {
+        panic!("esperava DateTimeUtc");
+    }
+
+    // Feriado passado no ano corrente avança para ano seguinte: "tiradentes às 9h" -> 21/04/2027
+    let m3 = CalendarIntentParser::parse("Desfile de tiradentes às 9h", &ref_time).expect("m3");
+    assert_eq!(m3.summary, "Desfile");
+    if let EventTime::DateTimeUtc(ts) = m3.start {
+        let (y, mo, d, h, m, _) = lauda_types::calendar::timestamp_to_utc_parts(ts);
+        assert_eq!(y, 2027);
+        assert_eq!(mo, 4);
+        assert_eq!(d, 21);
+        assert_eq!(h, 9);
+        assert_eq!(m, 0);
+    } else {
+        panic!("esperava DateTimeUtc");
+    }
+
+    // Data passada no ano corrente avança para ano seguinte: "01/10 às 15h" -> 01/10/2027
+    let m4 = CalendarIntentParser::parse("Conferência 01/10 às 15h", &ref_time).expect("m4");
+    assert_eq!(m4.summary, "Conferência");
+    if let EventTime::DateTimeUtc(ts) = m4.start {
+        let (y, mo, d, h, m, _) = lauda_types::calendar::timestamp_to_utc_parts(ts);
+        assert_eq!(y, 2027);
+        assert_eq!(mo, 10);
+        assert_eq!(d, 1);
+        assert_eq!(h, 15);
+        assert_eq!(m, 0);
+    } else {
+        panic!("esperava DateTimeUtc");
+    }
+
+    // Proteção de título com aspas: "'Reunião de Natal' amanhã às 14h"
+    let m5 =
+        CalendarIntentParser::parse("'Reunião de Natal' amanhã às 14h", &ref_time).expect("m5");
+    assert_eq!(m5.summary, "Reunião de Natal");
+    if let EventTime::DateTimeUtc(ts) = m5.start {
+        let (y, mo, d, h, _, _) = lauda_types::calendar::timestamp_to_utc_parts(ts);
+        assert_eq!(y, 2026);
+        assert_eq!(mo, 10);
+        assert_eq!(d, 15); // amanhã
+        assert_eq!(h, 14);
+    } else {
+        panic!("esperava DateTimeUtc");
+    }
+
+    // Heurística de logradouro sem aspas: "Almoço no clube 12 de agosto amanhã às 12h"
+    let m6 = CalendarIntentParser::parse("Almoço no clube 12 de agosto amanhã às 12h", &ref_time)
+        .expect("m6");
+    assert_eq!(m6.summary, "Almoço");
+    assert_eq!(m6.location.as_deref(), Some("clube 12 de agosto"));
+    if let EventTime::DateTimeUtc(ts) = m6.start {
+        let (y, mo, d, h, _, _) = lauda_types::calendar::timestamp_to_utc_parts(ts);
+        assert_eq!(y, 2026);
+        assert_eq!(mo, 10);
+        assert_eq!(d, 15); // amanhã
+        assert_eq!(h, 12);
+    } else {
+        panic!("esperava DateTimeUtc");
+    }
+}

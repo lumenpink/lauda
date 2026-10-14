@@ -657,7 +657,8 @@ impl CalendarIntentParser {
         input: &str,
         ref_time: &CalendarReferenceTime,
     ) -> Result<ParsedCalendarIntent, CalendarError> {
-        let trimmed = input.trim();
+        let (extracted_input, literals) = extract_quotes(input);
+        let trimmed = extracted_input.trim();
         if trimmed.is_empty() {
             return Err(CalendarError::ParseError("Entrada vazia".to_string()));
         }
@@ -669,6 +670,7 @@ impl CalendarIntentParser {
         let mut end_hour = None;
         let mut end_min = 0;
         let mut day_offset: i64 = 0;
+        let mut specific_date: Option<(i32, u32, u32)> = None;
         let mut weekday_target: Option<Weekday> = None;
         let mut is_all_day = true;
 
@@ -687,8 +689,65 @@ impl CalendarIntentParser {
             ("domingo", Weekday::Sunday),
         ];
 
-        // 1. Extração de padrões de frases temporais e recorrências por índice
+        // Pass 0: Localização protegida por aspas ou por substantivo de logradouro
         for i in 0..tokens.len() {
+            if consumed_indices.contains(&i) {
+                continue;
+            }
+            let t_low = tokens[i].to_lowercase();
+            if (t_low == "no" || t_low == "na" || t_low == "em" || t_low == "at")
+                && i + 1 < tokens.len()
+            {
+                let next_low = tokens[i + 1].to_lowercase();
+                if next_low.starts_with("__lit_") {
+                    location = Some(restore_literals(tokens[i + 1], &literals));
+                    consumed_indices.extend_from_slice(&[i, i + 1]);
+                    continue;
+                }
+                let venue_keywords = [
+                    "clube",
+                    "rua",
+                    "avenida",
+                    "av",
+                    "hospital",
+                    "restaurante",
+                    "bar",
+                    "edifício",
+                    "ed",
+                    "praça",
+                    "parque",
+                ];
+                if venue_keywords.iter().any(|&vk| next_low == vk) {
+                    let mut loc_tokens = Vec::new();
+                    let mut j = i + 1;
+                    while j < tokens.len() && !consumed_indices.contains(&j) {
+                        let w_low = tokens[j].to_lowercase();
+                        if w_low == "às"
+                            || w_low == "as"
+                            || w_low == "das"
+                            || w_low.starts_with("amanh")
+                            || w_low == "hoje"
+                            || w_low == "findi"
+                        {
+                            break;
+                        }
+                        loc_tokens.push(tokens[j]);
+                        consumed_indices.push(j);
+                        j += 1;
+                    }
+                    if !loc_tokens.is_empty() {
+                        location = Some(restore_literals(&loc_tokens.join(" "), &literals));
+                        consumed_indices.push(i);
+                    }
+                }
+            }
+        }
+
+        // Pass 1: Recorrências e padrões temporais
+        for i in 0..tokens.len() {
+            if consumed_indices.contains(&i) {
+                continue;
+            }
             let t_low = tokens[i].to_lowercase();
 
             // "a cada 15 dias"
@@ -807,8 +866,14 @@ impl CalendarIntentParser {
                 && let Ok(day_val) = tokens[i + 1].parse::<u32>()
                 && (1..=31).contains(&day_val)
             {
-                consumed_indices.extend_from_slice(&[i, i + 1]);
-                continue;
+                let is_date_of_month = i + 2 < tokens.len()
+                    && tokens[i + 2].to_lowercase() == "de"
+                    && i + 3 < tokens.len()
+                    && parse_month_token(tokens[i + 3]).is_some();
+                if !is_date_of_month {
+                    consumed_indices.extend_from_slice(&[i, i + 1]);
+                    continue;
+                }
             }
 
             // Palavras únicas de data/semana
@@ -858,6 +923,248 @@ impl CalendarIntentParser {
             }
         }
 
+        // Pass 1b: Feriados Nacionais e Coloquiais ("findi", "natal", etc.)
+        for i in 0..tokens.len() {
+            if consumed_indices.contains(&i) {
+                continue;
+            }
+            let t_low = tokens[i].to_lowercase();
+
+            // "findi", "fim de semana", "final de semana"
+            if t_low == "findi" || t_low == "fim-de-semana" {
+                let current_wd_num = ref_time.weekday.day_number();
+                let sat_num = Weekday::Saturday.day_number();
+                let diff = (sat_num + 7 - current_wd_num) % 7;
+                day_offset = if diff == 0 { 7 } else { diff as i64 };
+                consumed_indices.push(i);
+                if i > 0
+                    && (tokens[i - 1].to_lowercase() == "no"
+                        || tokens[i - 1].to_lowercase() == "neste")
+                    && !consumed_indices.contains(&(i - 1))
+                {
+                    consumed_indices.push(i - 1);
+                }
+                continue;
+            } else if (t_low == "fim" || t_low == "final")
+                && i + 2 < tokens.len()
+                && tokens[i + 1].to_lowercase() == "de"
+                && tokens[i + 2].to_lowercase() == "semana"
+            {
+                let current_wd_num = ref_time.weekday.day_number();
+                let sat_num = Weekday::Saturday.day_number();
+                let diff = (sat_num + 7 - current_wd_num) % 7;
+                day_offset = if diff == 0 { 7 } else { diff as i64 };
+                consumed_indices.extend_from_slice(&[i, i + 1, i + 2]);
+                if i > 0
+                    && (tokens[i - 1].to_lowercase() == "no"
+                        || tokens[i - 1].to_lowercase() == "neste")
+                    && !consumed_indices.contains(&(i - 1))
+                {
+                    consumed_indices.push(i - 1);
+                }
+                continue;
+            }
+
+            // Feriados
+            let is_natal = t_low == "natal";
+            let is_ano_novo = t_low == "reveillon"
+                || t_low == "réveillon"
+                || (t_low == "ano"
+                    && i + 1 < tokens.len()
+                    && tokens[i + 1].to_lowercase() == "novo");
+            let is_independencia = t_low == "independência" || t_low == "independencia";
+            let is_tiradentes = t_low == "tiradentes";
+            let is_trabalhador = t_low == "trabalhador"
+                || (t_low == "dia"
+                    && i + 1 < tokens.len()
+                    && (tokens[i + 1].to_lowercase() == "do"
+                        || tokens[i + 1].to_lowercase() == "de")
+                    && i + 2 < tokens.len()
+                    && tokens[i + 2].to_lowercase().starts_with("trabalh"));
+
+            if is_natal {
+                let year = if ref_time.month > 12 || (ref_time.month == 12 && ref_time.day > 25) {
+                    ref_time.year + 1
+                } else {
+                    ref_time.year
+                };
+                specific_date = Some((year, 12, 25));
+                consumed_indices.push(i);
+                if i > 0
+                    && (tokens[i - 1].to_lowercase() == "de"
+                        || tokens[i - 1].to_lowercase() == "no")
+                    && !consumed_indices.contains(&(i - 1))
+                {
+                    consumed_indices.push(i - 1);
+                }
+                continue;
+            } else if is_ano_novo {
+                let year = if ref_time.month > 1 || (ref_time.month == 1 && ref_time.day >= 1) {
+                    ref_time.year + 1
+                } else {
+                    ref_time.year
+                };
+                specific_date = Some((year, 1, 1));
+                if t_low == "ano" {
+                    consumed_indices.extend_from_slice(&[i, i + 1]);
+                } else {
+                    consumed_indices.push(i);
+                }
+                if i > 0
+                    && (tokens[i - 1].to_lowercase() == "de"
+                        || tokens[i - 1].to_lowercase() == "no")
+                    && !consumed_indices.contains(&(i - 1))
+                {
+                    consumed_indices.push(i - 1);
+                }
+                continue;
+            } else if is_independencia {
+                let year = if (ref_time.month, ref_time.day) > (9, 7) {
+                    ref_time.year + 1
+                } else {
+                    ref_time.year
+                };
+                specific_date = Some((year, 9, 7));
+                consumed_indices.push(i);
+                if i > 0
+                    && (tokens[i - 1].to_lowercase() == "de"
+                        || tokens[i - 1].to_lowercase() == "no")
+                    && !consumed_indices.contains(&(i - 1))
+                {
+                    consumed_indices.push(i - 1);
+                }
+                continue;
+            } else if is_tiradentes {
+                let year = if (ref_time.month, ref_time.day) > (4, 21) {
+                    ref_time.year + 1
+                } else {
+                    ref_time.year
+                };
+                specific_date = Some((year, 4, 21));
+                consumed_indices.push(i);
+                if i > 0
+                    && (tokens[i - 1].to_lowercase() == "de"
+                        || tokens[i - 1].to_lowercase() == "no")
+                    && !consumed_indices.contains(&(i - 1))
+                {
+                    consumed_indices.push(i - 1);
+                }
+                continue;
+            } else if is_trabalhador {
+                let year = if (ref_time.month, ref_time.day) > (5, 1) {
+                    ref_time.year + 1
+                } else {
+                    ref_time.year
+                };
+                specific_date = Some((year, 5, 1));
+                if t_low == "dia" {
+                    consumed_indices.extend_from_slice(&[i, i + 1, i + 2]);
+                } else {
+                    consumed_indices.push(i);
+                }
+                if i > 0
+                    && (tokens[i - 1].to_lowercase() == "de"
+                        || tokens[i - 1].to_lowercase() == "no")
+                    && !consumed_indices.contains(&(i - 1))
+                {
+                    consumed_indices.push(i - 1);
+                }
+                continue;
+            }
+
+            // Data com barra: 1/nov, 01/10, 15/10/2026
+            if t_low.contains('/') {
+                let parts: Vec<&str> = t_low.split('/').collect();
+                if (2..=3).contains(&parts.len())
+                    && let Ok(day_val) = parts[0].parse::<u32>()
+                    && (1..=31).contains(&day_val)
+                    && let Some(month_val) = parse_month_token(parts[1])
+                {
+                    let year_val = if parts.len() == 3 {
+                        if let Ok(y) = parts[2].parse::<i32>() {
+                            if y < 100 { 2000 + y } else { y }
+                        } else {
+                            ref_time.year
+                        }
+                    } else if (month_val, day_val) < (ref_time.month, ref_time.day) {
+                        ref_time.year + 1
+                    } else {
+                        ref_time.year
+                    };
+                    specific_date = Some((year_val, month_val, day_val));
+                    consumed_indices.push(i);
+                    continue;
+                }
+            }
+
+            // "primeiro de <mês>", "1º de <mês>", "1o de <mês>"
+            if t_low == "primeiro" || t_low == "1º" || t_low == "1o" {
+                if i + 2 < tokens.len()
+                    && tokens[i + 1].to_lowercase() == "de"
+                    && let Some(m) = parse_month_token(tokens[i + 2])
+                {
+                    let y = if (m, 1) < (ref_time.month, ref_time.day) {
+                        ref_time.year + 1
+                    } else {
+                        ref_time.year
+                    };
+                    specific_date = Some((y, m, 1));
+                    consumed_indices.extend_from_slice(&[i, i + 1, i + 2]);
+                    continue;
+                } else if i + 1 < tokens.len()
+                    && let Some(m) = parse_month_token(tokens[i + 1])
+                {
+                    let y = if (m, 1) < (ref_time.month, ref_time.day) {
+                        ref_time.year + 1
+                    } else {
+                        ref_time.year
+                    };
+                    specific_date = Some((y, m, 1));
+                    consumed_indices.extend_from_slice(&[i, i + 1]);
+                    continue;
+                }
+            }
+
+            // "<dia> de <mês>"
+            let day_cand = if t_low == "dia" && i + 1 < tokens.len() {
+                tokens[i + 1]
+                    .parse::<u32>()
+                    .ok()
+                    .or_else(|| parse_word_number(tokens[i + 1]))
+            } else {
+                tokens[i]
+                    .parse::<u32>()
+                    .ok()
+                    .or_else(|| parse_word_number(tokens[i]))
+            };
+            if let Some(d) = day_cand
+                && (1..=31).contains(&d)
+            {
+                let offset = if t_low == "dia" { 2 } else { 1 };
+                if i + offset < tokens.len() {
+                    let has_de = tokens
+                        .get(i + offset)
+                        .map(|s| s.to_lowercase() == "de")
+                        .unwrap_or(false);
+                    let m_token_idx = if has_de { i + offset + 1 } else { i + offset };
+                    if m_token_idx < tokens.len()
+                        && let Some(m) = parse_month_token(tokens[m_token_idx])
+                    {
+                        let y = if (m, d) < (ref_time.month, ref_time.day) {
+                            ref_time.year + 1
+                        } else {
+                            ref_time.year
+                        };
+                        specific_date = Some((y, m, d));
+                        for k in i..=m_token_idx {
+                            consumed_indices.push(k);
+                        }
+                        continue;
+                    }
+                }
+            }
+        }
+
         if let Some(target_wd) = weekday_target {
             let current_wd_num = ref_time.weekday.day_number();
             let target_wd_num = target_wd.day_number();
@@ -865,7 +1172,290 @@ impl CalendarIntentParser {
             day_offset = if diff == 0 { 7 } else { diff as i64 };
         }
 
-        // Pass 3a: Faixa horária "das ... às ..."
+        // Pass 2: Minutos Inversos ("15 pras 2", "20 pra meia noite", etc.)
+        for i in 0..tokens.len() {
+            if consumed_indices.contains(&i) {
+                continue;
+            }
+            let min_cand = tokens[i]
+                .parse::<u32>()
+                .ok()
+                .or_else(|| parse_word_number(tokens[i]));
+            if let Some(m) = min_cand
+                && (1..=59).contains(&m)
+                && i + 1 < tokens.len()
+            {
+                let p_low = tokens[i + 1].to_lowercase();
+                let is_prep = p_low == "pra"
+                    || p_low == "pras"
+                    || p_low == "pro"
+                    || p_low == "pros"
+                    || p_low == "para";
+                if is_prep {
+                    let mut target_idx = i + 2;
+                    if p_low == "para"
+                        && target_idx < tokens.len()
+                        && (tokens[target_idx].to_lowercase() == "as"
+                            || tokens[target_idx].to_lowercase() == "os"
+                            || tokens[target_idx].to_lowercase() == "a")
+                    {
+                        target_idx += 1;
+                    }
+                    if target_idx < tokens.len() {
+                        let tgt_low = tokens[target_idx].to_lowercase();
+                        let mut target_hour = None;
+                        let mut advance = 1;
+
+                        if tgt_low == "meia"
+                            && target_idx + 1 < tokens.len()
+                            && tokens[target_idx + 1].to_lowercase() == "noite"
+                        {
+                            target_hour = Some(0);
+                            advance = 2;
+                        } else if tgt_low == "meia-noite" || tgt_low == "meianoite" {
+                            target_hour = Some(0);
+                            advance = 1;
+                        } else if tgt_low == "meio"
+                            && target_idx + 1 < tokens.len()
+                            && tokens[target_idx + 1].to_lowercase() == "dia"
+                        {
+                            target_hour = Some(12);
+                            advance = 2;
+                        } else if tgt_low == "meio-dia" || tgt_low == "meiodia" {
+                            target_hour = Some(12);
+                            advance = 1;
+                        } else if let Some(th) = tokens[target_idx]
+                            .parse::<u32>()
+                            .ok()
+                            .or_else(|| parse_word_number(tokens[target_idx]))
+                        {
+                            target_hour = Some(th);
+                            advance = 1;
+                        }
+
+                        if let Some(mut th) = target_hour {
+                            let next_pos = target_idx + advance;
+                            let mut extra_consumed = 0;
+                            let mut turno = None;
+
+                            if next_pos + 1 < tokens.len()
+                                && tokens[next_pos].to_lowercase() == "da"
+                            {
+                                let t_type = tokens[next_pos + 1].to_lowercase();
+                                if t_type == "tarde" || t_type == "noite" {
+                                    turno = Some("pm");
+                                    extra_consumed = 2;
+                                } else if t_type == "manhã"
+                                    || t_type == "manha"
+                                    || t_type == "madrugada"
+                                {
+                                    turno = Some("am");
+                                    extra_consumed = 2;
+                                }
+                            }
+
+                            match turno {
+                                Some("pm") => {
+                                    if th < 12 && th != 0 {
+                                        th += 12;
+                                    }
+                                }
+                                Some("am") => {}
+                                _ => {
+                                    if (1..=6).contains(&th) {
+                                        th += 12;
+                                    }
+                                }
+                            }
+
+                            let final_min = 60 - m;
+                            let final_hour = if th == 0 { 23 } else { th - 1 };
+
+                            start_hour = Some(final_hour);
+                            start_min = final_min;
+                            is_all_day = false;
+
+                            for k in i..(next_pos + extra_consumed) {
+                                consumed_indices.push(k);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Pass 3: Termos nominais ("meio-dia", "meia-noite")
+        if start_hour.is_none() {
+            for i in 0..tokens.len() {
+                if consumed_indices.contains(&i) {
+                    continue;
+                }
+                let t_low = tokens[i].to_lowercase();
+                if t_low == "meio-dia" || t_low == "meiodia" {
+                    start_hour = Some(12);
+                    start_min = 0;
+                    is_all_day = false;
+                    consumed_indices.push(i);
+                    if i > 0
+                        && (tokens[i - 1].to_lowercase() == "ao"
+                            || tokens[i - 1].to_lowercase() == "às"
+                            || tokens[i - 1].to_lowercase() == "as")
+                        && !consumed_indices.contains(&(i - 1))
+                    {
+                        consumed_indices.push(i - 1);
+                    }
+                    break;
+                } else if t_low == "meio"
+                    && i + 1 < tokens.len()
+                    && tokens[i + 1].to_lowercase() == "dia"
+                {
+                    start_hour = Some(12);
+                    start_min = 0;
+                    is_all_day = false;
+                    consumed_indices.extend_from_slice(&[i, i + 1]);
+                    if i > 0
+                        && (tokens[i - 1].to_lowercase() == "ao"
+                            || tokens[i - 1].to_lowercase() == "às"
+                            || tokens[i - 1].to_lowercase() == "as")
+                        && !consumed_indices.contains(&(i - 1))
+                    {
+                        consumed_indices.push(i - 1);
+                    }
+                    break;
+                } else if t_low == "meia-noite" || t_low == "meianoite" {
+                    start_hour = Some(0);
+                    start_min = 0;
+                    is_all_day = false;
+                    consumed_indices.push(i);
+                    if i > 0
+                        && (tokens[i - 1].to_lowercase() == "à"
+                            || tokens[i - 1].to_lowercase() == "a"
+                            || tokens[i - 1].to_lowercase() == "às"
+                            || tokens[i - 1].to_lowercase() == "as")
+                        && !consumed_indices.contains(&(i - 1))
+                    {
+                        consumed_indices.push(i - 1);
+                    }
+                    break;
+                } else if t_low == "meia"
+                    && i + 1 < tokens.len()
+                    && tokens[i + 1].to_lowercase() == "noite"
+                {
+                    start_hour = Some(0);
+                    start_min = 0;
+                    is_all_day = false;
+                    consumed_indices.extend_from_slice(&[i, i + 1]);
+                    if i > 0
+                        && (tokens[i - 1].to_lowercase() == "à"
+                            || tokens[i - 1].to_lowercase() == "a"
+                            || tokens[i - 1].to_lowercase() == "às"
+                            || tokens[i - 1].to_lowercase() == "as")
+                        && !consumed_indices.contains(&(i - 1))
+                    {
+                        consumed_indices.push(i - 1);
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Pass 4: Horários compostos por extenso ("duas e meia da tarde", etc.)
+        if start_hour.is_none() {
+            for i in 0..tokens.len() {
+                if consumed_indices.contains(&i) {
+                    continue;
+                }
+                let t_low = tokens[i].to_lowercase();
+                let (hour_token_idx, has_prefix) =
+                    if (t_low == "às" || t_low == "as") && i + 1 < tokens.len() {
+                        (i + 1, true)
+                    } else {
+                        (i, false)
+                    };
+
+                if let Some(mut h) = tokens[hour_token_idx]
+                    .parse::<u32>()
+                    .ok()
+                    .or_else(|| parse_word_number(tokens[hour_token_idx]))
+                    && h <= 24
+                {
+                    let mut m = 0;
+                    let mut advance = if has_prefix { 2 } else { 1 };
+                    let mut matched_time = false;
+
+                    // "e meia", "e 30", "e quinze"
+                    let cur = i + advance;
+                    if cur + 1 < tokens.len() && tokens[cur].to_lowercase() == "e" {
+                        let m_tok = tokens[cur + 1].to_lowercase();
+                        if m_tok == "meia" {
+                            m = 30;
+                            advance += 2;
+                            matched_time = true;
+                        } else if let Some(m_val) = m_tok
+                            .parse::<u32>()
+                            .ok()
+                            .or_else(|| parse_word_number(&m_tok))
+                        {
+                            m = m_val;
+                            advance += 2;
+                            matched_time = true;
+                        }
+                    }
+
+                    // "horas", "hora", "h"
+                    let cur_h = i + advance;
+                    if cur_h < tokens.len() {
+                        let h_tok = tokens[cur_h].to_lowercase();
+                        if h_tok == "horas" || h_tok == "hora" || h_tok == "h" {
+                            advance += 1;
+                            matched_time = true;
+                        }
+                    }
+
+                    // "da tarde", "da noite", "da manhã"
+                    let cur_turno = i + advance;
+                    let mut turno = None;
+                    if cur_turno + 1 < tokens.len() && tokens[cur_turno].to_lowercase() == "da" {
+                        let t_type = tokens[cur_turno + 1].to_lowercase();
+                        if t_type == "tarde" || t_type == "noite" {
+                            turno = Some("pm");
+                            advance += 2;
+                            matched_time = true;
+                        } else if t_type == "manhã" || t_type == "manha" || t_type == "madrugada" {
+                            turno = Some("am");
+                            advance += 2;
+                            matched_time = true;
+                        }
+                    }
+
+                    if has_prefix || matched_time {
+                        match turno {
+                            Some("pm") => {
+                                if h < 12 {
+                                    h += 12;
+                                }
+                            }
+                            Some("am") => {}
+                            _ => {
+                                if (1..=6).contains(&h) {
+                                    h += 12;
+                                }
+                            }
+                        }
+                        start_hour = Some(h);
+                        start_min = m;
+                        is_all_day = false;
+                        for k in i..(i + advance) {
+                            consumed_indices.push(k);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Pass 5a: Faixa horária "das ... às ..."
         for i in 0..tokens.len() {
             if consumed_indices.contains(&i) {
                 continue;
@@ -888,7 +1478,7 @@ impl CalendarIntentParser {
             }
         }
 
-        // Pass 3b: Horário pontual "às X" ou "as X" ou token direto "Xh"
+        // Pass 5b: Horário pontual "às X" ou "as X" ou token direto "Xh"
         if start_hour.is_none() {
             for i in 0..tokens.len() {
                 if consumed_indices.contains(&i) {
@@ -913,33 +1503,35 @@ impl CalendarIntentParser {
             }
         }
 
-        // Pass 4: Local "no ...", "na ...", "em ...", "at ..."
-        for i in 0..tokens.len() {
-            if consumed_indices.contains(&i) {
-                continue;
-            }
-            let t_lower = tokens[i].to_lowercase();
-            if (t_lower == "no" || t_lower == "na" || t_lower == "em" || t_lower == "at")
-                && i + 1 < tokens.len()
-            {
-                let mut loc_tokens = Vec::new();
-                let mut j = i + 1;
-                while j < tokens.len() && !consumed_indices.contains(&j) {
-                    let next_low = tokens[j].to_lowercase();
-                    if next_low == "às"
-                        || next_low == "as"
-                        || next_low == "das"
-                        || next_low.starts_with("amanh")
-                    {
-                        break;
-                    }
-                    loc_tokens.push(tokens[j]);
-                    consumed_indices.push(j);
-                    j += 1;
+        // Pass 6: Local "no ...", "na ...", "em ...", "at ..." se ainda não extraído
+        if location.is_none() {
+            for i in 0..tokens.len() {
+                if consumed_indices.contains(&i) {
+                    continue;
                 }
-                if !loc_tokens.is_empty() {
-                    location = Some(loc_tokens.join(" "));
-                    consumed_indices.push(i);
+                let t_lower = tokens[i].to_lowercase();
+                if (t_lower == "no" || t_lower == "na" || t_lower == "em" || t_lower == "at")
+                    && i + 1 < tokens.len()
+                {
+                    let mut loc_tokens = Vec::new();
+                    let mut j = i + 1;
+                    while j < tokens.len() && !consumed_indices.contains(&j) {
+                        let next_low = tokens[j].to_lowercase();
+                        if next_low == "às"
+                            || next_low == "as"
+                            || next_low == "das"
+                            || next_low.starts_with("amanh")
+                        {
+                            break;
+                        }
+                        loc_tokens.push(tokens[j]);
+                        consumed_indices.push(j);
+                        j += 1;
+                    }
+                    if !loc_tokens.is_empty() {
+                        location = Some(restore_literals(&loc_tokens.join(" "), &literals));
+                        consumed_indices.push(i);
+                    }
                 }
             }
         }
@@ -953,14 +1545,22 @@ impl CalendarIntentParser {
             summary_tokens.push(*token);
         }
 
-        let summary = if summary_tokens.is_empty() {
+        let summary_raw = if summary_tokens.is_empty() {
             "Novo Evento".to_string()
         } else {
             summary_tokens.join(" ")
         };
+        let summary = restore_literals(&summary_raw, &literals);
+        if let Some(loc) = location.as_mut() {
+            *loc = restore_literals(loc, &literals);
+        }
 
         // Cálculo dos timestamps de início e término
-        let base_days = civil_to_days(ref_time.year, ref_time.month, ref_time.day) + day_offset;
+        let base_days = if let Some((sy, sm, sd)) = specific_date {
+            civil_to_days(sy, sm, sd)
+        } else {
+            civil_to_days(ref_time.year, ref_time.month, ref_time.day) + day_offset
+        };
         let (calc_y, calc_m, calc_d) = days_to_civil(base_days);
 
         let (start, end) = if is_all_day {
@@ -1016,9 +1616,114 @@ impl CalendarIntentParser {
     }
 }
 
-fn parse_time_token(token: &str) -> Option<(u32, u32)> {
+fn extract_quotes(input: &str) -> (String, Vec<String>) {
+    let mut literals = Vec::new();
+    let mut out = String::new();
+    let mut chars = input.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '"' || c == '\'' {
+            let quote = c;
+            let mut lit = String::new();
+            let mut closed = false;
+            for inner in chars.by_ref() {
+                if inner == quote {
+                    closed = true;
+                    break;
+                }
+                lit.push(inner);
+            }
+            if closed && !lit.is_empty() {
+                let placeholder = format!("__LIT_{}__", literals.len());
+                literals.push(lit);
+                out.push_str(&placeholder);
+            } else {
+                out.push(quote);
+                out.push_str(&lit);
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    (out, literals)
+}
+
+fn restore_literals(text: &str, literals: &[String]) -> String {
+    let mut res = text.to_string();
+    for (i, lit) in literals.iter().enumerate() {
+        let placeholder = format!("__LIT_{i}__");
+        res = res.replace(&placeholder, lit);
+    }
+    res
+}
+
+fn parse_word_number(word: &str) -> Option<u32> {
+    let w = word.trim().to_lowercase();
+    let clean = w.trim_matches(|c: char| !c.is_alphanumeric());
+    match clean {
+        "um" | "uma" | "1" => Some(1),
+        "dois" | "duas" | "2" => Some(2),
+        "três" | "tres" | "3" => Some(3),
+        "quatro" | "4" => Some(4),
+        "cinco" | "5" => Some(5),
+        "seis" | "6" => Some(6),
+        "sete" | "7" => Some(7),
+        "oito" | "8" => Some(8),
+        "nove" | "9" => Some(9),
+        "dez" | "10" => Some(10),
+        "onze" | "11" => Some(11),
+        "doze" | "12" => Some(12),
+        "treze" | "13" => Some(13),
+        "quatorze" | "catorze" | "14" => Some(14),
+        "quinze" | "15" => Some(15),
+        "dezesseis" | "dezeseis" | "16" => Some(16),
+        "dezessete" | "dezesete" | "17" => Some(17),
+        "dezoito" | "18" => Some(18),
+        "dezenove" | "19" => Some(19),
+        "vinte" | "20" => Some(20),
+        "trinta" | "30" => Some(30),
+        "quarenta" | "40" => Some(40),
+        "cinquenta" | "50" => Some(50),
+        _ => None,
+    }
+}
+
+fn parse_month_token(token: &str) -> Option<u32> {
     let clean = token.trim().to_lowercase();
-    let clean = clean.trim_end_matches('h');
+    let clean = clean.trim_matches(|c: char| !c.is_alphanumeric());
+    match clean {
+        "janeiro" | "jan" | "1" | "01" => Some(1),
+        "fevereiro" | "fev" | "2" | "02" => Some(2),
+        "março" | "marco" | "mar" | "3" | "03" => Some(3),
+        "abril" | "abr" | "4" | "04" => Some(4),
+        "maio" | "mai" | "5" | "05" => Some(5),
+        "junho" | "jun" | "6" | "06" => Some(6),
+        "julho" | "jul" | "7" | "07" => Some(7),
+        "agosto" | "ago" | "8" | "08" => Some(8),
+        "setembro" | "set" | "9" | "09" => Some(9),
+        "outubro" | "out" | "10" => Some(10),
+        "novembro" | "nov" | "11" => Some(11),
+        "dezembro" | "dez" | "12" => Some(12),
+        _ => None,
+    }
+}
+
+fn parse_time_token(token: &str) -> Option<(u32, u32)> {
+    let mut clean = token.trim().to_lowercase();
+    clean = clean
+        .trim_end_matches("minutos")
+        .trim_end_matches("minuto")
+        .trim_end_matches("mins")
+        .trim_end_matches("min")
+        .trim_end_matches('m')
+        .to_string();
+    clean = clean
+        .trim_end_matches("horas")
+        .trim_end_matches("hora")
+        .trim_end_matches("hrs")
+        .trim_end_matches("hr")
+        .trim_end_matches('h')
+        .to_string();
 
     if clean.contains(':') {
         let (h_str, m_str) = clean.split_once(':')?;
@@ -1040,9 +1745,16 @@ fn parse_time_token(token: &str) -> Option<(u32, u32)> {
         }
     } else if let Ok(h) = clean.parse::<u32>()
         && h < 24
-        && token.to_lowercase().ends_with('h')
     {
-        return Some((h, 0));
+        let tok_low = token.to_lowercase();
+        if tok_low.ends_with('h')
+            || tok_low.ends_with("hr")
+            || tok_low.ends_with("hrs")
+            || tok_low.ends_with("hora")
+            || tok_low.ends_with("horas")
+        {
+            return Some((h, 0));
+        }
     }
     None
 }
