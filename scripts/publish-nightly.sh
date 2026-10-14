@@ -137,8 +137,13 @@ fi
 
 cp "$GEN_APK" "$NIGHTLY_APK_PATH"
 cp "$GEN_APK" "$SITE_DIR/lauda-latest.apk"
+if [ -f "$REPO_ROOT/scripts/sign-release.sh" ]; then
+    echo "-> Assinando APKs soberanamente com in_twolp_release.keystore..."
+    "$REPO_ROOT/scripts/sign-release.sh" "$NIGHTLY_APK_PATH" || echo "Aviso: Assinatura de nightly falhou."
+    "$REPO_ROOT/scripts/sign-release.sh" "$SITE_DIR/lauda-latest.apk" || echo "Aviso: Assinatura de latest falhou."
+fi
 APK_SIZE="$(du -h "$NIGHTLY_APK_PATH" | cut -f1)"
-echo "✅ APK gerado em $NIGHTLY_APK_PATH ($APK_SIZE)"
+echo "✅ APK gerado e assinado em $NIGHTLY_APK_PATH ($APK_SIZE)"
 
 # 7. Gerar manifestos site/version-nightly.json e site/version.json
 echo "-> Atualizando manifestos de versão..."

@@ -76,6 +76,23 @@ jobs:
           WASM_NAME=$(ls site/app/assets | grep '^lauda-client_bg-.*\.wasm$' | head -n 1)
           sed -i -E "s|/app/assets/lauda-client-[^\"']+\.js|/app/assets/${JS_NAME}|g" site/app/index.html
           sed -i -E "s|/app/assets/lauda-client_bg-[^\"']+\.wasm|/app/assets/${WASM_NAME}|g" site/app/index.html
+      - name: "Ensure Sovereign Keystore Signature on APKs"
+        run: |
+          if [ -f "$HOME/.android/in_twolp_release.keystore" ] && [ -f "$HOME/.android/in_twolp_release.properties" ]; then
+            echo "✅ Keystore soberana oficial detectada em $HOME/.android/"
+            if [ -f site/lauda-latest.apk ] && [ -f scripts/sign-release.sh ]; then
+              ./scripts/sign-release.sh site/lauda-latest.apk || true
+            fi
+            if [ -f site/lauda-nightly.apk ] && [ -f scripts/sign-release.sh ]; then
+              ./scripts/sign-release.sh site/lauda-nightly.apk || true
+            fi
+          else
+            echo "Aviso: Keystore soberana não montada em ~/.android; mantendo assinatura existente."
+          fi
+          if command -v apksigner >/dev/null 2>&1; then
+            echo "Verificando assinaturas dos APKs em site/:"
+            apksigner verify --print-certs site/lauda-latest.apk || true
+          fi
       - name: "Deploy to Cloudflare Workers"
         run: |
           if [ -n "$CLOUDFLARE_API_TOKEN" ]; then

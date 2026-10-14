@@ -19,4 +19,5 @@
 # Artefatos Android e Sessões Locais
 *.apk
 site/*.apk
+*.idsig
 session.json
