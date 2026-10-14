@@ -43,13 +43,28 @@ fn test_generate_itip_request_payload_conformance() {
     let payload = generate_itip_payload(&event, ItipMethod::Request, &organizer);
 
     // Verificações estruturais iCalendar RFC 5545 e iTIP RFC 5546
-    assert!(payload.contains("BEGIN:VCALENDAR"), "Deve conter cabeçalho VCALENDAR");
+    assert!(
+        payload.contains("BEGIN:VCALENDAR"),
+        "Deve conter cabeçalho VCALENDAR"
+    );
     assert!(payload.contains("VERSION:2.0"), "Versão deve ser 2.0");
-    assert!(payload.contains("METHOD:REQUEST"), "Deve declarar METHOD:REQUEST");
+    assert!(
+        payload.contains("METHOD:REQUEST"),
+        "Deve declarar METHOD:REQUEST"
+    );
     assert!(payload.contains("BEGIN:VEVENT"), "Deve conter bloco VEVENT");
-    assert!(payload.contains("UID:inv-test-uid-100"), "UID deve ser preservado");
-    assert!(payload.contains("SUMMARY:Reunião de Arquitetura"), "Summary deve ser preservado");
-    assert!(payload.contains("ORGANIZER;CN=\"Organizador do Evento\":mailto:organizador@2lp.in"), "Organizer formatado");
+    assert!(
+        payload.contains("UID:inv-test-uid-100"),
+        "UID deve ser preservado"
+    );
+    assert!(
+        payload.contains("SUMMARY:Reunião de Arquitetura"),
+        "Summary deve ser preservado"
+    );
+    assert!(
+        payload.contains("ORGANIZER;CN=\"Organizador do Evento\":mailto:organizador@2lp.in"),
+        "Organizer formatado"
+    );
     assert!(payload.contains("ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN=\"Convidado Especial\":mailto:convidado@dominio.com"), "Attendee formatado com RSVP");
     assert!(payload.contains("SEQUENCE:1"), "Sequence deve ser incluído");
     assert!(payload.contains("END:VEVENT"), "Deve fechar VEVENT");

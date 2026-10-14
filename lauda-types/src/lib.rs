@@ -20,8 +20,8 @@ pub use android_sync::{
 pub use auth::{LoginRequest, TokenResponse};
 pub use calendar::{
     CalendarError, CalendarEvent, CalendarIntentParser, CalendarReferenceTime, EventAttendee,
-    EventStatus, EventTime, ParsedCalendarIntent, RecurrenceFreq, RecurrenceRule, RsvpStatus,
-    Weekday,
+    EventStatus, EventTime, ItipMethod, ParsedCalendarIntent, RecurrenceFreq, RecurrenceRule,
+    RsvpStatus, Weekday, generate_itip_payload,
 };
 pub use compose::{AttachmentUpload, ComposeForm};
 pub use contact::{ContactEntry, ContactInfo, ContactSyncRequest, ContactSyncResponse};

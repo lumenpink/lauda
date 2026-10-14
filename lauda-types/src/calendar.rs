@@ -257,6 +257,32 @@ impl EventStatus {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ItipMethod {
+    Request,
+    Reply,
+    Cancel,
+}
+
+impl ItipMethod {
+    pub fn to_ical_str(&self) -> &'static str {
+        match self {
+            ItipMethod::Request => "REQUEST",
+            ItipMethod::Reply => "REPLY",
+            ItipMethod::Cancel => "CANCEL",
+        }
+    }
+
+    pub fn from_ical_str(s: &str) -> Option<Self> {
+        match s.trim().to_uppercase().as_str() {
+            "REQUEST" => Some(ItipMethod::Request),
+            "REPLY" => Some(ItipMethod::Reply),
+            "CANCEL" => Some(ItipMethod::Cancel),
+            _ => None,
+        }
+    }
+}
+
 // Algoritmo civil exato de calendário Gregoriano sem dependências externas
 pub fn days_to_civil(days: i64) -> (i32, u32, u32) {
     let z = days + 719468;
@@ -627,6 +653,94 @@ impl CalendarEvent {
             updated_at: None,
         })
     }
+}
+
+/// Gera o payload iTIP (RFC 5546 / RFC 5545) para convites, respostas ou cancelamento de eventos.
+pub fn generate_itip_payload(
+    event: &CalendarEvent,
+    method: ItipMethod,
+    organizer: &EventAttendee,
+) -> String {
+    let mut lines = Vec::new();
+    lines.push("BEGIN:VCALENDAR".to_string());
+    lines.push("VERSION:2.0".to_string());
+    lines.push("PRODID:-//Lauda//PT-BR".to_string());
+    lines.push(format!("METHOD:{}", method.to_ical_str()));
+    lines.push("BEGIN:VEVENT".to_string());
+    lines.push(format!("UID:{}", event.uid));
+
+    let dtstamp = event.updated_at.unwrap_or_else(|| {
+        event
+            .created_at
+            .unwrap_or_else(|| event.start.to_timestamp_utc())
+    });
+    lines.push(format!(
+        "DTSTAMP:{}",
+        EventTime::DateTimeUtc(dtstamp).to_ical_string()
+    ));
+
+    lines.push(format!("SUMMARY:{}", event.summary));
+
+    if let Some(desc) = &event.description {
+        lines.push(format!("DESCRIPTION:{desc}"));
+    }
+    if let Some(loc) = &event.location {
+        lines.push(format!("LOCATION:{loc}"));
+    }
+
+    match &event.start {
+        EventTime::DateTimeUtc(_) => {
+            lines.push(format!("DTSTART:{}", event.start.to_ical_string()))
+        }
+        EventTime::DateOnly { .. } => lines.push(format!(
+            "DTSTART;VALUE=DATE:{}",
+            event.start.to_ical_string()
+        )),
+    }
+
+    match &event.end {
+        EventTime::DateTimeUtc(_) => lines.push(format!("DTEND:{}", event.end.to_ical_string())),
+        EventTime::DateOnly { .. } => {
+            lines.push(format!("DTEND;VALUE=DATE:{}", event.end.to_ical_string()))
+        }
+    }
+
+    if let Some(rrule) = &event.rrule {
+        lines.push(format!("RRULE:{}", rrule.to_rrule_string()));
+    }
+
+    lines.push(format!("STATUS:{}", event.status.to_ical_str()));
+
+    match &organizer.name {
+        Some(name) => lines.push(format!(
+            "ORGANIZER;CN=\"{name}\":mailto:{}",
+            organizer.email
+        )),
+        None => lines.push(format!("ORGANIZER:mailto:{}", organizer.email)),
+    }
+
+    for att in &event.attendees {
+        let cn_str = match &att.name {
+            Some(name) => format!(";CN=\"{name}\""),
+            None => String::new(),
+        };
+        let rsvp_str = if method == ItipMethod::Request {
+            ";RSVP=TRUE"
+        } else {
+            ""
+        };
+        lines.push(format!(
+            "ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT={}{rsvp_str}{cn_str}:mailto:{}",
+            att.status.to_ical_str(),
+            att.email
+        ));
+    }
+
+    lines.push(format!("SEQUENCE:{}", event.sequence));
+    lines.push("END:VEVENT".to_string());
+    lines.push("END:VCALENDAR".to_string());
+
+    lines.join("\r\n") + "\r\n"
 }
 
 /// Formata a data e horário do evento para exibição amigável em chips na interface visual.
