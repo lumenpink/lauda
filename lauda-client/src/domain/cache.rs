@@ -440,6 +440,7 @@ impl LocalMessageCache {
     }
 
     /// Parser minimalista para timestamps ISO-8601 UTC (ex: "2026-10-10T12:00:00Z" ou "2026-10-10 12:00:00").
+    #[cfg(not(target_arch = "wasm32"))]
     fn parse_iso_date_to_unix(date_str: &str) -> Option<u64> {
         let parts: Vec<&str> = date_str.split(&['T', ' '][..]).collect();
         if parts.is_empty() {
