@@ -31,18 +31,17 @@ echo "================================================================="
 
 cd "$REPO_ROOT"
 
-# 1. Metadados da versão Nightly
+# 1. Metadados da versão
 BASE_VERSION="$(cat "$REPO_ROOT/VERSION" | tr -d '[:space:]')"
 DATE_STR="$(date +%Y%m%d)"
 GIT_HASH="$(git rev-parse --short HEAD)"
-NIGHTLY_VERSION="${BASE_VERSION}-nightly.${DATE_STR}.${GIT_HASH}"
+NIGHTLY_VERSION="$BASE_VERSION"
 VERSION_CODE="$(date +%y%m%d%H)"
 PUBLISHED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
-echo "-> Versão Base:    $BASE_VERSION"
-echo "-> Versão Nightly: $NIGHTLY_VERSION"
-echo "-> versionCode:    $VERSION_CODE"
-echo "-> Commit HEAD:    $GIT_HASH"
+echo "-> Versão Base (versionName): $BASE_VERSION"
+echo "-> versionCode:               $VERSION_CODE"
+echo "-> Commit HEAD:               $GIT_HASH"
 
 # 2. Compilar alvos nativos Android (x86_64 e aarch64) com dx
 echo "-> Compilando alvos Android com dx (x86_64)..."
@@ -60,7 +59,7 @@ GRADLE_BUILD_KTS="$REPO_ROOT/target/dx/lauda-client/release/android/app/app/buil
 echo "-> Configurando packaging e versão em $GRADLE_BUILD_KTS..."
 
 sed -i "s/versionCode = [0-9]\+/versionCode = $VERSION_CODE/g" "$GRADLE_BUILD_KTS"
-sed -i "s/versionName = \".*\"/versionName = \"$NIGHTLY_VERSION\"/g" "$GRADLE_BUILD_KTS"
+sed -i "s/versionName = \".*\"/versionName = \"$BASE_VERSION\"/g" "$GRADLE_BUILD_KTS"
 sed -i 's/applicationId = ".*"/applicationId = "in.twolp.lauda"/g' "$GRADLE_BUILD_KTS"
 sed -i 's/namespace = ".*"/namespace = "in.twolp.lauda"/g' "$GRADLE_BUILD_KTS"
 
@@ -115,6 +114,13 @@ MAIN_KT="$REPO_ROOT/target/dx/lauda-client/release/android/app/app/src/main/kotl
 if [ -f "$REPO_ROOT/lauda-client/android/MainActivity.kt" ]; then
     echo "-> Configurando OnBackPressedDispatcher em $MAIN_KT..."
     cp "$REPO_ROOT/lauda-client/android/MainActivity.kt" "$MAIN_KT"
+fi
+
+# Injetar recursos de ícones e arquivos do Lauda (res)
+ANDROID_APP_RES="$REPO_ROOT/target/dx/lauda-client/release/android/app/app/src/main/res"
+if [ -d "$REPO_ROOT/lauda-client/android/res" ]; then
+    echo "-> Sincronizando ícones e recursos do Lauda em $ANDROID_APP_RES..."
+    cp -r "$REPO_ROOT/lauda-client/android/res/"* "$ANDROID_APP_RES/"
 fi
 
 # 5. Montar APK comprimido via Gradle

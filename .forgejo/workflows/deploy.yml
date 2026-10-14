@@ -19,6 +19,21 @@ jobs:
     steps:
       - name: "Checkout repository"
         uses: https://github.com/actions/checkout@v4
+      - name: "Checkout sibling dependencies"
+        run: |
+          mkdir -p ../ishcondidim ../papeli ../urupema
+          if [ -d /opt/gost/deps/ishcondidim ]; then
+            ln -sf /opt/gost/deps/* ../ 2>/dev/null || true
+          fi
+          if [ ! -f ../ishcondidim/Cargo.toml ]; then
+            git clone --depth 1 https://codeberg.org/lumenpink/ishcondidim.git ../ishcondidim
+          fi
+          if [ ! -f ../papeli/Cargo.toml ]; then
+            git clone --depth 1 https://codeberg.org/lumenpink/papeli.git ../papeli
+          fi
+          if [ ! -f ../urupema/Cargo.toml ]; then
+            git clone --depth 1 https://codeberg.org/lumenpink/urupema.git ../urupema
+          fi
       - name: "Build Dioxus Web Client (Release)"
         run: |
           dx build -p lauda-client --platform web --release
