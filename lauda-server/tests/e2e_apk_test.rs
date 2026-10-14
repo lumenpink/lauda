@@ -451,3 +451,46 @@ fn test_ci_multi_target_pipeline_manifests_and_scripts() {
         "site/version-nightly.json deve refletir a versão canônica do arquivo VERSION"
     );
 }
+
+#[test]
+fn test_gost10_ci_workflow_unification_and_strict_needs_test() {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let repo_root = manifest_dir.parent().unwrap();
+    let workflows_dir = repo_root.join(".forgejo/workflows");
+
+    // 1. Arquivo canônico ci.yml deve existir
+    let ci_yml = workflows_dir.join("ci.yml");
+    assert!(
+        ci_yml.exists(),
+        ".forgejo/workflows/ci.yml deve existir como pipeline canônico"
+    );
+
+    // 2. Arquivos concorrentes obsoletos não devem existir
+    assert!(
+        !workflows_dir.join("test.yml").exists(),
+        "test.yml obsoleto deve ser removido para evitar concorrência descontrolada"
+    );
+    assert!(
+        !workflows_dir.join("deploy.yml").exists(),
+        "deploy.yml obsoleto deve ser removido para evitar concorrência descontrolada"
+    );
+
+    // 3. Inspeção estrutural do ci.yml
+    let content = std::fs::read_to_string(&ci_yml).expect("Leitura de ci.yml");
+
+    // Deve conter job 'test'
+    assert!(
+        content.contains("test:"),
+        "ci.yml deve declarar o job obrigatório 'test'"
+    );
+
+    // Todos os jobs de deploy devem declarar needs: [test] e if: github.ref == 'refs/heads/main'
+    assert!(
+        content.contains("needs: [test]"),
+        "Jobs de deploy no ci.yml devem obrigatoriamente declarar needs: [test]"
+    );
+    assert!(
+        content.contains("github.ref == 'refs/heads/main'"),
+        "Jobs de deploy devem ser restritos à branch main"
+    );
+}
