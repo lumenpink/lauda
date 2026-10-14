@@ -1,6 +1,6 @@
 use lauda_types::calendar::{
     CalendarEvent, CalendarIntentParser, CalendarReferenceTime, EventAttendee, EventStatus,
-    EventTime, RecurrenceFreq, RecurrenceRule, RsvpStatus, Weekday,
+    EventTime, RecurrenceFreq, RecurrenceRule, RsvpStatus, Weekday, format_event_datetime_chip,
 };
 
 fn sample_ref_time() -> CalendarReferenceTime {
@@ -453,4 +453,63 @@ fn test_parse_attendees_extraction() {
     let p5 = CalendarIntentParser::parse("'Almoço com Marcelo' amanhã", &ref_time).expect("p5");
     assert_eq!(p5.summary, "Almoço com Marcelo");
     assert!(p5.attendees.is_empty());
+}
+
+#[test]
+fn test_format_event_datetime_chip_scenarios() {
+    // 1. Mesmo dia com horário: 14/10 · 09:00 - 10:30
+    let ev1 = CalendarEvent {
+        uid: "e1".to_string(),
+        summary: "Reunião de Alinhamento".to_string(),
+        description: None,
+        location: Some("Sala 1".to_string()),
+        start: EventTime::DateTimeUtc(1791968400), // 14/10/2026 09:00 UTC
+        end: EventTime::DateTimeUtc(1791973800),   // 14/10/2026 10:30 UTC
+        is_all_day: false,
+        rrule: None,
+        status: EventStatus::Confirmed,
+        organizer: None,
+        attendees: vec![],
+        sequence: 1,
+        created_at: None,
+        updated_at: None,
+    };
+    let chip1 = format_event_datetime_chip(&ev1);
+    assert_eq!(chip1, "14/10 · 09:00 - 10:30");
+
+    // 2. Dia inteiro via is_all_day: true
+    let ev2 = CalendarEvent {
+        is_all_day: true,
+        ..ev1.clone()
+    };
+    let chip2 = format_event_datetime_chip(&ev2);
+    assert_eq!(chip2, "14/10 (Dia inteiro)");
+
+    // 3. DateOnly
+    let ev3 = CalendarEvent {
+        start: EventTime::DateOnly {
+            year: 2026,
+            month: 10,
+            day: 15,
+        },
+        end: EventTime::DateOnly {
+            year: 2026,
+            month: 10,
+            day: 15,
+        },
+        is_all_day: true,
+        ..ev1.clone()
+    };
+    let chip3 = format_event_datetime_chip(&ev3);
+    assert_eq!(chip3, "15/10 (Dia inteiro)");
+
+    // 4. Overnight atravessando meia-noite
+    let ev4 = CalendarEvent {
+        start: EventTime::DateTimeUtc(1792018800), // 14/10/2026 23:00 UTC
+        end: EventTime::DateTimeUtc(1792029600),   // 15/10/2026 02:00 UTC
+        is_all_day: false,
+        ..ev1.clone()
+    };
+    let chip4 = format_event_datetime_chip(&ev4);
+    assert_eq!(chip4, "14/10 23:00 → 15/10 02:00");
 }
