@@ -16,6 +16,11 @@ jobs:
     container:
       image: codeberg.org/lumenpink/gost-ci-lauda:latest
     steps:
+      - name: "Install Node.js Runtime for Runner Actions"
+        run: |
+          if ! command -v node >/dev/null 2>&1; then
+            apt-get update -qq && apt-get install -y -qq --no-install-recommends nodejs >/dev/null
+          fi
       - name: "Checkout repository"
         uses: https://github.com/actions/checkout@v4
       - name: "Link Hermetic Dependencies"

@@ -36,9 +36,36 @@ jobs:
             echo "CLOUDFLARE_API_TOKEN not set, skipping Cloudflare deploy."
           fi
       - name: "Deploy to Codeberg Pages (Fallback)"
-        uses: https://codeberg.org/actions/pages@v1
-        with:
-          path: site
+        env:
+          CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -d site ]; then
+            git config user.name "actions-user"
+            git config user.email "actions@codeberg.org"
+
+            WORKTREE_DIR=$(mktemp -d)
+            if git ls-remote --exit-code --heads origin pages >/dev/null 2>&1; then
+              git fetch origin pages:pages
+              git worktree add "$WORKTREE_DIR" pages
+            else
+              git worktree add --orphan -b pages "$WORKTREE_DIR"
+            fi
+
+            rm -rf "${WORKTREE_DIR:?}"/*
+            cp -r site/* "$WORKTREE_DIR/"
+
+            cd "$WORKTREE_DIR"
+            git add -A
+            if git diff --staged --quiet; then
+              echo "No changes to deploy to Codeberg Pages."
+            else
+              git commit -m "docs(site): deploy to Codeberg Pages [skip ci]"
+              git push origin pages
+              echo "Successfully deployed to Codeberg Pages."
+            fi
+            cd - >/dev/null
+            git worktree remove "$WORKTREE_DIR" --force || true
+          fi
 
   build-and-deploy-server:
     name: "Build Docker Image & Update lauda-server"
