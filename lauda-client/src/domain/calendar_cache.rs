@@ -76,6 +76,139 @@ impl LocalCalendarCache {
         })
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub async fn open_rexie() -> Result<rexie::Rexie, ClientError> {
+        rexie::Rexie::builder("lauda_calendar")
+            .version(1)
+            .add_object_store(rexie::ObjectStore::new("events").key_path("uid"))
+            .add_object_store(rexie::ObjectStore::new("metadata").key_path("key"))
+            .build()
+            .await
+            .map_err(|e| ClientError::Internal(e.to_string()))
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub async fn load_events_idb() -> Result<Vec<CalendarEvent>, ClientError> {
+        let rexie = Self::open_rexie().await?;
+        let tx = rexie
+            .transaction(&["events"], rexie::TransactionMode::ReadOnly)
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        let store = tx
+            .store("events")
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        let raw_values = store
+            .get_all(None, None)
+            .await
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        let mut events = Vec::new();
+        for val in raw_values {
+            if let Ok(json) = js_sys::JSON::stringify(&val) {
+                let json_str: String = json.into();
+                if let Ok(ev) = serde_json::from_str::<CalendarEvent>(&json_str) {
+                    events.push(ev);
+                }
+            }
+        }
+        tx.done()
+            .await
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        events.sort_by_key(|e| e.start.to_timestamp_utc());
+        Ok(events)
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub async fn put_event_idb(event: &CalendarEvent) -> Result<(), ClientError> {
+        let rexie = Self::open_rexie().await?;
+        let tx = rexie
+            .transaction(&["events"], rexie::TransactionMode::ReadWrite)
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        let store = tx
+            .store("events")
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        let json_str =
+            serde_json::to_string(event).map_err(|e| ClientError::Internal(e.to_string()))?;
+        let js_val = js_sys::JSON::parse(&json_str)
+            .map_err(|_| ClientError::Internal("JSON parse error".to_string()))?;
+        store
+            .put(&js_val, None)
+            .await
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        tx.done()
+            .await
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        Ok(())
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub async fn delete_event_idb(id: &str) -> Result<bool, ClientError> {
+        let rexie = Self::open_rexie().await?;
+        let tx = rexie
+            .transaction(&["events"], rexie::TransactionMode::ReadWrite)
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        let store = tx
+            .store("events")
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        let key = web_sys::wasm_bindgen::JsValue::from_str(id);
+        store
+            .delete(key)
+            .await
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        tx.done()
+            .await
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        Ok(true)
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub async fn count_events_idb() -> Result<usize, ClientError> {
+        let rexie = Self::open_rexie().await?;
+        let tx = rexie
+            .transaction(&["events"], rexie::TransactionMode::ReadOnly)
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        let store = tx
+            .store("events")
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        let count = store
+            .count(None)
+            .await
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        tx.done()
+            .await
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        Ok(count as usize)
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub async fn set_sync_token_idb(token: &str) -> Result<(), ClientError> {
+        if let Some(window) = web_sys::window()
+            && let Ok(Some(storage)) = window.local_storage()
+        {
+            let _ = storage.set_item("lauda_calendar_sync_token", token);
+        }
+        let rexie = Self::open_rexie().await?;
+        let tx = rexie
+            .transaction(&["metadata"], rexie::TransactionMode::ReadWrite)
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        let store = tx
+            .store("metadata")
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        let obj = serde_json::json!({
+            "key": "calendar_sync_token",
+            "value": token
+        });
+        let json_str = obj.to_string();
+        let js_val = js_sys::JSON::parse(&json_str)
+            .map_err(|_| ClientError::Internal("JSON parse error".to_string()))?;
+        store
+            .put(&js_val, None)
+            .await
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        tx.done()
+            .await
+            .map_err(|e| ClientError::Internal(e.to_string()))?;
+        Ok(())
+    }
+
     /// Retorna o caminho base do cache.
     pub fn base_dir(&self) -> &Path {
         &self.base_dir
@@ -225,7 +358,10 @@ impl LocalCalendarCache {
         }
         #[cfg(target_arch = "wasm32")]
         {
-            let _ = event;
+            let ev = event.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                let _ = Self::put_event_idb(&ev).await;
+            });
             Ok(())
         }
     }
@@ -253,7 +389,10 @@ impl LocalCalendarCache {
         }
         #[cfg(target_arch = "wasm32")]
         {
-            let _ = id;
+            let uid = id.to_string();
+            wasm_bindgen_futures::spawn_local(async move {
+                let _ = Self::delete_event_idb(&uid).await;
+            });
             Ok(true)
         }
     }
@@ -286,9 +425,18 @@ impl LocalCalendarCache {
         }
         #[cfg(target_arch = "wasm32")]
         {
-            let _ = updated;
-            let _ = deleted_ids;
-            let _ = new_token;
+            let up = updated.to_vec();
+            let del = deleted_ids.to_vec();
+            let tok = new_token.to_string();
+            wasm_bindgen_futures::spawn_local(async move {
+                for ev in up {
+                    let _ = Self::put_event_idb(&ev).await;
+                }
+                for id in del {
+                    let _ = Self::delete_event_idb(&id).await;
+                }
+                let _ = Self::set_sync_token_idb(&tok).await;
+            });
             Ok(())
         }
     }

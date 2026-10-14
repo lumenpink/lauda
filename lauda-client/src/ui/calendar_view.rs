@@ -47,16 +47,35 @@ fn create_event_action(
         updated_at: Some(now),
     };
 
+    // 1. Atualização OTIMISTA imediata na UI (0ms latency!)
+    let mut current_list = events.read().clone();
+    if let Some(pos) = current_list.iter().position(|e| e.uid == event.uid) {
+        current_list[pos] = event.clone();
+    } else {
+        current_list.push(event.clone());
+    }
+    current_list.sort_by_key(|e| e.start.to_timestamp_utc());
+    events.set(current_list);
+
+    // 2. Persistência em cache (SQLite em Native ou IndexedDB na Web)
     let cache_dir = crate::domain::cache::get_default_cache_dir();
     if let Ok(cache) = LocalCalendarCache::open(&cache_dir) {
         let _ = cache.upsert_event(&event);
-        if let Ok(updated_list) = cache.load_events() {
-            events.set(updated_list);
-        }
     }
 
     quick_input.set(String::new());
     error_msg.set(None);
+}
+
+fn delete_event_action(mut events: Signal<Vec<CalendarEvent>>, del_uid: &str) {
+    let mut current_list = events.read().clone();
+    current_list.retain(|e| e.uid != del_uid);
+    events.set(current_list);
+
+    let cache_dir = crate::domain::cache::get_default_cache_dir();
+    if let Ok(cache) = LocalCalendarCache::open(&cache_dir) {
+        let _ = cache.delete_event(del_uid);
+    }
 }
 
 #[component]
@@ -66,14 +85,27 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
     let quick_input = use_signal(String::new);
     let mut error_msg = use_signal(|| None::<String>);
 
-    // Carregamento imediato e otimista a partir do cache local SQLite
+    // Carregamento imediato a partir do cache local SQLite (Native) ou IndexedDB (Web)
     use_effect(move || {
-        let cache_dir = crate::domain::cache::get_default_cache_dir();
-        if let Ok(cache) = LocalCalendarCache::open(&cache_dir)
-            && let Ok(local_list) = cache.load_events()
+        #[cfg(not(target_arch = "wasm32"))]
         {
-            events.set(local_list);
-            is_loading.set(false);
+            let cache_dir = crate::domain::cache::get_default_cache_dir();
+            if let Ok(cache) = LocalCalendarCache::open(&cache_dir)
+                && let Ok(local_list) = cache.load_events()
+            {
+                events.set(local_list);
+                is_loading.set(false);
+            }
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            spawn(async move {
+                if let Ok(list) = LocalCalendarCache::load_events_idb().await {
+                    events.set(list);
+                    is_loading.set(false);
+                }
+            });
         }
     });
 
@@ -293,14 +325,7 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
                                     EventCard {
                                         event: ev,
                                         on_delete: move |_| {
-                                            let cache_dir = crate::domain::cache::get_default_cache_dir();
-                                            if let Ok(cache) = LocalCalendarCache::open(&cache_dir) {
-                                                let _ = cache.delete_event(&del_uid);
-                                                if let Ok(updated_list) = cache.load_events() {
-                                                    let mut ev_sig = events;
-                                                    ev_sig.set(updated_list);
-                                                }
-                                            }
+                                            delete_event_action(events, &del_uid);
                                         },
                                     }
                                 }
@@ -330,14 +355,7 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
                                     EventCard {
                                         event: ev,
                                         on_delete: move |_| {
-                                            let cache_dir = crate::domain::cache::get_default_cache_dir();
-                                            if let Ok(cache) = LocalCalendarCache::open(&cache_dir) {
-                                                let _ = cache.delete_event(&del_uid);
-                                                if let Ok(updated_list) = cache.load_events() {
-                                                    let mut ev_sig = events;
-                                                    ev_sig.set(updated_list);
-                                                }
-                                            }
+                                            delete_event_action(events, &del_uid);
                                         },
                                     }
                                 }
@@ -361,14 +379,7 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
                                     EventCard {
                                         event: ev,
                                         on_delete: move |_| {
-                                            let cache_dir = crate::domain::cache::get_default_cache_dir();
-                                            if let Ok(cache) = LocalCalendarCache::open(&cache_dir) {
-                                                let _ = cache.delete_event(&del_uid);
-                                                if let Ok(updated_list) = cache.load_events() {
-                                                    let mut ev_sig = events;
-                                                    ev_sig.set(updated_list);
-                                                }
-                                            }
+                                            delete_event_action(events, &del_uid);
                                         },
                                     }
                                 }

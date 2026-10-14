@@ -86,3 +86,16 @@ END:VCALENDAR\r\n";
     assert_eq!(ev.summary, "Alinhamento Geral");
     assert_eq!(ev.location.as_deref(), Some("Auditório"));
 }
+
+#[test]
+fn test_calendar_event_json_serialization_roundtrip() {
+    let ev = sample_event("ev-json-1", "Alinhamento Arquitetural", 1791968400);
+    let json_str = serde_json::to_string(&ev).expect("serialize event to json");
+    let restored: CalendarEvent =
+        serde_json::from_str(&json_str).expect("deserialize event from json");
+    assert_eq!(ev.uid, restored.uid);
+    assert_eq!(ev.summary, restored.summary);
+    assert_eq!(ev.start, restored.start);
+    assert_eq!(ev.status, restored.status);
+    assert_eq!(ev.location, restored.location);
+}
