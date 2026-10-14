@@ -404,3 +404,50 @@ async fn test_e2e_apk_mobile_client_live_server_full_loop() {
     // H. Verificação de Persistência no Backend
     assert_eq!(backend.sent_count(), 1);
 }
+
+#[test]
+fn test_ci_multi_target_pipeline_manifests_and_scripts() {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let repo_root = manifest_dir.parent().unwrap();
+
+    // 1. O script canônico de sincronização de manifestos deve existir e ser executável
+    let sync_script = repo_root.join("scripts/sync-version-manifests.sh");
+    assert!(
+        sync_script.exists(),
+        "scripts/sync-version-manifests.sh deve existir"
+    );
+
+    // 2. O script canônico de empacotamento completo deve existir
+    let package_script = repo_root.join("scripts/package-all.sh");
+    assert!(
+        package_script.exists(),
+        "scripts/package-all.sh deve existir"
+    );
+
+    // 3. Execução do script de sincronização e validação de version.json e version-nightly.json
+    let version_content = std::fs::read_to_string(repo_root.join("VERSION"))
+        .expect("Leitura do VERSION")
+        .trim()
+        .to_string();
+
+    let v_json: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(repo_root.join("site/version.json")).expect("version.json"),
+    )
+    .expect("json parse");
+    assert_eq!(
+        v_json["version"].as_str().unwrap(),
+        version_content,
+        "site/version.json deve refletir a versão canônica do arquivo VERSION"
+    );
+
+    let v_nightly_json: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(repo_root.join("site/version-nightly.json"))
+            .expect("version-nightly.json"),
+    )
+    .expect("json parse");
+    assert_eq!(
+        v_nightly_json["version"].as_str().unwrap(),
+        version_content,
+        "site/version-nightly.json deve refletir a versão canônica do arquivo VERSION"
+    );
+}
