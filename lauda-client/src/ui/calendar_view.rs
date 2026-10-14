@@ -5,9 +5,39 @@ use lauda_types::calendar::{
 };
 
 use crate::domain::calendar_cache::LocalCalendarCache;
+use crate::domain::contacts_cache::LocalContactsCache;
 use crate::domain::session::SessionConfig;
 use crate::domain::time::current_unix_timestamp;
 use crate::ui::state::Screen;
+use lauda_types::contact::ContactEntry;
+
+fn apply_contact_to_input(
+    contact: &ContactEntry,
+    quick_input: &mut Signal<String>,
+    attendee_to_link: &Option<String>,
+) {
+    let current = quick_input.read().clone();
+    let name = contact
+        .display_name
+        .as_deref()
+        .unwrap_or(&contact.primary_email);
+    let email = &contact.primary_email;
+    let replacement = format!("\"{name}\" <{email}>");
+
+    if let Some(target) = attendee_to_link
+        && let Some(idx) = current.find(target)
+    {
+        let mut new_val = current[..idx].to_string();
+        new_val.push_str(&replacement);
+        new_val.push_str(&current[(idx + target.len())..]);
+        quick_input.set(new_val);
+        return;
+    }
+
+    let mut new_val = current;
+    new_val.push_str(&format!(" com {replacement}"));
+    quick_input.set(new_val);
+}
 
 fn create_event_action(
     mut quick_input: Signal<String>,
@@ -84,6 +114,9 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
     let mut is_loading = use_signal(|| true);
     let quick_input = use_signal(String::new);
     let mut error_msg = use_signal(|| None::<String>);
+    let contact_suggestions = use_signal(Vec::<ContactEntry>::new);
+    let active_suggestion_index = use_signal(|| None::<usize>);
+    let dismissed_query = use_signal(String::new);
 
     // Carregamento imediato a partir do cache local SQLite (Native) ou IndexedDB (Web)
     use_effect(move || {
@@ -131,6 +164,14 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
     } else {
         None
     };
+
+    let attendee_to_link = parsed_intent.as_ref().and_then(|intent| {
+        intent
+            .attendees
+            .iter()
+            .find(|att| att.email.is_empty())
+            .and_then(|att| att.name.clone())
+    });
 
     // Agrupamento temporal para a Timeline Stream
     let events_list = events.read().clone();
@@ -217,11 +258,104 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
                         value: "{quick_input.read()}",
                         oninput: {
                             let mut quick_input = quick_input;
-                            move |evt: FormEvent| quick_input.set(evt.value())
+                            let mut contact_suggestions = contact_suggestions;
+                            let mut active_suggestion_index = active_suggestion_index;
+                            move |evt: FormEvent| {
+                                let val = evt.value();
+                                quick_input.set(val.clone());
+
+                                if val.ends_with(' ') {
+                                    contact_suggestions.set(Vec::new());
+                                    active_suggestion_index.set(None);
+                                    return;
+                                }
+
+                                if let Ok(intent) = CalendarIntentParser::parse(&val, &ref_time)
+                                    && let Some(att) = intent.attendees.iter().find(|a| a.email.is_empty())
+                                    && let Some(ref name) = att.name
+                                    && dismissed_query.read().as_str() != name.as_str()
+                                {
+                                    let cache_dir = crate::domain::cache::get_default_cache_dir();
+                                    if let Ok(cache) = LocalContactsCache::open(&cache_dir) {
+                                        let matches = cache.search_contacts_fuzzy(name, 5).unwrap_or_default();
+                                        contact_suggestions.set(matches);
+                                        active_suggestion_index.set(None);
+                                        return;
+                                    }
+                                }
+                                contact_suggestions.set(Vec::new());
+                                active_suggestion_index.set(None);
+                            }
                         },
-                        onkeydown: move |evt: KeyboardEvent| {
-                            if evt.key() == Key::Enter {
-                                create_event_action(quick_input, error_msg, events, &ref_time);
+                        onkeydown: {
+                            let mut quick_input = quick_input;
+                            let mut contact_suggestions = contact_suggestions;
+                            let mut active_suggestion_index = active_suggestion_index;
+                            let mut dismissed_query = dismissed_query;
+                            let attendee_to_link = attendee_to_link.clone();
+                            move |evt: KeyboardEvent| {
+                                let suggestions = contact_suggestions.read().clone();
+                                let count = suggestions.len();
+                                if count > 0 {
+                                    match evt.key() {
+                                        Key::ArrowDown => {
+                                            evt.prevent_default();
+                                            let current_idx = *active_suggestion_index.read();
+                                            let next = match current_idx {
+                                                Some(idx) => (idx + 1) % count,
+                                                None => 0,
+                                            };
+                                            active_suggestion_index.set(Some(next));
+                                            return;
+                                        }
+                                        Key::ArrowUp => {
+                                            evt.prevent_default();
+                                            let current_idx = *active_suggestion_index.read();
+                                            let prev = match current_idx {
+                                                Some(idx) => (idx + count - 1) % count,
+                                                None => count.saturating_sub(1),
+                                            };
+                                            active_suggestion_index.set(Some(prev));
+                                            return;
+                                        }
+                                        Key::Enter => {
+                                            let current_idx = *active_suggestion_index.read();
+                                            if let Some(idx) = current_idx
+                                                && let Some(selected) = suggestions.get(idx)
+                                            {
+                                                evt.prevent_default();
+                                                apply_contact_to_input(selected, &mut quick_input, &attendee_to_link);
+                                                contact_suggestions.set(Vec::new());
+                                                active_suggestion_index.set(None);
+                                                return;
+                                            }
+                                        }
+                                        Key::Character(ref ch) if ch == " " => {
+                                            if let Some(ref att_name) = attendee_to_link {
+                                                dismissed_query.set(att_name.clone());
+                                            }
+                                            contact_suggestions.set(Vec::new());
+                                            active_suggestion_index.set(None);
+                                            return;
+                                        }
+                                        Key::Escape => {
+                                            evt.prevent_default();
+                                            if let Some(ref att_name) = attendee_to_link {
+                                                dismissed_query.set(att_name.clone());
+                                            }
+                                            contact_suggestions.set(Vec::new());
+                                            active_suggestion_index.set(None);
+                                            return;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+
+                                if evt.key() == Key::Enter {
+                                    create_event_action(quick_input, error_msg, events, &ref_time);
+                                    contact_suggestions.set(Vec::new());
+                                    active_suggestion_index.set(None);
+                                }
                             }
                         },
                     }
@@ -232,6 +366,61 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
                             create_event_action(quick_input, error_msg, events, &ref_time);
                         },
                         "+ CRIAR"
+                    }
+                }
+
+                // Dropdown de sugestões de contatos (abaixo do campo de entrada)
+                if !contact_suggestions.read().is_empty() {
+                    div {
+                        style: "border: 2px solid #0a0a0a; background: #fff; box-shadow: 4px 4px 0 #0a0a0a; max-height: 180px; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; margin-top: -0.2rem; margin-bottom: 0.4rem; z-index: 50;",
+                        for (i, c) in contact_suggestions.read().clone().into_iter().enumerate() {
+                            {
+                                let is_active = *active_suggestion_index.read() == Some(i);
+                                let c_clone = c.clone();
+                                let att_clone = attendee_to_link.clone();
+                                let display_name = c.display_name.clone().unwrap_or_else(|| c.primary_email.clone());
+                                let primary_email = c.primary_email.clone();
+                                let has_auto = c.has_autocrypt;
+
+                                rsx! {
+                                    div {
+                                        key: "{c.id}",
+                                        style: if is_active {
+                                            "background: #0a0a0a; color: #fff; padding: 0.5rem 0.8rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333;"
+                                        } else {
+                                            "background: #fff; color: #0a0a0a; padding: 0.5rem 0.8rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee;"
+                                        },
+                                        onclick: {
+                                            let mut quick_input = quick_input;
+                                            let mut contact_suggestions = contact_suggestions;
+                                            let mut active_suggestion_index = active_suggestion_index;
+                                            move |_| {
+                                                apply_contact_to_input(&c_clone, &mut quick_input, &att_clone);
+                                                contact_suggestions.set(Vec::new());
+                                                active_suggestion_index.set(None);
+                                            }
+                                        },
+                                        div {
+                                            style: "display: flex; flex-direction: column; gap: 0.1rem;",
+                                            span {
+                                                style: "font-weight: bold; font-size: 0.85rem;",
+                                                "{display_name}"
+                                            }
+                                            span {
+                                                style: if is_active { "font-size: 0.75rem; color: #ccc;" } else { "font-size: 0.75rem; color: #666;" },
+                                                "{primary_email}"
+                                            }
+                                        }
+                                        if has_auto {
+                                            span {
+                                                style: "background: #2e7d32; color: #fff; font-size: 0.65rem; font-weight: bold; padding: 0.1rem 0.4rem; border-radius: 2px;",
+                                                "AUTOCRYPT"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -265,9 +454,27 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
                             }
                         }
                         for att in &intent.attendees {
-                            span {
-                                style: "background: #fff; border: 1px solid #0a0a0a; padding: 0.1rem 0.4rem; font-size: 0.75rem;",
-                                "👤 {att.name.as_deref().unwrap_or(&att.email)}"
+                            {
+                                let is_linked = !att.email.is_empty() && att.name.as_deref() != Some(&att.email);
+                                let label = if is_linked {
+                                    if let Some(ref n) = att.name {
+                                        format!("{n} <{}>", att.email)
+                                    } else {
+                                        att.email.clone()
+                                    }
+                                } else {
+                                    att.name.as_deref().unwrap_or(&att.email).to_string()
+                                };
+                                rsx! {
+                                    span {
+                                        style: if is_linked {
+                                            "background: #e8f5e9; border: 1px solid #2e7d32; color: #1b5e20; padding: 0.1rem 0.4rem; font-size: 0.75rem; font-weight: bold;"
+                                        } else {
+                                            "background: #fff; border: 1px solid #0a0a0a; padding: 0.1rem 0.4rem; font-size: 0.75rem;"
+                                        },
+                                        "👤 {label}"
+                                    }
+                                }
                             }
                         }
                     }
@@ -449,9 +656,27 @@ fn EventCard(event: CalendarEvent, on_delete: EventHandler<()>) -> Element {
                             }
                         }
                         for att in &event.attendees {
-                            span {
-                                style: "background: #eee; border: 1px solid #ccc; padding: 0.1rem 0.3rem; font-size: 0.7rem;",
-                                "👤 {att.name.as_deref().unwrap_or(&att.email)}"
+                            {
+                                let is_linked = !att.email.is_empty() && att.name.as_deref() != Some(&att.email);
+                                let label = if is_linked {
+                                    if let Some(ref n) = att.name {
+                                        format!("{n} <{}>", att.email)
+                                    } else {
+                                        att.email.clone()
+                                    }
+                                } else {
+                                    att.name.as_deref().unwrap_or(&att.email).to_string()
+                                };
+                                rsx! {
+                                    span {
+                                        style: if is_linked {
+                                            "background: #e8f5e9; border: 1px solid #2e7d32; color: #1b5e20; padding: 0.1rem 0.3rem; font-size: 0.7rem; font-weight: bold;"
+                                        } else {
+                                            "background: #eee; border: 1px solid #ccc; padding: 0.1rem 0.3rem; font-size: 0.7rem;"
+                                        },
+                                        "👤 {label}"
+                                    }
+                                }
                             }
                         }
                     }

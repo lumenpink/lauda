@@ -2,6 +2,7 @@ pub mod cache;
 pub mod calendar_cache;
 pub mod contacts_cache;
 pub mod folders;
+pub mod fuzzy;
 pub mod outbox;
 pub mod ports;
 pub mod session;

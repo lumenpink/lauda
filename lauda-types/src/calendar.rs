@@ -1642,7 +1642,22 @@ impl CalendarIntentParser {
                         if name_or_email.is_empty() {
                             continue;
                         }
-                        if name_or_email.contains('@') {
+                        if let Some(start) = name_or_email.find('<')
+                            && let Some(end) = name_or_email.rfind('>')
+                            && start < end
+                        {
+                            let name_part = name_or_email[..start].trim().trim_matches('"').trim();
+                            let email_part = name_or_email[(start + 1)..end].trim();
+                            attendees.push(EventAttendee {
+                                email: email_part.to_string(),
+                                name: if name_part.is_empty() {
+                                    None
+                                } else {
+                                    Some(name_part.to_string())
+                                },
+                                status: RsvpStatus::NeedsAction,
+                            });
+                        } else if name_or_email.contains('@') {
                             attendees.push(EventAttendee {
                                 email: name_or_email.to_string(),
                                 name: None,

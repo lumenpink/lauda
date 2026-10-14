@@ -211,6 +211,42 @@ impl LocalContactsCache {
         }
     }
 
+    /// Executa busca heurística ponderada (fuzzy matching, tolerância a erros e acentos)
+    /// sobre a coleção de contatos ativos.
+    pub fn search_contacts_fuzzy(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<ContactEntry>, ClientError> {
+        let all_contacts = self.load_contacts()?;
+        let mut scored: Vec<(u32, ContactEntry)> = all_contacts
+            .into_iter()
+            .filter_map(|contact| {
+                let name = contact.display_name.as_deref().unwrap_or("");
+                let score = crate::domain::fuzzy::calculate_fuzzy_match_score(
+                    query,
+                    name,
+                    &contact.primary_email,
+                );
+                if score > 0 {
+                    Some((score, contact))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        scored.sort_by(|(s1, c1), (s2, c2)| {
+            s2.cmp(s1).then_with(|| {
+                let n1 = c1.display_name.as_deref().unwrap_or(&c1.primary_email);
+                let n2 = c2.display_name.as_deref().unwrap_or(&c2.primary_email);
+                n1.to_lowercase().cmp(&n2.to_lowercase())
+            })
+        });
+
+        Ok(scored.into_iter().take(limit).map(|(_, c)| c).collect())
+    }
+
     /// Aplica lote de atualizações e remoções (tombstones) e atualiza o sync_token de forma atômica.
     pub fn apply_sync_delta(
         &self,
