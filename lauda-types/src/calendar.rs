@@ -648,6 +648,7 @@ pub struct ParsedCalendarIntent {
     pub is_all_day: bool,
     pub location: Option<String>,
     pub rrule: Option<RecurrenceRule>,
+    pub attendees: Vec<EventAttendee>,
 }
 
 pub struct CalendarIntentParser;
@@ -1536,6 +1537,76 @@ impl CalendarIntentParser {
             }
         }
 
+        // Pass 7: Extração de participantes por conectivos de companhia
+        let mut attendees = Vec::new();
+        for i in 0..tokens.len() {
+            if consumed_indices.contains(&i) {
+                continue;
+            }
+            let t_low = tokens[i].to_lowercase();
+            let mut connective_len = 0;
+
+            if t_low == "com" {
+                connective_len = 1;
+            } else if t_low == "junto"
+                && i + 1 < tokens.len()
+                && (tokens[i + 1].to_lowercase() == "a"
+                    || tokens[i + 1].to_lowercase() == "de"
+                    || tokens[i + 1].to_lowercase() == "com")
+            {
+                connective_len = 2;
+            } else if (t_low == "em" || t_low == "na")
+                && i + 2 < tokens.len()
+                && tokens[i + 1].to_lowercase() == "companhia"
+                && tokens[i + 2].to_lowercase() == "de"
+            {
+                connective_len = 3;
+            }
+
+            if connective_len > 0 {
+                let start_idx = i + connective_len;
+                let mut attendee_tokens = Vec::new();
+                let mut j = start_idx;
+
+                while j < tokens.len()
+                    && !consumed_indices.contains(&j)
+                    && !is_intent_delimiter(tokens[j])
+                {
+                    attendee_tokens.push(tokens[j]);
+                    consumed_indices.push(j);
+                    j += 1;
+                }
+
+                if !attendee_tokens.is_empty() {
+                    for k in i..(i + connective_len) {
+                        consumed_indices.push(k);
+                    }
+                    let joined = attendee_tokens.join(" ");
+                    let restored = restore_literals(&joined, &literals);
+                    let normalized = restored.replace(" e ", ", ");
+                    for part in normalized.split(',') {
+                        let name_or_email = part.trim();
+                        if name_or_email.is_empty() {
+                            continue;
+                        }
+                        if name_or_email.contains('@') {
+                            attendees.push(EventAttendee {
+                                email: name_or_email.to_string(),
+                                name: None,
+                                status: RsvpStatus::NeedsAction,
+                            });
+                        } else {
+                            attendees.push(EventAttendee {
+                                email: String::new(),
+                                name: Some(name_or_email.to_string()),
+                                status: RsvpStatus::NeedsAction,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
         // Construção do Summary limpo com todos os tokens não consumidos
         let mut summary_tokens = Vec::new();
         for (idx, token) in tokens.iter().enumerate() {
@@ -1612,8 +1683,59 @@ impl CalendarIntentParser {
             is_all_day,
             location,
             rrule,
+            attendees,
         })
     }
+}
+
+fn is_intent_delimiter(token: &str) -> bool {
+    let t = token.trim().to_lowercase();
+    let clean = t.trim_matches(|c: char| !c.is_alphanumeric());
+    if clean.is_empty() {
+        return false;
+    }
+    matches!(
+        clean,
+        "às" | "as"
+            | "das"
+            | "à"
+            | "a"
+            | "até"
+            | "ate"
+            | "amanhã"
+            | "amanha"
+            | "hoje"
+            | "depois"
+            | "findi"
+            | "fim"
+            | "final"
+            | "no"
+            | "na"
+            | "em"
+            | "at"
+            | "segunda"
+            | "terça"
+            | "terca"
+            | "quarta"
+            | "quinta"
+            | "sexta"
+            | "sábado"
+            | "sabado"
+            | "domingo"
+            | "natal"
+            | "reveillon"
+            | "réveillon"
+            | "tiradentes"
+            | "trabalhador"
+            | "independência"
+            | "independencia"
+            | "dia"
+            | "todo"
+            | "toda"
+            | "todas"
+    ) || parse_time_token(token).is_some()
+        || parse_month_token(token).is_some()
+        || clean.contains('/')
 }
 
 fn extract_quotes(input: &str) -> (String, Vec<String>) {

@@ -41,7 +41,7 @@ fn create_event_action(
         rrule: intent.rrule,
         status: EventStatus::Confirmed,
         organizer: None,
-        attendees: Vec::new(),
+        attendees: intent.attendees,
         sequence: 1,
         created_at: Some(now),
         updated_at: Some(now),
@@ -264,6 +264,12 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
                                 "🔁 {rr.freq.to_ical_str()}"
                             }
                         }
+                        for att in &intent.attendees {
+                            span {
+                                style: "background: #fff; border: 1px solid #0a0a0a; padding: 0.1rem 0.4rem; font-size: 0.75rem;",
+                                "👤 {att.name.as_deref().unwrap_or(&att.email)}"
+                            }
+                        }
                     }
                 }
             }
@@ -433,6 +439,12 @@ fn EventCard(event: CalendarEvent, on_delete: EventHandler<()>) -> Element {
                             span {
                                 style: "background: #eee; border: 1px solid #ccc; padding: 0.1rem 0.3rem; font-size: 0.7rem;",
                                 "🔁 {rr.freq.to_ical_str()}"
+                            }
+                        }
+                        for att in &event.attendees {
+                            span {
+                                style: "background: #eee; border: 1px solid #ccc; padding: 0.1rem 0.3rem; font-size: 0.7rem;",
+                                "👤 {att.name.as_deref().unwrap_or(&att.email)}"
                             }
                         }
                     }

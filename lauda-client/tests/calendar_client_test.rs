@@ -1,5 +1,5 @@
 use lauda_client::domain::calendar_cache::LocalCalendarCache;
-use lauda_types::calendar::{CalendarEvent, EventStatus, EventTime};
+use lauda_types::calendar::{CalendarEvent, EventAttendee, EventStatus, EventTime, RsvpStatus};
 use tempfile::tempdir;
 
 fn sample_event(id: &str, summary: &str, start_ts: i64) -> CalendarEvent {
@@ -98,4 +98,35 @@ fn test_calendar_event_json_serialization_roundtrip() {
     assert_eq!(ev.start, restored.start);
     assert_eq!(ev.status, restored.status);
     assert_eq!(ev.location, restored.location);
+}
+
+#[test]
+fn test_calendar_event_attendees_preservation_and_cache() {
+    let temp = tempdir().expect("tempdir");
+    let cache = LocalCalendarCache::open(temp.path()).expect("open cache");
+
+    let mut ev = sample_event("ev-att-1", "Almoço", 1791968400);
+    ev.attendees = vec![
+        EventAttendee {
+            email: "marcelo@example.com".to_string(),
+            name: Some("Marcelo".to_string()),
+            status: RsvpStatus::NeedsAction,
+        },
+        EventAttendee {
+            email: String::new(),
+            name: Some("Beatriz".to_string()),
+            status: RsvpStatus::NeedsAction,
+        },
+    ];
+
+    cache
+        .upsert_event(&ev)
+        .expect("upsert event with attendees");
+    let loaded = cache.load_events().expect("load events");
+    assert_eq!(loaded.len(), 1);
+    let loaded_ev = &loaded[0];
+    assert_eq!(loaded_ev.attendees.len(), 2);
+    assert_eq!(loaded_ev.attendees[0].name.as_deref(), Some("Marcelo"));
+    assert_eq!(loaded_ev.attendees[0].email, "marcelo@example.com");
+    assert_eq!(loaded_ev.attendees[1].name.as_deref(), Some("Beatriz"));
 }
