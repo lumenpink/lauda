@@ -23,7 +23,9 @@ fn test_parse_simple_time_and_summary() {
         CalendarIntentParser::parse("Almoço com Marcelo amanhã às 12h30 no Fasano", &ref_time)
             .expect("parsing failed");
 
-    assert_eq!(parsed.summary, "Almoço com Marcelo");
+    assert_eq!(parsed.summary, "Almoço");
+    assert_eq!(parsed.attendees.len(), 1);
+    assert_eq!(parsed.attendees[0].name.as_deref(), Some("Marcelo"));
     assert_eq!(parsed.location.as_deref(), Some("Fasano"));
     assert!(!parsed.is_all_day);
 
@@ -410,3 +412,49 @@ fn test_parse_colloquial_mutation_and_edge_cases() {
         panic!("esperava DateTimeUtc");
     }
 }
+
+#[test]
+fn test_parse_attendees_extraction() {
+    let ref_time = sample_ref_time();
+
+    // 1. Participante simples com conectivo "com"
+    let p1 = CalendarIntentParser::parse("Almoço com Marcelo amanhã às 12h30", &ref_time)
+        .expect("p1");
+    assert_eq!(p1.summary, "Almoço");
+    assert_eq!(p1.attendees.len(), 1);
+    assert_eq!(p1.attendees[0].name.as_deref(), Some("Marcelo"));
+    assert_eq!(p1.attendees[0].status, RsvpStatus::NeedsAction);
+
+    // 2. Múltiplos participantes: "Reunião com Alice e Bob sexta às 15h"
+    let p2 = CalendarIntentParser::parse("Reunião com Alice e Bob sexta às 15h", &ref_time)
+        .expect("p2");
+    assert_eq!(p2.summary, "Reunião");
+    assert_eq!(p2.attendees.len(), 2);
+    assert_eq!(p2.attendees[0].name.as_deref(), Some("Alice"));
+    assert_eq!(p2.attendees[1].name.as_deref(), Some("Bob"));
+
+    // 3. Conectivo composto: "Alinhamento junto a Carlos, Daniel e Elisa"
+    let p3 = CalendarIntentParser::parse(
+        "Alinhamento junto a Carlos, Daniel e Elisa",
+        &ref_time,
+    )
+    .expect("p3");
+    assert_eq!(p3.summary, "Alinhamento");
+    assert_eq!(p3.attendees.len(), 3);
+    assert_eq!(p3.attendees[0].name.as_deref(), Some("Carlos"));
+    assert_eq!(p3.attendees[1].name.as_deref(), Some("Daniel"));
+    assert_eq!(p3.attendees[2].name.as_deref(), Some("Elisa"));
+
+    // 4. Participante com e-mail: "Sync com dev@lohn.in amanhã às 11h"
+    let p4 = CalendarIntentParser::parse("Sync com dev@lohn.in amanhã às 11h", &ref_time)
+        .expect("p4");
+    assert_eq!(p4.summary, "Sync");
+    assert_eq!(p4.attendees.len(), 1);
+    assert_eq!(p4.attendees[0].email, "dev@lohn.in");
+
+    // 5. Escape com aspas: "'Almoço com Marcelo' amanhã"
+    let p5 = CalendarIntentParser::parse("'Almoço com Marcelo' amanhã", &ref_time).expect("p5");
+    assert_eq!(p5.summary, "Almoço com Marcelo");
+    assert!(p5.attendees.is_empty());
+}
+
