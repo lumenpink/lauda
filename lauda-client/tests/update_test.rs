@@ -156,3 +156,34 @@ fn test_should_show_update_banner_dismissal_behavior() {
         None, None
     ));
 }
+
+#[test]
+fn test_should_show_update_banner_mutation_and_edge_cases() {
+    let manifest = UpdateManifest {
+        version: "0.5.0".to_string(),
+        min_compatible_version: "0.1.0".to_string(),
+        apk_url: "https://lauda.2lp.in/lauda-latest.apk".to_string(),
+        release_notes: "Nova versão".to_string(),
+        published_at: "2026-10-15T10:00:00Z".to_string(),
+    };
+
+    // Espaços em branco não devem burlar a dispensa
+    assert!(!lauda_client::domain::update::should_show_update_banner(
+        Some(&manifest),
+        Some("  0.5.0  ")
+    ));
+
+    // Manifest com versão contendo espaços
+    let mut manifest_ws = manifest.clone();
+    manifest_ws.version = " 0.5.0 \n".to_string();
+    assert!(!lauda_client::domain::update::should_show_update_banner(
+        Some(&manifest_ws),
+        Some("0.5.0")
+    ));
+
+    // None manifest com Some dismissed
+    assert!(!lauda_client::domain::update::should_show_update_banner(
+        None,
+        Some("0.5.0")
+    ));
+}
