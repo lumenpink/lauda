@@ -508,10 +508,10 @@ A identidade visual do ícone soberano do aplicativo **Lauda** (`in.twolp.lauda`
 
 ### 17.1 Critérios de Aceite e Verificação
 - [x] Especificação formal aprovada e documentada na Seção 17 do `SPEC.md`.
-- [ ] Gerador vetorial determinístico implementado em `scripts/gerar-recursos-android.py` com supersampling 2x (1024x1024 -> 512x512/densidades).
-- [ ] Mestre `site/lauda-logo.png` e SVG canônico gerados em 8-bit RGBA.
-- [ ] Todas as 5 densidades Android geradas nos formatos padrão e circular.
-- [ ] Teste automatizado de validação de dimensões, formato e paleta aprovado.
+- [x] Gerador vetorial determinístico implementado em `scripts/gerar-recursos-android.py` com supersampling 2x (1024x1024 -> 512x512/densidades).
+- [x] Mestre `site/lauda-logo.png` e SVG canônico gerados em 8-bit RGBA.
+- [x] Todas as 5 densidades Android geradas nos formatos padrão e circular.
+- [x] Teste automatizado de validação de dimensões, formato e paleta aprovado.
 - [ ] Conformidade integral com `cargo fmt --check`, `cargo clippy` e `cccp check --strict`.
 
 

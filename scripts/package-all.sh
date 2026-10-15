@@ -119,6 +119,10 @@ fi
 
 # 4. Compilar Versão Android APK
 if [ "$DO_BUILD_APK" = true ]; then
+    echo "-> Assegurando ícones canônicos oficiais Android..."
+    python3 "$SCRIPT_DIR/gerar-recursos-android.py"
+    "$REPO_ROOT/tests/test-android-icons.sh"
+
     if command -v dx >/dev/null 2>&1 && rustup target list | grep -q 'aarch64-linux-android (installed)' && [ -d "${ANDROID_NDK_HOME:-/opt/android-ndk/android-ndk-r27c}" ]; then
         echo "-> Compilando Android APK nativo (aarch64)..."
         "$SCRIPT_DIR/publish-nightly.sh" || echo "Aviso: Build Android concluída com avisos."
