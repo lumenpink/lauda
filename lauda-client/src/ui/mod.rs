@@ -243,7 +243,8 @@ pub fn App() -> Element {
     // Verificação de atualização assíncrona
     use_effect(move || {
         spawn(async move {
-            let manifest_url = if env!("CARGO_PKG_VERSION").contains("nightly") {
+            let current_ver = env!("LAUDA_APP_VERSION");
+            let manifest_url = if current_ver.contains("nightly") {
                 "https://lauda.2lp.in/version-nightly.json"
             } else {
                 "https://lauda.2lp.in/version.json"
@@ -251,7 +252,7 @@ pub fn App() -> Element {
             if let Ok(manifest) = crate::domain::update::fetch_remote_manifest(manifest_url).await
                 && let crate::domain::update::UpdateStatus::Available(m)
                 | crate::domain::update::UpdateStatus::Required(m) =
-                    crate::domain::update::check_update(env!("CARGO_PKG_VERSION"), &manifest)
+                    crate::domain::update::check_update(current_ver, &manifest)
             {
                 update_notice.set(Some(m));
             }

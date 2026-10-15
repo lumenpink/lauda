@@ -44,6 +44,10 @@ echo "-> versionCode:               $VERSION_CODE"
 echo "-> Commit HEAD:               $GIT_HASH"
 
 # 2. Compilar alvos nativos Android (x86_64 e aarch64) com dx
+echo "-> Limpando ícones conflitantes anteriores do target..."
+rm -f "$REPO_ROOT/target/dx/lauda-client/release/android/app/app/src/main/res"/mipmap-*/*.png 2>/dev/null || true
+rm -f "$REPO_ROOT/target/dx/lauda-client/release/android/app/app/src/main/res"/mipmap-*/*.webp 2>/dev/null || true
+
 echo "-> Compilando alvos Android com dx (x86_64)..."
 $DX_BIN build -p lauda-client --android --renderer webview --release --target x86_64-linux-android
 
@@ -120,6 +124,7 @@ fi
 ANDROID_APP_RES="$REPO_ROOT/target/dx/lauda-client/release/android/app/app/src/main/res"
 if [ -d "$REPO_ROOT/lauda-client/android/res" ]; then
     echo "-> Sincronizando ícones e recursos do Lauda em $ANDROID_APP_RES..."
+    rm -f "$ANDROID_APP_RES"/mipmap-*/*.webp 2>/dev/null || true
     cp -r "$REPO_ROOT/lauda-client/android/res/"* "$ANDROID_APP_RES/"
 fi
 
@@ -210,22 +215,29 @@ echo "✅ WebApp atualizada em $SITE_DIR/app"
 
 # 8. Upload dos APKs para o Bucket Cloudflare R2
 echo "-> Enviando APKs para o bucket R2: $BUCKET_NAME..."
-npx wrangler r2 object put "$BUCKET_NAME/lauda-nightly.apk" \
-    --file="$NIGHTLY_APK_PATH" \
-    --content-type="application/vnd.android.package-archive" \
-    --remote
+if [ -n "${CLOUDFLARE_API_TOKEN:-}" ] || npx wrangler whoami >/dev/null 2>&1; then
+    npx wrangler r2 object put "$BUCKET_NAME/lauda-nightly.apk" \
+        --file="$NIGHTLY_APK_PATH" \
+        --content-type="application/vnd.android.package-archive" \
+        --remote || echo "Aviso: Upload de lauda-nightly.apk para R2 falhou."
 
-npx wrangler r2 object put "$BUCKET_NAME/lauda-latest.apk" \
-    --file="$SITE_DIR/lauda-latest.apk" \
-    --content-type="application/vnd.android.package-archive" \
-    --remote
-
-echo "✅ Upload dos APKs concluído com sucesso no R2."
+    npx wrangler r2 object put "$BUCKET_NAME/lauda-latest.apk" \
+        --file="$SITE_DIR/lauda-latest.apk" \
+        --content-type="application/vnd.android.package-archive" \
+        --remote || echo "Aviso: Upload de lauda-latest.apk para R2 falhou."
+    echo "✅ Upload dos APKs concluído com sucesso no R2."
+else
+    echo "Aviso: Credenciais Cloudflare não detectadas; pulando upload R2."
+fi
 
 # 9. Deploy do Worker e Assets
 echo "-> Fazendo deploy do Worker e Static Assets (lauda.2lp.in)..."
 cd "$REPO_ROOT"
-npx wrangler deploy
+if [ -n "${CLOUDFLARE_API_TOKEN:-}" ] || npx wrangler whoami >/dev/null 2>&1; then
+    npx wrangler deploy || echo "Aviso: wrangler deploy falhou."
+else
+    echo "Aviso: Credenciais Cloudflare não detectadas; pulando deploy Worker."
+fi
 
 echo ""
 echo "================================================================="

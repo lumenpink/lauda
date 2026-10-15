@@ -513,7 +513,10 @@ fn test_ci_workflow_has_deploy_apk_job_with_strict_contract() {
         .split("deploy-apk:")
         .nth(1)
         .expect("bloco deploy-apk");
-    let next_job_block = deploy_apk_block.split("\n  deploy-").next().unwrap_or(deploy_apk_block);
+    let next_job_block = deploy_apk_block
+        .split("\n  deploy-")
+        .next()
+        .unwrap_or(deploy_apk_block);
 
     assert!(
         next_job_block.contains("needs: [test]"),
