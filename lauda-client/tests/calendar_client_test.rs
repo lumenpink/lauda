@@ -367,3 +367,59 @@ fn test_format_relative_event_time_scenarios() {
         "em 3 dias"
     );
 }
+
+#[test]
+fn test_format_relative_event_time_mutation_and_edge_cases() {
+    use lauda_client::ui::calendar_view::format_relative_event_time;
+    use lauda_types::calendar::EventTime;
+
+    let now_ts = 1_000_000;
+
+    // Fronteira de segundos -> minutos: 59s vs 60s
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 59), now_ts),
+        "agora"
+    );
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 60), now_ts),
+        "em 1 min"
+    );
+
+    // Fronteira de minutos -> horas: 3599s vs 3600s vs 3660s
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 3599), now_ts),
+        "em 59 min"
+    );
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 3600), now_ts),
+        "em 1h"
+    );
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 3660), now_ts),
+        "em 1h 1min"
+    );
+
+    // Fronteira de horas -> dias: 86399s vs 86400s vs 86400 + 3600
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 86399), now_ts),
+        "em 23h 59min"
+    );
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 86400), now_ts),
+        "em 1 dia"
+    );
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 86400 + 3600), now_ts),
+        "em 1 dia e 1h"
+    );
+
+    // Múltiplos dias exatos vs com horas
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 2 * 86400), now_ts),
+        "em 2 dias"
+    );
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 2 * 86400 + 3600), now_ts),
+        "em 2 dias e 1h"
+    );
+}
