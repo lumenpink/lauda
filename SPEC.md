@@ -419,6 +419,16 @@ A esteira é encadeada com dependência estrita do gate de testes (`needs: [test
 - A verificação de atualização no cliente (`check_update`) consome estritamente o identificador canônico de build `env!("LAUDA_APP_VERSION")`, e não o `CARGO_PKG_VERSION` isolado.
 - Durante o desenvolvimento, versões `dev` superiores ou iguais às versões publicadas remotamente no manifesto são consideradas atualizadas (`UpdateStatus::UpToDate`), prevenindo alertas espúrios de downgrade.
 
+---
+
+## 13. Banner de Atualização Disponível Dispensável (Ticket #56)
+
+Para otimizar o aproveitamento da área visível em telas móveis e desktop, o banner de nova versão no smolclient deve ser dispensável interativamente:
+1. **Controle de Estado:** O componente raiz mantém o identificador da versão dispensada (`dismissed_update_version`).
+2. **Interação:** O banner exibe um botão de fechamento rápido (`✕`). Ao ser acionado, o banner é recolhido imediatamente sem interromper a navegação da caixa postal ou exigir recarregamento.
+3. **Resiliência:** Caso uma versão mais recente do que a dispensada seja detectada subsequentemente, o banner torna-se novamente elegível para exibição.
+
+
 
 
 
