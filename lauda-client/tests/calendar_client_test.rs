@@ -272,3 +272,98 @@ fn test_select_upcoming_events_mutation_and_edge_cases() {
     assert_eq!(sel_all[1].uid, "fut1");
     assert_eq!(sel_all[2].uid, "fut2");
 }
+
+#[test]
+fn test_format_relative_event_time_scenarios() {
+    use lauda_client::ui::calendar_view::format_relative_event_time;
+    use lauda_types::calendar::EventTime;
+
+    let now_ts = 1_700_000_000; // 2023-11-14 22:13:20 UTC
+
+    // 1. Passado ou menos de 60 segundos
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts), now_ts),
+        "agora"
+    );
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts - 100), now_ts),
+        "agora"
+    );
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 45), now_ts),
+        "agora"
+    );
+
+    // 2. Minutos (< 1h)
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 25 * 60), now_ts),
+        "em 25 min"
+    );
+
+    // 3. Horas (< 24h)
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 4 * 3600), now_ts),
+        "em 4h"
+    );
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 4 * 3600 + 15 * 60), now_ts),
+        "em 4h 15min"
+    );
+
+    // 4. Dias (>= 24h)
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 86400), now_ts),
+        "em 1 dia"
+    );
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 86400 + 3 * 3600), now_ts),
+        "em 1 dia e 3h"
+    );
+    assert_eq!(
+        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 2 * 86400 + 3 * 3600), now_ts),
+        "em 2 dias e 3h"
+    );
+
+    // 5. DateOnly (comparado por dias civis UTC)
+    let (y, m, d, _, _, _) = lauda_types::calendar::timestamp_to_utc_parts(now_ts);
+    assert_eq!(
+        format_relative_event_time(
+            &EventTime::DateOnly {
+                year: y,
+                month: m,
+                day: d
+            },
+            now_ts
+        ),
+        "Hoje"
+    );
+
+    // Amanhã em timestamp_to_utc_parts
+    let (tm_y, tm_m, tm_d, _, _, _) = lauda_types::calendar::timestamp_to_utc_parts(now_ts + 86400);
+    assert_eq!(
+        format_relative_event_time(
+            &EventTime::DateOnly {
+                year: tm_y,
+                month: tm_m,
+                day: tm_d
+            },
+            now_ts
+        ),
+        "Amanhã"
+    );
+
+    // 3 dias depois
+    let (f_y, f_m, f_d, _, _, _) =
+        lauda_types::calendar::timestamp_to_utc_parts(now_ts + 3 * 86400);
+    assert_eq!(
+        format_relative_event_time(
+            &EventTime::DateOnly {
+                year: f_y,
+                month: f_m,
+                day: f_d
+            },
+            now_ts
+        ),
+        "em 3 dias"
+    );
+}
