@@ -481,6 +481,40 @@ A indicação do tempo restante até um compromisso é formatada de forma coloqu
 - [x] Tique reativo contínuo integrado em `CalendarView`.
 - [x] Conformidade integral com `cargo fmt`, `cargo clippy` e `cccp check --strict`.
 
+---
+
+## 17. Padronização dos Ícones Oficiais do Launcher e Vitrine em 8-Bit RGBA (Ticket #63)
+
+A identidade visual do ícone soberano do aplicativo **Lauda** (`in.twolp.lauda`) segue rigorosamente a estética visual Trash Polka Postal com supersampling vetorial 8-bit RGBA (Proposta C2):
+
+1. **Geometria & Composição Visual:**
+   - **Fundo:** Papel envelhecido off-white (`#f4efe6`) com retícula pontilhada halftone (`#0a0a0a` a 15% de opacidade).
+   - **Faixas Diagonais:** Vermelho carmim (`#dc143c`) e bordô profundo (`#8b0000`) em cortes assimétricos.
+   - **Envelope Brutalista Central:** Corpo em branco puro (`#ffffff`) com bordas pretas grossas (`#0a0a0a`), vincos de dobra e sombra dura deslocada.
+   - **Lacre de Cera Central:** Bloco maciço preto puro (`#0a0a0a`) com topo triangular carmim, sem letras ou glifos internos.
+   - **Carimbo Postal Cancelador Reforçado (Proposta C2):**
+     - Anel circular com traço ultra pesado (10px) em carmim puro (`#dc143c`).
+     - Barras de cancelamento horizontais de 5px acima e abaixo do texto.
+     - Texto `" S M O L "` em tipografia mono expressiva, posicionado estrategicamente (`cx=175, cy=205`, ângulo de -6°) de forma que 100% dos glifos fiquem sobre o fundo branco do envelope.
+     - Sobreposição em camada direta por cima da aba e corpo do envelope.
+   - **Ausência de Texto de Rodapé:** Sem tarja inferior "LAUDA", permitindo respiro simétrico e equilíbrio vetorial em qualquer tamanho.
+
+2. **Densidades e Recursos Android & Vitrine:**
+   - **Mestre Canônico da Vitrine e F-Droid:** `site/lauda-logo.png` (512x512, 8-bit RGBA).
+   - **Densidades Launcher Android:** `res/mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher.png` (48x48, 72x72, 96x96, 144x144, 192x192).
+   - **Variante Circular (Pixel/Round Launchers):** `res/mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher_round.png`.
+   - **Ícones Adaptativos:** `res/drawable/ic_launcher_foreground.png` e definições em `res/mipmap-anydpi-v26/`.
+   - **Modo de Cor Estrito:** Todos os arquivos de saída devem ser salvos em 8-bit RGBA com canais alfa limpos nos cantos.
+
+### 17.1 Critérios de Aceite e Verificação
+- [x] Especificação formal aprovada e documentada na Seção 17 do `SPEC.md`.
+- [ ] Gerador vetorial determinístico implementado em `scripts/gerar-recursos-android.py` com supersampling 2x (1024x1024 -> 512x512/densidades).
+- [ ] Mestre `site/lauda-logo.png` e SVG canônico gerados em 8-bit RGBA.
+- [ ] Todas as 5 densidades Android geradas nos formatos padrão e circular.
+- [ ] Teste automatizado de validação de dimensões, formato e paleta aprovado.
+- [ ] Conformidade integral com `cargo fmt --check`, `cargo clippy` e `cccp check --strict`.
+
+
 
 
 
