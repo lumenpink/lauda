@@ -130,3 +130,52 @@ fn test_calendar_event_attendees_preservation_and_cache() {
     assert_eq!(loaded_ev.attendees[0].email, "marcelo@example.com");
     assert_eq!(loaded_ev.attendees[1].name.as_deref(), Some("Beatriz"));
 }
+
+#[test]
+fn test_quick_add_default_placeholder_is_generic_and_parseable() {
+    use lauda_client::ui::calendar_view::QUICK_ADD_DEFAULT_PLACEHOLDER;
+    use lauda_types::calendar::{CalendarIntentParser, CalendarReferenceTime, Weekday};
+
+    // 1. Constante deve ser neutra e conter o formato genérico
+    assert_eq!(
+        QUICK_ADD_DEFAULT_PLACEHOLDER,
+        "Ex: Reunião de equipe amanhã às 14h na Sala 2"
+    );
+
+    // 2. Não deve conter termos pessoais ou locais específicos depreciados
+    assert!(!QUICK_ADD_DEFAULT_PLACEHOLDER.contains("Marcelo"));
+    assert!(!QUICK_ADD_DEFAULT_PLACEHOLDER.contains("Fasano"));
+
+    // 3. O exemplo sugerido (sem o prefixo 'Ex: ') deve ser perfeitamente interpretável pelo parser
+    let example_input = QUICK_ADD_DEFAULT_PLACEHOLDER
+        .strip_prefix("Ex: ")
+        .expect("Prefixo 'Ex: ' deve estar presente");
+
+    let ref_time = CalendarReferenceTime {
+        year: 2026,
+        month: 10,
+        day: 15,
+        hour: 9,
+        minute: 0,
+        weekday: Weekday::Thursday,
+        timestamp_utc: 1792054800,
+    };
+
+    let parsed = CalendarIntentParser::parse(example_input, &ref_time)
+        .expect("O texto do placeholder deve ser interpretável pelo parser");
+
+    assert!(parsed.summary.to_lowercase().contains("reunião de equipe"));
+    assert_eq!(parsed.location.as_deref(), Some("Sala 2"));
+    let (_y, _m, _d, h, min, _s) = match parsed.start {
+        lauda_types::calendar::EventTime::DateTimeUtc(ts) => {
+            lauda_types::calendar::timestamp_to_utc_parts(ts)
+        }
+        lauda_types::calendar::EventTime::DateOnly {
+            year,
+            month,
+            day,
+        } => (year, month, day, 0, 0, 0),
+    };
+    assert_eq!(h, 14);
+    assert_eq!(min, 0);
+}
