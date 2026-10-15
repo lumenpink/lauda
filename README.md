@@ -2,7 +2,7 @@
 
 > Cliente de e-mail ultraleve focado em leitura pura e redação rápida sem a sobrecarga de clientes IMAP/SMTP tradicionais, construído em Rust com **Dioxus 0.7**, backend em **Axum** e motor nativo de indexação **lauda-index**.
 
-[![GOST Compliance](https://img.shields.io/badge/GOST-1.0.0-crimson)](https://codeberg.org/lumenpink/gost)
+[![GOST Compliance](https://img.shields.io/badge/GOST-1.4.0-crimson)](https://codeberg.org/lumenpink/gost)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](./LICENSE)
 [![Website](https://img.shields.io/badge/portal-lauda.2lp.in-red)](https://lauda.2lp.in)
 
