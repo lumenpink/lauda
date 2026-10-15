@@ -170,11 +170,9 @@ fn test_quick_add_default_placeholder_is_generic_and_parseable() {
         lauda_types::calendar::EventTime::DateTimeUtc(ts) => {
             lauda_types::calendar::timestamp_to_utc_parts(ts)
         }
-        lauda_types::calendar::EventTime::DateOnly {
-            year,
-            month,
-            day,
-        } => (year, month, day, 0, 0, 0),
+        lauda_types::calendar::EventTime::DateOnly { year, month, day } => {
+            (year, month, day, 0, 0, 0)
+        }
     };
     assert_eq!(h, 14);
     assert_eq!(min, 0);

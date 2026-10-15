@@ -443,10 +443,10 @@ O texto de instrução e sugestão (placeholder) da barra de entrada rápida da 
 3. **Consumo:** Aplicado no atributo `placeholder` do campo `<input>`.
 
 ### 14.1 Critérios de Aceite e Verificação
-- [ ] Especificação formal documentada em `docs/specs/ui_quick_add_generic_placeholder_spec.md`.
-- [ ] Constante `QUICK_ADD_DEFAULT_PLACEHOLDER` definida e consumida no componente `CalendarView`.
-- [ ] Teste automatizado assegurando o valor e estrutura da constante.
-- [ ] Conformidade integral com `cargo fmt`, `cargo clippy` e `cccp check --strict`.
+- [x] Especificação formal documentada em `docs/specs/ui_quick_add_generic_placeholder_spec.md`.
+- [x] Constante `QUICK_ADD_DEFAULT_PLACEHOLDER` definida e consumida no componente `CalendarView`.
+- [x] Teste automatizado assegurando o valor e estrutura da constante.
+- [x] Conformidade integral com `cargo fmt`, `cargo clippy` e `cccp check --strict`.
 
 
 
