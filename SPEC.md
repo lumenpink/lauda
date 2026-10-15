@@ -463,6 +463,21 @@ O card superior de destaque na Agenda Soberana (`lauda-client/src/ui/calendar_vi
 - [x] Componente `CalendarView` atualizado para renderizar a lista tripla de destaque.
 - [x] Conformidade integral com `cargo fmt`, `cargo clippy` e `cccp check --strict`.
 
+---
+
+## 16. Formatação Amigável de Tempo Relativo e Reatividade Temporal (Ticket #59)
+
+A indicação do tempo restante até um compromisso é formatada de forma coloquial e atualizada reativamente:
+1. **Formatação Humanizada:** A função `format_relative_event_time` decompõe deltas de tempo em minutos (`"em 25 min"`), horas com minutos (`"em 4h 15min"`), ou dias e horas (`"em 2 dias e 3h"`). Deltas passados ou inferiores a 1 minuto são apresentados como `"agora"`.
+2. **Eventos DateOnly:** São comparados com a data civil corrente, gerando `"Hoje"`, `"Amanhã"` ou `"em X dias"`.
+3. **Reatividade Contínua:** Sinal periódico a cada 30 segundos garante recálculo em tempo real no cliente Lauda.
+
+### 16.1 Critérios de Aceite e Verificação
+- [ ] Especificação formal documentada em `docs/specs/ui_relative_event_time_format_spec.md`.
+- [ ] Função `format_relative_event_time` implementada e testada para minutos, horas, dias e DateOnly.
+- [ ] Tique reativo contínuo integrado em `CalendarView`.
+- [ ] Conformidade integral com `cargo fmt`, `cargo clippy` e `cccp check --strict`.
+
 
 
 
