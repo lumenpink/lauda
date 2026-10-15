@@ -448,6 +448,21 @@ O texto de instrução e sugestão (placeholder) da barra de entrada rápida da 
 - [x] Teste automatizado assegurando o valor e estrutura da constante.
 - [x] Conformidade integral com `cargo fmt`, `cargo clippy` e `cccp check --strict`.
 
+---
+
+## 15. Destaque dos Três Próximos Eventos na Agenda (Ticket #58)
+
+O card superior de destaque na Agenda Soberana (`lauda-client/src/ui/calendar_view.rs`) exibe até 3 próximos compromissos futuros:
+1. **Seleção e Ordenação:** A função `select_upcoming_events` filtra compromissos futuros (`start >= now_ts`), ordena-os cronologicamente e seleciona até 3 itens.
+2. **Apresentação:** Renderiza um banner unificado em estética Trash Polka com o badge `"PRÓXIMOS COMPROMISSOS"`, listando os eventos com suas respectivas estimativas temporais.
+3. **Resiliência:** Suporta perfeitamente 0, 1, 2 ou 3 eventos sem quebras ou lacunas visuais.
+
+### 15.1 Critérios de Aceite e Verificação
+- [ ] Especificação formal documentada em `docs/specs/ui_three_upcoming_events_spec.md`.
+- [ ] Função `select_upcoming_events` implementada e testada para 0, 1, 2, 3 e >3 eventos.
+- [ ] Componente `CalendarView` atualizado para renderizar a lista tripla de destaque.
+- [ ] Conformidade integral com `cargo fmt`, `cargo clippy` e `cccp check --strict`.
+
 
 
 
