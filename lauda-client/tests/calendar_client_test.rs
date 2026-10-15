@@ -253,3 +253,30 @@ fn test_select_upcoming_events_chronological_and_limit() {
     assert_eq!(two_selected[0].uid, "f1");
     assert_eq!(two_selected[1].uid, "f5");
 }
+
+#[test]
+fn test_select_upcoming_events_mutation_and_edge_cases() {
+    use lauda_client::ui::calendar_view::select_upcoming_events;
+
+    let now_ts = 200_000;
+    let ev_now = sample_event("now", "Agora", now_ts);
+    let ev_future1 = sample_event("fut1", "Futuro 1", now_ts + 60);
+    let ev_future2 = sample_event("fut2", "Futuro 2", now_ts + 120);
+
+    let list = vec![ev_future2, ev_now.clone(), ev_future1];
+
+    // Mutante de limite zero: deve retornar vazio
+    assert!(select_upcoming_events(&list, now_ts, 0).is_empty());
+
+    // Evento com start == now_ts deve ser considerado futuro/presente imediato
+    let sel1 = select_upcoming_events(&list, now_ts, 1);
+    assert_eq!(sel1.len(), 1);
+    assert_eq!(sel1[0].uid, "now");
+
+    // Limite superior maior que o número de disponíveis
+    let sel_all = select_upcoming_events(&list, now_ts, 10);
+    assert_eq!(sel_all.len(), 3);
+    assert_eq!(sel_all[0].uid, "now");
+    assert_eq!(sel_all[1].uid, "fut1");
+    assert_eq!(sel_all[2].uid, "fut2");
+}
