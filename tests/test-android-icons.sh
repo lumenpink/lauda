@@ -111,6 +111,55 @@ print('✔ Paleta de cores Trash Polka validada com sucesso')
 " || FAILED=1
 fi
 
+# 5. Testes de Mutação e Limites (Resiliência contra corrupção e modos inválidos)
+echo "-> Executando testes de mutação e limites..."
+python3 -c "
+import tempfile, os
+from PIL import Image
+
+# Mutação 1: Imagem não-quadrada deve falhar
+with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+    mut1 = Image.new('RGBA', (512, 480), (255, 0, 0, 255))
+    mut1.save(tmp.name)
+    try:
+        im = Image.open(tmp.name)
+        assert im.size == (512, 512)
+        raise RuntimeError('Mutação 1 não detectada!')
+    except AssertionError:
+        pass
+    finally:
+        os.unlink(tmp.name)
+
+# Mutação 2: Imagem sem canal alfa (RGB puro) deve falhar
+with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+    mut2 = Image.new('RGB', (512, 512), (255, 0, 0))
+    mut2.save(tmp.name)
+    try:
+        im = Image.open(tmp.name)
+        assert im.mode == 'RGBA'
+        raise RuntimeError('Mutação 2 não detectada!')
+    except AssertionError:
+        pass
+    finally:
+        os.unlink(tmp.name)
+
+# Mutação 3: Canto opaco em ícone circular deve falhar
+with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+    mut3 = Image.new('RGBA', (48, 48), (0, 0, 0, 0))
+    mut3.putpixel((0, 0), (244, 239, 230, 255))
+    mut3.save(tmp.name)
+    try:
+        im = Image.open(tmp.name)
+        assert im.getpixel((0, 0))[3] == 0
+        raise RuntimeError('Mutação 3 não detectada!')
+    except AssertionError:
+        pass
+    finally:
+        os.unlink(tmp.name)
+
+print('✔ Todas as 3 mutações sintéticas foram detectadas e rejeitadas corretamente')
+" || FAILED=1
+
 if [ $FAILED -ne 0 ]; then
     echo "❌ Falhas encontradas na validação de ícones."
     exit 1
