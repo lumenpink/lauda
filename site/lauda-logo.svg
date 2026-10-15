@@ -20,33 +20,33 @@
     <polygon points="290,0 420,0 190,512 60,512" fill="#dc143c" />
     <polygon points="435,0 470,0 240,512 205,512" fill="#8b0000" opacity="0.85" />
 
-    <!-- Carimbo Circular Trash Polka -->
-    <circle cx="140" cy="140" r="56" fill="none" stroke="#dc143c" stroke-width="2.5" stroke-dasharray="6 4" opacity="0.75" />
-    <text x="140" y="145" font-family="monospace" font-weight="bold" font-size="12" fill="#dc143c" text-anchor="middle" letter-spacing="3" opacity="0.85">2LP // SMOL</text>
-
     <!-- Envelope Brutalista Central -->
     <g>
       <!-- Sombra Dura Vetorial Fiel -->
-      <rect x="108" y="172" width="320" height="220" rx="4" fill="#0a0a0a" />
+      <rect x="110" y="169" width="320" height="220" rx="4" fill="#0a0a0a" />
 
       <!-- Base do Envelope -->
-      <rect x="96" y="160" width="320" height="220" rx="4" fill="#ffffff" stroke="#0a0a0a" stroke-width="10" stroke-linejoin="miter" />
+      <rect x="96" y="155" width="320" height="220" rx="4" fill="#ffffff" stroke="#0a0a0a" stroke-width="10" stroke-linejoin="miter" />
 
       <!-- Linhas do Envelope em Linha Grossa -->
-      <path d="M96 160 L256 295 L416 160" fill="none" stroke="#0a0a0a" stroke-width="10" stroke-linecap="square" stroke-linejoin="miter" />
-      <path d="M96 380 L216 270" fill="none" stroke="#0a0a0a" stroke-width="8" stroke-linecap="square" />
-      <path d="M416 380 L296 270" fill="none" stroke="#0a0a0a" stroke-width="8" stroke-linecap="square" />
+      <path d="M96 155 L256 290 L416 155" fill="none" stroke="#0a0a0a" stroke-width="10" stroke-linecap="square" stroke-linejoin="miter" />
+      <path d="M96 375 L216 265" fill="none" stroke="#0a0a0a" stroke-width="8" stroke-linecap="square" />
+      <path d="M416 375 L296 265" fill="none" stroke="#0a0a0a" stroke-width="8" stroke-linecap="square" />
 
-      <!-- Lacre / Selo Central com Tipografia L -->
-      <polygon points="256,180 282,204 230,204" fill="#dc143c" stroke="#0a0a0a" stroke-width="3" />
-      <rect x="230" y="204" width="52" height="56" fill="#0a0a0a" />
-      <text x="256" y="246" font-family="monospace" font-weight="900" font-size="36" fill="#ffffff" text-anchor="middle">L</text>
+      <!-- Lacre / Selo Central Maciço Preto (Sem Glifos) -->
+      <polygon points="256,175 282,199 230,199" fill="#dc143c" stroke="#0a0a0a" stroke-width="3" />
+      <rect x="230" y="199" width="52" height="56" fill="#0a0a0a" />
     </g>
 
-    <!-- Rótulo / Tarja Inferior: LAUDA -->
-    <g transform="translate(256, 436)">
-      <rect x="-115" y="-22" width="230" height="42" fill="#0a0a0a" />
-      <text x="0" y="8" font-family="monospace" font-weight="900" font-size="24" fill="#f4efe6" text-anchor="middle" letter-spacing="6">LAUDA</text>
+    <!-- Carimbo Postal Cancelador Reforçado C2 (Sobreposto ao Envelope) -->
+    <g transform="translate(175, 205) rotate(-6)">
+      <!-- Anel Externo Pesado -->
+      <circle cx="0" cy="0" r="60" fill="none" stroke="#dc143c" stroke-width="10.5" />
+      <!-- Barras de Cancelamento -->
+      <line x1="-42" y1="-18" x2="42" y2="-18" stroke="#dc143c" stroke-width="5" stroke-linecap="round" />
+      <line x1="-42" y1="18" x2="42" y2="18" stroke="#dc143c" stroke-width="5" stroke-linecap="round" />
+      <!-- Texto SMOL 100% sobre o fundo branco -->
+      <text x="0" y="7" font-family="monospace" font-weight="900" font-size="21" fill="#dc143c" text-anchor="middle" letter-spacing="4">SMOL</text>
     </g>
   </g>
 
