@@ -1,15 +1,25 @@
 use lauda_server::adapters::MaildirBackend;
 use lauda_server::domain::ports::MailBackend;
-use std::path::PathBuf;
 
 #[tokio::test]
 async fn test_maildir_backend_read_mailboxes_and_messages() {
-    let maildir = PathBuf::from("/home/lumen/stacks/mail/data/dms/mail-data/lumen.pink/hi");
-    if !maildir.exists() {
-        return;
-    }
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
 
-    let backend = MaildirBackend::new(&maildir);
+    std::fs::create_dir_all(root.join("cur")).unwrap();
+    std::fs::create_dir_all(root.join("new")).unwrap();
+    std::fs::create_dir_all(root.join(".Sent").join("cur")).unwrap();
+
+    let msg1 = "1728000001.M123P456.test:2,S";
+    let msg2 = "1728000002.M123P456.test:2,";
+    let content = "From: remetente@2lp.in\nTo: dest@2lp.in\nSubject: Teste Sintetico\nDate: Mon, 05 Oct 2026 12:00:00 +0000\nContent-Type: text/plain; charset=utf-8\n\nOla Mundo!\n";
+    std::fs::write(root.join("cur").join(msg1), content).unwrap();
+    std::fs::write(root.join("cur").join(msg2), content).unwrap();
+
+    let uidlist = "3 V1728000000 N100 Gabcdef\n100 :1728000001.M123P456.test\n101 :1728000002.M123P456.test\n";
+    std::fs::write(root.join("dovecot-uidlist"), uidlist).unwrap();
+
+    let backend = MaildirBackend::new(root);
     backend.add_user("lumen", "senha123");
 
     // Autenticação
@@ -26,17 +36,14 @@ async fn test_maildir_backend_read_mailboxes_and_messages() {
         .iter()
         .find(|m| m.name == "INBOX")
         .expect("INBOX existe");
-    assert!(
-        inbox.total_messages >= 40,
-        "Deve haver mais de 40 mensagens na INBOX"
-    );
+    assert_eq!(inbox.total_messages, 2);
 
     // Listar mensagens
     let messages = backend
         .list_messages("lumen", "INBOX")
         .await
         .expect("Listar mensagens");
-    assert!(!messages.is_empty());
+    assert_eq!(messages.len(), 2);
     assert_eq!(messages.len() as u32, inbox.total_messages);
 
     // Mensagens devem estar ordenadas de forma decrescente por UID

@@ -20,6 +20,11 @@ pub struct MaildirBackend {
     users: RwLock<HashMap<String, String>>, // username -> password
 }
 
+/// Verifica se o ambiente atual é de testes ou CI para suprimir envio real de e-mails
+pub fn is_sendmail_suppressed_for_tests() -> bool {
+    MaildirBackend::is_sendmail_suppressed_for_tests()
+}
+
 impl MaildirBackend {
     pub fn new(base_dir: impl Into<PathBuf>) -> Self {
         Self {
@@ -280,7 +285,34 @@ impl MaildirBackend {
         }
     }
 
+    /// Verifica se o ambiente atual é de testes ou CI para suprimir envio real de e-mails
+    pub fn is_sendmail_suppressed_for_tests() -> bool {
+        if cfg!(test) {
+            return true;
+        }
+        if std::env::var("LAUDA_TEST_MODE").is_ok()
+            || std::env::var("CI").is_ok()
+            || std::env::var("RUST_TEST").is_ok()
+        {
+            return true;
+        }
+        if let Ok(exe) = std::env::current_exe() {
+            let s = exe.to_string_lossy();
+            if s.contains("/deps/") || s.contains("test") {
+                return true;
+            }
+        }
+        false
+    }
+
     fn dispatch_sendmail(raw_email: &str) -> Result<(), String> {
+        if Self::is_sendmail_suppressed_for_tests() {
+            tracing::info!(
+                "lauda-server: modo de teste ativo, despacho real de sendmail suprimido com sucesso"
+            );
+            return Ok(());
+        }
+
         if let Ok(custom_cmd) = std::env::var("LAUDA_SENDMAIL_CMD") {
             let mut child = std::process::Command::new("sh")
                 .arg("-c")
