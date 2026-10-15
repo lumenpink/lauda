@@ -433,6 +433,21 @@ Para otimizar o aproveitamento da área visível em telas móveis e desktop, o b
 - [x] Testes unitários, de integração e de mutação cobrindo casos de borda e resiliência a espaços.
 - [x] Conformidade integral com `cargo fmt`, `cargo clippy` e `cccp check --strict`.
 
+---
+
+## 14. Padronização do Placeholder da Quick-Add Bar (Ticket #57)
+
+O texto de instrução e sugestão (placeholder) da barra de entrada rápida da Agenda Soberana (`lauda-client/src/ui/calendar_view.rs`) é padronizado com um exemplo genérico e profissional:
+1. **Definição Canônica:** Declarado via constante pública `QUICK_ADD_DEFAULT_PLACEHOLDER`.
+2. **Conteúdo:** `"Ex: Reunião de equipe amanhã às 14h na Sala 2"`, demonstrando título, horário/data e local.
+3. **Consumo:** Aplicado no atributo `placeholder` do campo `<input>`.
+
+### 14.1 Critérios de Aceite e Verificação
+- [ ] Especificação formal documentada em `docs/specs/ui_quick_add_generic_placeholder_spec.md`.
+- [ ] Constante `QUICK_ADD_DEFAULT_PLACEHOLDER` definida e consumida no componente `CalendarView`.
+- [ ] Teste automatizado assegurando o valor e estrutura da constante.
+- [ ] Conformidade integral com `cargo fmt`, `cargo clippy` e `cccp check --strict`.
+
 
 
 
