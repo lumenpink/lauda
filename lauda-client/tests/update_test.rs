@@ -122,3 +122,37 @@ fn test_check_update_edge_cases_and_whitespace_resilience() {
     let status_v = check_update("v0.4.1", &manifest);
     assert_eq!(status_v, UpdateStatus::UpToDate);
 }
+
+#[test]
+fn test_should_show_update_banner_dismissal_behavior() {
+    let manifest = UpdateManifest {
+        version: "0.5.0".to_string(),
+        min_compatible_version: "0.1.0".to_string(),
+        apk_url: "https://lauda.2lp.in/lauda-latest.apk".to_string(),
+        release_notes: "Nova versão".to_string(),
+        published_at: "2026-10-15T10:00:00Z".to_string(),
+    };
+
+    // Sem dispensa prévia: deve exibir
+    assert!(lauda_client::domain::update::should_show_update_banner(
+        Some(&manifest),
+        None
+    ));
+
+    // Dispensado para a mesma versão: NÃO deve exibir
+    assert!(!lauda_client::domain::update::should_show_update_banner(
+        Some(&manifest),
+        Some("0.5.0")
+    ));
+
+    // Dispensado para versão anterior diferente: DEVE exibir para a nova versão
+    assert!(lauda_client::domain::update::should_show_update_banner(
+        Some(&manifest),
+        Some("0.4.9")
+    ));
+
+    // Sem manifesto: NÃO deve exibir
+    assert!(!lauda_client::domain::update::should_show_update_banner(
+        None, None
+    ));
+}
