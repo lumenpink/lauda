@@ -11,6 +11,9 @@ use crate::domain::time::current_unix_timestamp;
 use crate::ui::state::Screen;
 use lauda_types::contact::ContactEntry;
 
+/// Texto de instrução e sugestão (placeholder) genérico e neutro para o campo Quick-Add.
+pub const QUICK_ADD_DEFAULT_PLACEHOLDER: &str = "Ex: Reunião de equipe amanhã às 14h na Sala 2";
+
 fn apply_contact_to_input(
     contact: &ContactEntry,
     quick_input: &mut Signal<String>,
@@ -254,7 +257,7 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
 
                     input {
                         style: "flex: 1; border: 2px solid #0a0a0a; padding: 0.6rem 0.8rem; font-size: 0.95rem; outline: none; background: #fdfdfd;",
-                        placeholder: "Ex: Almoço com Marcelo amanhã 12h30 no Fasano",
+                        placeholder: "{QUICK_ADD_DEFAULT_PLACEHOLDER}",
                         value: "{quick_input.read()}",
                         oninput: {
                             let mut quick_input = quick_input;

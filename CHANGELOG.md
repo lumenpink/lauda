@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Features
+- **calendar:** padronizar placeholder da quick-add bar para formato generico (#57)
 - **ui:** botao de dispensa e exibicao condicional no banner de atualizacao (#56)
 - **ci:** esteira completa de compilacao multi-alvo e deploy continuo no push (closes #61)
 - **client:** resolver comparacao de versao com LAUDA_APP_VERSION (#61)
