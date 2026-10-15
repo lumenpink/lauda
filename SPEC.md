@@ -402,6 +402,24 @@ Para consolidar o ecossistema Soberano com robustez de nível de produção e to
 - [x] Execução hermética sem dependências externas no CI (`cargo test`).
 - [x] Zero warnings no Clippy e formatação determinística verificada.
 
+---
+
+## 12. Esteira Soberana de Compilação Multi-Alvo e Deploy Contínuo no Push (Ticket #61)
+
+Conforme a doutrina GOST, a única via legítima de publicação e deploy é a automação da esteira de CI (`.forgejo/workflows/ci.yml`) acionada automaticamente no evento de push para a branch principal (`main`). Deploys manuais ou ad-hoc são vedados. Durante o ciclo contínuo de desenvolvimento, versões com identificador de desenvolvimento (`-dev...`) são tratadas como estáveis para todos os efeitos práticos de distribuição e consumo.
+
+### 12.1 Contrato da Esteira Multi-Alvo no Push
+A esteira é encadeada com dependência estrita do gate de testes (`needs: [test]`) e dispara simultaneamente a entrega de todos os canais:
+1. **Web (Dioxus WebAssembly):** Compilação de artefatos estáticos PWA e deploy automático via Cloudflare Workers (`lauda.2lp.in`) e Codeberg Pages.
+2. **Desktop (Linux Nativo):** Compilação release do binário `dist/desktop/lauda-desktop`.
+3. **Android APK Nativo (`deploy-apk`):** Compilação do APK real via `dx` e Gradle, strip de símbolos JNI, assinatura criptográfica oficial soberana (`in_twolp_release.keystore`), publicação em bucket R2 e espelhamento automático na Pratilera (`banca.2lp.in/pratilera`).
+4. **Pacotes & Manifestos:** Sincronização atômica dos manifestos de distribuição (`version.json` e `version-nightly.json`) com o arquivo canônico `VERSION`.
+
+### 12.2 Resolução de Versão do Cliente (`lauda-client`)
+- A verificação de atualização no cliente (`check_update`) consome estritamente o identificador canônico de build `env!("LAUDA_APP_VERSION")`, e não o `CARGO_PKG_VERSION` isolado.
+- Durante o desenvolvimento, versões `dev` superiores ou iguais às versões publicadas remotamente no manifesto são consideradas atualizadas (`UpdateStatus::UpToDate`), prevenindo alertas espúrios de downgrade.
+
+
 
 
 
