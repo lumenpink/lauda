@@ -78,3 +78,29 @@ fn test_check_update_nightly_channel() {
     let status_up_to_date = check_update("0.2.1", &manifest);
     assert_eq!(status_up_to_date, UpdateStatus::UpToDate);
 }
+
+#[test]
+fn test_check_update_dev_versions_treated_as_stable_and_not_inferior() {
+    let manifest = UpdateManifest {
+        version: "0.4.0-dev.46+20261014.7c0b89e".to_string(),
+        min_compatible_version: "0.1.0".to_string(),
+        apk_url: "https://lauda.2lp.in/lauda-latest.apk".to_string(),
+        release_notes: "Versão remota no manifesto".to_string(),
+        published_at: "2026-10-14T18:35:20Z".to_string(),
+    };
+
+    // Versão dev 0.4.1 em execução é superior a 0.4.0 -> UpToDate
+    let status_dev_newer = check_update("0.4.1-dev.4+20261015.f0478e0", &manifest);
+    assert_eq!(status_dev_newer, UpdateStatus::UpToDate);
+
+    // Versão dev igual à do manifesto remoto -> UpToDate
+    let manifest_same = UpdateManifest {
+        version: "0.4.1-dev.4+20261015.f0478e0".to_string(),
+        min_compatible_version: "0.1.0".to_string(),
+        apk_url: "https://lauda.2lp.in/lauda-latest.apk".to_string(),
+        release_notes: "Mesma versão dev".to_string(),
+        published_at: "2026-10-15T09:00:00Z".to_string(),
+    };
+    let status_same_dev = check_update("0.4.1-dev.4+20261015.f0478e0", &manifest_same);
+    assert_eq!(status_same_dev, UpdateStatus::UpToDate);
+}

@@ -494,3 +494,33 @@ fn test_gost10_ci_workflow_unification_and_strict_needs_test() {
         "Jobs de deploy devem ser restritos à branch main"
     );
 }
+
+#[test]
+fn test_ci_workflow_has_deploy_apk_job_with_strict_contract() {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let repo_root = manifest_dir.parent().unwrap();
+    let ci_yml = repo_root.join(".forgejo/workflows/ci.yml");
+    let content = std::fs::read_to_string(&ci_yml).expect("Leitura de ci.yml");
+
+    // Deve conter job 'deploy-apk'
+    assert!(
+        content.contains("deploy-apk:"),
+        "ci.yml deve declarar o job 'deploy-apk' para compilação contínua do Android APK"
+    );
+
+    // Deve declarar needs: [test] e if: github.ref == 'refs/heads/main'
+    let deploy_apk_block = content
+        .split("deploy-apk:")
+        .nth(1)
+        .expect("bloco deploy-apk");
+    let next_job_block = deploy_apk_block.split("\n  deploy-").next().unwrap_or(deploy_apk_block);
+
+    assert!(
+        next_job_block.contains("needs: [test]"),
+        "deploy-apk deve declarar needs: [test]"
+    );
+    assert!(
+        next_job_block.contains("github.ref == 'refs/heads/main'"),
+        "deploy-apk deve ser restrito à branch main"
+    );
+}
