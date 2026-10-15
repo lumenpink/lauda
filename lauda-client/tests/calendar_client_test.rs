@@ -208,3 +208,48 @@ fn test_quick_add_default_placeholder_mutation_and_edge_cases() {
     assert!(CalendarIntentParser::parse("", &ref_time).is_err());
     assert!(CalendarIntentParser::parse("   ", &ref_time).is_err());
 }
+
+#[test]
+fn test_select_upcoming_events_chronological_and_limit() {
+    use lauda_client::ui::calendar_view::select_upcoming_events;
+
+    let now_ts = 100_000;
+
+    // 1. Lista vazia
+    assert!(select_upcoming_events(&[], now_ts, 3).is_empty());
+
+    // 2. Apenas eventos passados
+    let past1 = sample_event("p1", "Passado 1", now_ts - 500);
+    let past2 = sample_event("p2", "Passado 2", now_ts - 100);
+    assert!(select_upcoming_events(&[past1.clone(), past2.clone()], now_ts, 3).is_empty());
+
+    // 3. Mistura com 5 futuros fora de ordem e passados
+    let fut5 = sample_event("f5", "Futuro 5", now_ts + 5000);
+    let fut1 = sample_event("f1", "Futuro 1", now_ts + 1000);
+    let fut4 = sample_event("f4", "Futuro 4", now_ts + 4000);
+    let fut2 = sample_event("f2", "Futuro 2", now_ts + 2000);
+    let fut3 = sample_event("f3", "Futuro 3", now_ts + 3000);
+
+    let all_events = vec![
+        fut5,
+        past1,
+        fut1,
+        past2,
+        fut4,
+        fut2,
+        fut3,
+    ];
+
+    let selected = select_upcoming_events(&all_events, now_ts, 3);
+    assert_eq!(selected.len(), 3);
+    assert_eq!(selected[0].uid, "f1");
+    assert_eq!(selected[1].uid, "f2");
+    assert_eq!(selected[2].uid, "f3");
+
+    // 4. Se houver apenas 2 eventos futuros, retorna os 2
+    let two_selected = select_upcoming_events(&all_events[..4], now_ts, 3);
+    // all_events[..4] possui fut5, past1, fut1, past2 -> futuros são fut1 e fut5
+    assert_eq!(two_selected.len(), 2);
+    assert_eq!(two_selected[0].uid, "f1");
+    assert_eq!(two_selected[1].uid, "f5");
+}
