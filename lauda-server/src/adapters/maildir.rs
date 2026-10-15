@@ -599,18 +599,18 @@ impl MailBackend for MaildirBackend {
             }
         }
 
-        let txt_auto = txt_original
-            .as_deref()
-            .map(Self::clean_comment_tags)
-            .or_else(|| {
-                html_sanitized.as_ref().map(|html| {
-                    html.replace("<br>", "\n")
-                        .replace("<br/>", "\n")
-                        .replace("<br />", "\n")
-                        .replace("<p>", "\n\n")
-                        .replace("</p>", "")
-                })
-            });
+        let txt_auto = if let Some(ref html) = html_sanitized {
+            let clean = Self::clean_comment_tags(html);
+            let md = html2text::from_read(clean.as_bytes(), 10_000);
+            let trimmed = md.trim().to_string();
+            if !trimmed.is_empty() {
+                Some(trimmed)
+            } else {
+                txt_original.as_deref().map(Self::clean_comment_tags)
+            }
+        } else {
+            txt_original.as_deref().map(Self::clean_comment_tags)
+        };
 
         let attachments: Vec<lauda_types::AttachmentMeta> = parsed
             .attachments()

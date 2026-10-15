@@ -3,12 +3,18 @@ use pulldown_cmark::{Options, Parser, html};
 
 /// Converte Markdown ("txt auto") em representação HTML higienizada para visualização gráfica.
 pub fn parse_markdown_to_html(markdown: &str) -> String {
+    // Normaliza quebras de linha CRLF e espaços não-separáveis (\u{00A0}) isolados
+    let normalized = markdown.replace("\r\n", "\n").replace('\u{00A0}', " ");
+
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
     options.insert(Options::ENABLE_FOOTNOTES);
     options.insert(Options::ENABLE_STRIKETHROUGH);
 
-    let parser = Parser::new_ext(markdown, options);
+    let parser = Parser::new_ext(&normalized, options).map(|event| match event {
+        pulldown_cmark::Event::SoftBreak => pulldown_cmark::Event::HardBreak,
+        other => other,
+    });
     let mut html_output = String::new();
     html::push_html(&mut html_output, parser);
     html_output
