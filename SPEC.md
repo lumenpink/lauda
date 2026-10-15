@@ -458,10 +458,10 @@ O card superior de destaque na Agenda Soberana (`lauda-client/src/ui/calendar_vi
 3. **Resiliência:** Suporta perfeitamente 0, 1, 2 ou 3 eventos sem quebras ou lacunas visuais.
 
 ### 15.1 Critérios de Aceite e Verificação
-- [ ] Especificação formal documentada em `docs/specs/ui_three_upcoming_events_spec.md`.
-- [ ] Função `select_upcoming_events` implementada e testada para 0, 1, 2, 3 e >3 eventos.
-- [ ] Componente `CalendarView` atualizado para renderizar a lista tripla de destaque.
-- [ ] Conformidade integral com `cargo fmt`, `cargo clippy` e `cccp check --strict`.
+- [x] Especificação formal documentada em `docs/specs/ui_three_upcoming_events_spec.md`.
+- [x] Função `select_upcoming_events` implementada e testada para 0, 1, 2, 3 e >3 eventos.
+- [x] Componente `CalendarView` atualizado para renderizar a lista tripla de destaque.
+- [x] Conformidade integral com `cargo fmt`, `cargo clippy` e `cccp check --strict`.
 
 
 

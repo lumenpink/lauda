@@ -230,15 +230,7 @@ fn test_select_upcoming_events_chronological_and_limit() {
     let fut2 = sample_event("f2", "Futuro 2", now_ts + 2000);
     let fut3 = sample_event("f3", "Futuro 3", now_ts + 3000);
 
-    let all_events = vec![
-        fut5,
-        past1,
-        fut1,
-        past2,
-        fut4,
-        fut2,
-        fut3,
-    ];
+    let all_events = vec![fut5, past1, fut1, past2, fut4, fut2, fut3];
 
     let selected = select_upcoming_events(&all_events, now_ts, 3);
     assert_eq!(selected.len(), 3);
