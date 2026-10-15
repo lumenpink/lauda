@@ -104,3 +104,21 @@ fn test_check_update_dev_versions_treated_as_stable_and_not_inferior() {
     let status_same_dev = check_update("0.4.1-dev.4+20261015.f0478e0", &manifest_same);
     assert_eq!(status_same_dev, UpdateStatus::UpToDate);
 }
+
+#[test]
+fn test_check_update_edge_cases_and_whitespace_resilience() {
+    let manifest = UpdateManifest {
+        version: "  0.4.1-dev.4+20261015.f0478e0 \n".to_string(),
+        min_compatible_version: " 0.1.0 ".to_string(),
+        apk_url: "https://lauda.2lp.in/lauda-latest.apk".to_string(),
+        release_notes: "Notas".to_string(),
+        published_at: "2026-10-15T09:00:00Z".to_string(),
+    };
+
+    let status = check_update("0.4.1-dev.4+20261015.f0478e0", &manifest);
+    assert_eq!(status, UpdateStatus::UpToDate);
+
+    // SemVer com tag v
+    let status_v = check_update("v0.4.1", &manifest);
+    assert_eq!(status_v, UpdateStatus::UpToDate);
+}
