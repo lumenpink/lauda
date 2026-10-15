@@ -3732,6 +3732,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "chrono",
+ "html2text",
  "http-body-util",
  "ishcondidim",
  "jsonwebtoken",
