@@ -14,6 +14,23 @@ use lauda_types::contact::ContactEntry;
 /// Texto de instrução e sugestão (placeholder) genérico e neutro para o campo Quick-Add.
 pub const QUICK_ADD_DEFAULT_PLACEHOLDER: &str = "Ex: Reunião de equipe amanhã às 14h na Sala 2";
 
+/// Seleciona até `limit` eventos cronológicos futuros ordenados pelo início.
+pub fn select_upcoming_events(
+    events: &[CalendarEvent],
+    now_ts: i64,
+    limit: usize,
+) -> Vec<CalendarEvent> {
+    let mut upcoming: Vec<CalendarEvent> = events
+        .iter()
+        .filter(|ev| ev.start.to_timestamp_utc() >= now_ts)
+        .cloned()
+        .collect();
+
+    upcoming.sort_by_key(|ev| ev.start.to_timestamp_utc());
+    upcoming.truncate(limit);
+    upcoming
+}
+
 fn apply_contact_to_input(
     contact: &ContactEntry,
     quick_input: &mut Signal<String>,
@@ -200,9 +217,7 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
         }
     }
 
-    let next_event = events_list
-        .iter()
-        .find(|ev| ev.start.to_timestamp_utc() >= now_ts);
+    let upcoming_highlights = select_upcoming_events(&events_list, now_ts, 3);
 
     rsx! {
         div {
@@ -484,33 +499,60 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
                 }
             }
 
-            // Banner de Próximo Compromisso (se houver)
-            if let Some(next_ev) = next_event {
+            // Banner de Próximos Compromissos (se houver, até 3 eventos)
+            if !upcoming_highlights.is_empty() {
                 div {
-                    style: "border: 2px solid #0a0a0a; background: #0a0a0a; color: #fff; padding: 0.8rem 1rem; box-shadow: 3px 3px 0 #dc143c; display: flex; align-items: center; justify-content: space-between;",
+                    style: "border: 2px solid #0a0a0a; background: #0a0a0a; color: #fff; padding: 0.8rem 1rem; box-shadow: 3px 3px 0 #dc143c; display: flex; flex-direction: column; gap: 0.6rem;",
                     div {
-                        style: "display: flex; align-items: center; gap: 0.8rem;",
+                        style: "display: flex; align-items: center; justify-content: space-between;",
                         span {
-                            style: "background: #dc143c; color: #fff; font-weight: bold; font-size: 0.75rem; padding: 0.2rem 0.5rem;",
-                            "PRÓXIMO COMPROMISSO"
+                            style: "background: #dc143c; color: #fff; font-weight: bold; font-size: 0.75rem; padding: 0.2rem 0.5rem; letter-spacing: 0.5px;",
+                            "PRÓXIMOS COMPROMISSOS"
                         }
                         span {
-                            style: "font-weight: bold; font-size: 0.95rem;",
-                            "{next_ev.summary}"
+                            style: "font-size: 0.75rem; color: #aaa;",
+                            "{upcoming_highlights.len()} DESTAQUE(S)"
                         }
                     }
-                    span {
-                        style: "font-size: 0.8rem; color: #ccc;",
-                        match &next_ev.start {
-                            EventTime::DateTimeUtc(ts) => {
-                                let diff = (ts - now_ts) / 60;
-                                if diff > 0 {
-                                    format!("em {diff} min")
-                                } else {
-                                    "agora".to_string()
+                    div {
+                        style: "display: flex; flex-direction: column; gap: 0.4rem;",
+                        for ev in &upcoming_highlights {
+                            {
+                                let loc_label = ev.location.as_deref().map(|l| format!("📍 {l}")).unwrap_or_default();
+                                rsx! {
+                                    div {
+                                        key: "{ev.uid}",
+                                        style: "display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #222; padding-top: 0.4rem; flex-wrap: wrap; gap: 0.4rem;",
+                                        div {
+                                            style: "display: flex; align-items: center; gap: 0.6rem;",
+                                            span {
+                                                style: "font-weight: bold; font-size: 0.9rem;",
+                                                "{ev.summary}"
+                                            }
+                                            if !loc_label.is_empty() {
+                                                span {
+                                                    style: "font-size: 0.75rem; color: #bbb;",
+                                                    "{loc_label}"
+                                                }
+                                            }
+                                        }
+                                        span {
+                                            style: "font-size: 0.8rem; color: #ccc;",
+                                            match &ev.start {
+                                                EventTime::DateTimeUtc(ts) => {
+                                                    let diff = (ts - now_ts) / 60;
+                                                    if diff > 0 {
+                                                        format!("em {diff} min")
+                                                    } else {
+                                                        "agora".to_string()
+                                                    }
+                                                }
+                                                EventTime::DateOnly { .. } => "Hoje".to_string(),
+                                            }
+                                        }
+                                    }
                                 }
                             }
-                            EventTime::DateOnly { .. } => "Hoje".to_string(),
                         }
                     }
                 }
