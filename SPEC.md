@@ -426,7 +426,12 @@ A esteira é encadeada com dependência estrita do gate de testes (`needs: [test
 Para otimizar o aproveitamento da área visível em telas móveis e desktop, o banner de nova versão no smolclient deve ser dispensável interativamente:
 1. **Controle de Estado:** O componente raiz mantém o identificador da versão dispensada (`dismissed_update_version`).
 2. **Interação:** O banner exibe um botão de fechamento rápido (`✕`). Ao ser acionado, o banner é recolhido imediatamente sem interromper a navegação da caixa postal ou exigir recarregamento.
-3. **Resiliência:** Caso uma versão mais recente do que a dispensada seja detectada subsequentemente, o banner torna-se novamente elegível para exibição.
+### 13.1 Critérios de Aceite e Verificação
+- [x] Especificação formal documentada em `docs/specs/ui_dismissable_update_banner_spec.md`.
+- [x] Lógica de filtragem `should_show_update_banner` implementada e testada.
+- [x] Botão interativo de fechamento (`✕`) estilizado em Trash Polka no banner.
+- [x] Testes unitários, de integração e de mutação cobrindo casos de borda e resiliência a espaços.
+- [x] Conformidade integral com `cargo fmt`, `cargo clippy` e `cccp check --strict`.
 
 
 
