@@ -59,3 +59,15 @@ pub async fn fetch_remote_manifest(url: &str) -> Result<UpdateManifest, String> 
         .await
         .map_err(|e| e.to_string())
 }
+
+/// Avalia se o banner de atualização deve ser exibido, considerando o estado de dispensa do usuário.
+pub fn should_show_update_banner(
+    manifest: Option<&UpdateManifest>,
+    dismissed_version: Option<&str>,
+) -> bool {
+    match (manifest, dismissed_version) {
+        (Some(m), Some(d)) => m.version.trim() != d.trim(),
+        (Some(_), None) => true,
+        (None, _) => false,
+    }
+}

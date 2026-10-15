@@ -43,6 +43,7 @@ pub fn App() -> Element {
     let mut current_view_mode = use_signal(|| ViewMode::TxtAuto);
 
     let mut update_notice = use_signal(|| None::<crate::domain::update::UpdateManifest>);
+    let mut dismissed_update_version = use_signal(|| None::<String>);
 
     // Interceptar navegação de histórico / popstate (suporte a gestos Android e botão Voltar)
     use_effect(move || {
@@ -329,14 +330,30 @@ pub fn App() -> Element {
 
             // Banner Trash Polka de Atualização Disponível
             if let Some(manifest) = update_notice.read().clone() {
-                div {
-                    style: "background: #dc143c; color: #fff; padding: 0.6rem 1rem; margin-bottom: 1.2rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; font-weight: bold; border: 2px solid #0a0a0a; box-shadow: 3px 3px 0 #0a0a0a; flex-wrap: wrap; gap: 0.5rem;",
-                    span { "NOVA VERSÃO DISPONÍVEL: v{manifest.version}" }
-                    a {
-                        href: "{manifest.apk_url}",
-                        target: "_blank",
-                        style: "background: #fff; color: #0a0a0a; padding: 0.3rem 0.7rem; text-decoration: none; font-size: 0.8rem; font-weight: bold; border: 1px solid #0a0a0a; white-space: nowrap;",
-                        "ATUALIZAR APK"
+                if crate::domain::update::should_show_update_banner(Some(&manifest), dismissed_update_version.read().as_deref()) {
+                    div {
+                        style: "background: #dc143c; color: #fff; padding: 0.6rem 1rem; margin-bottom: 1.2rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; font-weight: bold; border: 2px solid #0a0a0a; box-shadow: 3px 3px 0 #0a0a0a; flex-wrap: wrap; gap: 0.5rem;",
+                        span { "NOVA VERSÃO DISPONÍVEL: v{manifest.version}" }
+                        div {
+                            style: "display: flex; align-items: center; gap: 0.5rem;",
+                            a {
+                                href: "{manifest.apk_url}",
+                                target: "_blank",
+                                style: "background: #fff; color: #0a0a0a; padding: 0.3rem 0.7rem; text-decoration: none; font-size: 0.8rem; font-weight: bold; border: 1px solid #0a0a0a; white-space: nowrap;",
+                                "ATUALIZAR APK"
+                            }
+                            button {
+                                style: "background: #0a0a0a; color: #fff; border: 1px solid #0a0a0a; cursor: pointer; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.85rem;",
+                                title: "Fechar aviso de atualização",
+                                onclick: {
+                                    let v = manifest.version.clone();
+                                    move |_| {
+                                        dismissed_update_version.set(Some(v.clone()));
+                                    }
+                                },
+                                "✕"
+                            }
+                        }
                     }
                 }
             }
