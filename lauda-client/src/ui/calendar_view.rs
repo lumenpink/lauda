@@ -31,6 +31,63 @@ pub fn select_upcoming_events(
     upcoming
 }
 
+/// Formata o tempo restante até um evento de forma amigável e legível para humanos.
+pub fn format_relative_event_time(event_time: &EventTime, now_ts: i64) -> String {
+    match event_time {
+        EventTime::DateTimeUtc(ts) => {
+            let diff_sec = ts - now_ts;
+            if diff_sec < 60 {
+                return "agora".to_string();
+            }
+            if diff_sec < 3600 {
+                let mins = diff_sec / 60;
+                return format!("em {mins} min");
+            }
+            if diff_sec < 86400 {
+                let hours = diff_sec / 3600;
+                let mins = (diff_sec % 3600) / 60;
+                if mins == 0 {
+                    return format!("em {hours}h");
+                } else {
+                    return format!("em {hours}h {mins}min");
+                }
+            }
+
+            let days = diff_sec / 86400;
+            let rem_sec = diff_sec % 86400;
+            let hours = rem_sec / 3600;
+
+            if days == 1 {
+                if hours > 0 {
+                    format!("em 1 dia e {hours}h")
+                } else {
+                    "em 1 dia".to_string()
+                }
+            } else if hours > 0 {
+                format!("em {days} dias e {hours}h")
+            } else {
+                format!("em {days} dias")
+            }
+        }
+        EventTime::DateOnly { year, month, day } => {
+            let (now_y, now_m, now_d, _, _, _) = timestamp_to_utc_parts(now_ts);
+            let today_ts =
+                lauda_types::calendar::utc_parts_to_timestamp(now_y, now_m, now_d, 0, 0, 0);
+            let ev_ts =
+                lauda_types::calendar::utc_parts_to_timestamp(*year, *month, *day, 0, 0, 0);
+            let diff_days = (ev_ts - today_ts) / 86400;
+
+            if diff_days <= 0 {
+                "Hoje".to_string()
+            } else if diff_days == 1 {
+                "Amanhã".to_string()
+            } else {
+                format!("em {diff_days} dias")
+            }
+        }
+    }
+}
+
 fn apply_contact_to_input(
     contact: &ContactEntry,
     quick_input: &mut Signal<String>,
@@ -162,7 +219,19 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
         }
     });
 
-    let now_ts = current_unix_timestamp() as i64;
+    let mut current_now = use_signal(|| current_unix_timestamp() as i64);
+
+    // Tique temporal reativo contínuo (atualiza a cada 30 segundos sem bloqueio)
+    use_effect(move || {
+        spawn(async move {
+            loop {
+                crate::domain::time::async_sleep(std::time::Duration::from_secs(30)).await;
+                current_now.set(current_unix_timestamp() as i64);
+            }
+        });
+    });
+
+    let now_ts = *current_now.read();
     let (y, m, d, h, min, _s) = timestamp_to_utc_parts(now_ts);
     // 1970-01-01 foi Quinta-feira (4)
     let days_since_epoch = now_ts.div_euclid(86400);
@@ -538,17 +607,7 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
                                         }
                                         span {
                                             style: "font-size: 0.8rem; color: #ccc;",
-                                            match &ev.start {
-                                                EventTime::DateTimeUtc(ts) => {
-                                                    let diff = (ts - now_ts) / 60;
-                                                    if diff > 0 {
-                                                        format!("em {diff} min")
-                                                    } else {
-                                                        "agora".to_string()
-                                                    }
-                                                }
-                                                EventTime::DateOnly { .. } => "Hoje".to_string(),
-                                            }
+                                            "{format_relative_event_time(&ev.start, now_ts)}"
                                         }
                                     }
                                 }
