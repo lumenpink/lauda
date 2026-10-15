@@ -36,6 +36,21 @@ fn test_markdown_parser_conversion() {
 }
 
 #[test]
+fn test_markdown_preserves_single_line_breaks_and_paragraphs() {
+    let md = "Linha 1\nLinha 2\nLinha 3\n\nOutro Paragrafo";
+    let html = parse_markdown_to_html(md);
+
+    // Linhas consecutivas em um mesmo bloco devem preservar a quebra visual com <br />
+    assert!(
+        html.contains("<br") || html.contains("<br/>") || html.contains("<br />"),
+        "Linhas dentro de um bloco devem gerar quebra de linha visual: {}",
+        html
+    );
+    // Parágrafos separados por linha em branco devem ser parágrafos distintos
+    assert!(html.contains("<p>Outro Paragrafo</p>"));
+}
+
+#[test]
 fn test_view_mode_switching() {
     let mut mode = ViewMode::TxtAuto;
     assert_eq!(mode, ViewMode::TxtAuto);

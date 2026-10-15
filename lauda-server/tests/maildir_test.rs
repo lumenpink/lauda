@@ -338,3 +338,89 @@ async fn test_dovecot_maildir_flag_parsing_with_size_metadata() {
     let inbox_unread = boxes_unread.iter().find(|b| b.name == "INBOX").unwrap();
     assert_eq!(inbox_unread.unread_messages, 2);
 }
+
+#[tokio::test]
+async fn test_maildir_txt_auto_prioritizes_html_over_plain() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+
+    std::fs::create_dir_all(root.join("cur")).unwrap();
+    std::fs::create_dir_all(root.join("new")).unwrap();
+
+    let msg = "1728000010.M123P456.test:2,S";
+    let content = concat!(
+        "From: mailling@abvo.com.br\r\n",
+        "To: hi@lumen.pink\r\n",
+        "Subject: LEI 14.751/2023\r\n",
+        "Content-Type: multipart/alternative; boundary=\"boundary_abc\"\r\n",
+        "\r\n",
+        "--boundary_abc\r\n",
+        "Content-Type: text/plain; charset=utf-8\r\n",
+        "\r\n",
+        "CORPO EM TEXTO PURO DEGRADADO SEM QUEBRAS\r\n",
+        "--boundary_abc\r\n",
+        "Content-Type: text/html; charset=utf-8\r\n",
+        "\r\n",
+        "<p>PUBLICADA LEI 14.751/2023 LOB NACIONAL</p>\r\n",
+        "<p>Prezados(as) Dirigentes de Entidades</p>\r\n",
+        "<p>DIRETORIA DA FENEME</p>\r\n",
+        "--boundary_abc--\r\n"
+    );
+    std::fs::write(root.join("cur").join(msg), content).unwrap();
+
+    let uidlist = "3 V1728000000 N100 Gabcdef\n200 :1728000010.M123P456.test\n";
+    std::fs::write(root.join("dovecot-uidlist"), uidlist).unwrap();
+
+    let backend = MaildirBackend::new(root);
+    backend.add_user("lumen", "senha123");
+
+    let full_msg = backend
+        .get_message("lumen", "INBOX", 200)
+        .await
+        .expect("Buscar mensagem");
+
+    assert!(full_msg.txt_auto.is_some());
+    let txt_auto = full_msg.txt_auto.unwrap();
+
+    // txt_auto DEVE priorizar o conteúdo derivado do HTML e não o texto puro degradado
+    assert!(
+        !txt_auto.contains("CORPO EM TEXTO PURO DEGRADADO"),
+        "txt_auto não deve usar o texto puro degradado quando há HTML válido"
+    );
+    assert!(
+        txt_auto.contains("PUBLICADA LEI 14.751/2023 LOB NACIONAL"),
+        "txt_auto deve conter o conteúdo derivado do HTML"
+    );
+    assert!(
+        txt_auto.contains("Prezados(as) Dirigentes de Entidades"),
+        "txt_auto deve conter parágrafos intermediários do HTML"
+    );
+}
+
+#[tokio::test]
+async fn test_maildir_txt_auto_falls_back_to_plain_when_no_html() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+
+    std::fs::create_dir_all(root.join("cur")).unwrap();
+    std::fs::create_dir_all(root.join("new")).unwrap();
+
+    let msg = "1728000011.M123P456.test:2,S";
+    let content = "From: cron@local\r\nTo: root@local\r\nSubject: Backup OK\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nRelatorio de backup executado com sucesso.\r\n";
+    std::fs::write(root.join("cur").join(msg), content).unwrap();
+
+    let uidlist = "3 V1728000000 N100 Gabcdef\n201 :1728000011.M123P456.test\n";
+    std::fs::write(root.join("dovecot-uidlist"), uidlist).unwrap();
+
+    let backend = MaildirBackend::new(root);
+    backend.add_user("lumen", "senha123");
+
+    let full_msg = backend
+        .get_message("lumen", "INBOX", 201)
+        .await
+        .expect("Buscar mensagem");
+
+    assert!(full_msg.txt_auto.is_some());
+    let txt_auto = full_msg.txt_auto.unwrap();
+    assert!(txt_auto.contains("Relatorio de backup executado com sucesso."));
+}
