@@ -70,7 +70,7 @@ O crate de biblioteca `lauda-types` centraliza os modelos serializáveis consumi
 
 ### 3.3 Envelopes e Mensagens
 - **`ViewMode`**:
-  - `txt_auto`: Markdown limpo gerado pelo Urupema (padrão).
+  - `txt_auto`: Markdown limpo gerado a partir do HTML higienizado (ou fallback de texto puro) com quebras de linha preservadas (padrão).
   - `txt_original`: Texto cru com espaçamento fixo preservado.
   - `html`: Conteúdo HTML higienizado em sandbox.
 - **`MessageEnvelope`**:
@@ -82,9 +82,12 @@ O crate de biblioteca `lauda-types` centraliza os modelos serializáveis consumi
   - `is_flagged`: Flag booleana `\Flagged`.
 - **`Message`**:
   - Todos os campos do envelope + corpos:
-  - `txt_auto`: `Option<String>`
+  - `txt_auto`: `Option<String>` (prioriza conversão estruturada de `html_sanitized` em Markdown, recorrendo a `txt_original` como fallback).
   - `txt_original`: `Option<String>`
   - `html_sanitized`: `Option<String>`
+- **Resolução de `txt_auto` e Renderização**:
+  - **Prioridade de Fonte**: Em mensagens `multipart/alternative`, o `html_sanitized` é a fonte primária para o `txt_auto`, preservando tags de parágrafo (`<p>`), quebras (`<br>`), listas e entidades de acentuação sem corrupção de charset. O `txt_original` é utilizado exclusivamente quando não existir corpo HTML.
+  - **Preservação de Quebras de Linha**: Na conversão de Markdown para HTML no cliente (`parse_markdown_to_html`), quebras suaves e quebras simples intencionais em parágrafos e linhas de texto são convertidas em `<br />` ou parágrafos separados, e espaços não-separáveis isolados são normalizados para evitar colapso de texto.
 
 ### 3.4 Composição e Envio
 - **`ComposeForm`**:
