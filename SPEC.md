@@ -473,10 +473,10 @@ A indicação do tempo restante até um compromisso é formatada de forma coloqu
 3. **Reatividade Contínua:** Sinal periódico a cada 30 segundos garante recálculo em tempo real no cliente Lauda.
 
 ### 16.1 Critérios de Aceite e Verificação
-- [ ] Especificação formal documentada em `docs/specs/ui_relative_event_time_format_spec.md`.
-- [ ] Função `format_relative_event_time` implementada e testada para minutos, horas, dias e DateOnly.
-- [ ] Tique reativo contínuo integrado em `CalendarView`.
-- [ ] Conformidade integral com `cargo fmt`, `cargo clippy` e `cccp check --strict`.
+- [x] Especificação formal documentada em `docs/specs/ui_relative_event_time_format_spec.md`.
+- [x] Função `format_relative_event_time` implementada e testada para minutos, horas, dias e DateOnly.
+- [x] Tique reativo contínuo integrado em `CalendarView`.
+- [x] Conformidade integral com `cargo fmt`, `cargo clippy` e `cccp check --strict`.
 
 
 

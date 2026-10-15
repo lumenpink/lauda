@@ -320,7 +320,10 @@ fn test_format_relative_event_time_scenarios() {
         "em 1 dia e 3h"
     );
     assert_eq!(
-        format_relative_event_time(&EventTime::DateTimeUtc(now_ts + 2 * 86400 + 3 * 3600), now_ts),
+        format_relative_event_time(
+            &EventTime::DateTimeUtc(now_ts + 2 * 86400 + 3 * 3600),
+            now_ts
+        ),
         "em 2 dias e 3h"
     );
 

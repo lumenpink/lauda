@@ -73,8 +73,7 @@ pub fn format_relative_event_time(event_time: &EventTime, now_ts: i64) -> String
             let (now_y, now_m, now_d, _, _, _) = timestamp_to_utc_parts(now_ts);
             let today_ts =
                 lauda_types::calendar::utc_parts_to_timestamp(now_y, now_m, now_d, 0, 0, 0);
-            let ev_ts =
-                lauda_types::calendar::utc_parts_to_timestamp(*year, *month, *day, 0, 0, 0);
+            let ev_ts = lauda_types::calendar::utc_parts_to_timestamp(*year, *month, *day, 0, 0, 0);
             let diff_days = (ev_ts - today_ts) / 86400;
 
             if diff_days <= 0 {
