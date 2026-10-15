@@ -179,3 +179,34 @@ fn test_quick_add_default_placeholder_is_generic_and_parseable() {
     assert_eq!(h, 14);
     assert_eq!(min, 0);
 }
+
+#[test]
+fn test_quick_add_default_placeholder_mutation_and_edge_cases() {
+    use lauda_client::ui::calendar_view::QUICK_ADD_DEFAULT_PLACEHOLDER;
+    use lauda_types::calendar::{CalendarIntentParser, CalendarReferenceTime, Weekday};
+
+    // Não pode ser vazio nem conter somente espaços
+    assert!(!QUICK_ADD_DEFAULT_PLACEHOLDER.trim().is_empty());
+
+    // Deve conter prefixo instrutivo 'Ex: '
+    assert!(QUICK_ADD_DEFAULT_PLACEHOLDER.starts_with("Ex: "));
+
+    // Deve cobrir os marcadores essenciais de intenção natural
+    let lower = QUICK_ADD_DEFAULT_PLACEHOLDER.to_lowercase();
+    assert!(lower.contains("amanhã"));
+    assert!(lower.contains("14h"));
+    assert!(lower.contains("sala"));
+
+    // O parser deve rejeitar entrada vazia (mutante de omissão)
+    let ref_time = CalendarReferenceTime {
+        year: 2026,
+        month: 10,
+        day: 15,
+        hour: 9,
+        minute: 0,
+        weekday: Weekday::Thursday,
+        timestamp_utc: 1792054800,
+    };
+    assert!(CalendarIntentParser::parse("", &ref_time).is_err());
+    assert!(CalendarIntentParser::parse("   ", &ref_time).is_err());
+}
