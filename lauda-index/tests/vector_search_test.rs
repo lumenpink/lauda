@@ -10,8 +10,8 @@ struct MockEmbeddingProvider;
 impl EmbeddingProvider for MockEmbeddingProvider {
     fn embed(&self, text: &str) -> Vec<f32> {
         let lower = text.to_lowercase();
-        // Vetor 4D sintético: [armamento, saude, juridico, saudacao]
-        let mut vec = vec![0.0f32; 4];
+        // Vetor 5D sintético: [armamento, saude, juridico, major, coronel]
+        let mut vec = vec![0.0f32; 5];
 
         if lower.contains("arma") || lower.contains("tiro") || lower.contains("ig-10") {
             vec[0] += 1.0;
@@ -22,8 +22,11 @@ impl EmbeddingProvider for MockEmbeddingProvider {
         if lower.contains("lei") || lower.contains("norma") || lower.contains("artigo") {
             vec[2] += 1.0;
         }
-        if lower.contains("atenciosamente") || lower.contains("major") || lower.contains("coronel") {
+        if lower.contains("major") {
             vec[3] += 1.0;
+        }
+        if lower.contains("coronel") {
+            vec[4] += 1.0;
         }
 
         // Normalização L2
@@ -62,6 +65,7 @@ fn test_semantic_max_pooling_and_best_segment() {
             is_read: true,
             is_flagged: false,
             has_attachments: false,
+            ..Default::default()
         },
         txt_auto: Some(
             "Informo que está aprovada a nova regulamentação de armas e tiro da corporação.\n\n\
@@ -84,6 +88,7 @@ fn test_semantic_max_pooling_and_best_segment() {
             is_read: true,
             is_flagged: false,
             has_attachments: false,
+            ..Default::default()
         },
         txt_auto: Some(
             "Encaminho o servidor para inspeção de saúde no hospital militar.\n\n\
@@ -131,6 +136,7 @@ fn test_hybrid_search_fusion() {
             is_read: true,
             is_flagged: false,
             has_attachments: false,
+            ..Default::default()
         },
         txt_auto: Some("Texto da nova lei publicada no diário oficial.".to_string()),
         txt_original: None,

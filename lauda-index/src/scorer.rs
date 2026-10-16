@@ -61,6 +61,30 @@ pub fn levenshtein_distance(a: &str, b: &str) -> usize {
     dp[m][n]
 }
 
+/// Calcula a similaridade do cosseno entre dois vetores de ponto flutuante.
+pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+    if a.is_empty() || a.len() != b.len() {
+        return 0.0;
+    }
+
+    let mut dot = 0.0f32;
+    let mut norm_a = 0.0f32;
+    let mut norm_b = 0.0f32;
+
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        dot += x * y;
+        norm_a += x * x;
+        norm_b += y * y;
+    }
+
+    let denom = norm_a.sqrt() * norm_b.sqrt();
+    if denom <= 0.0 {
+        0.0
+    } else {
+        dot / denom
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

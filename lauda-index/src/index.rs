@@ -3,9 +3,126 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use crate::parser::{Query, QueryClause, parse_query};
-use crate::scorer::{levenshtein_distance, score_bm25};
+use crate::scorer::{cosine_similarity, levenshtein_distance, score_bm25};
 use crate::tokenizer::{normalize, tokenize};
 use lauda_types::Message;
+use urupema::domain::{HeaderMeta, SegmentKind, SegmentationConfig, segment_email};
+
+/// Provedor de embeddings textuais (ex: modelo CPU ONNX ou mock para testes).
+pub trait EmbeddingProvider: Send + Sync {
+    fn embed(&self, text: &str) -> Vec<f32>;
+}
+
+mod segment_kind_serde {
+    use super::*;
+    use serde::{Deserializer, Serializer};
+
+    pub fn serialize<S>(
+        kind: &Option<SegmentKind>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match kind {
+            Some(k) => {
+                let s = match k {
+                    SegmentKind::Header => "Header",
+                    SegmentKind::Body => "Body",
+                    SegmentKind::Signature => "Signature",
+                    SegmentKind::QuotedThread => "QuotedThread",
+                };
+                serializer.serialize_some(s)
+            }
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<Option<SegmentKind>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let opt: Option<String> = Option::deserialize(deserializer)?;
+        match opt.as_deref() {
+            Some("Header") => Ok(Some(SegmentKind::Header)),
+            Some("Body") => Ok(Some(SegmentKind::Body)),
+            Some("Signature") => Ok(Some(SegmentKind::Signature)),
+            Some("QuotedThread") => Ok(Some(SegmentKind::QuotedThread)),
+            _ => Ok(None),
+        }
+    }
+}
+
+mod segment_embeddings_serde {
+    use super::*;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    #[derive(Serialize, Deserialize)]
+    struct Entry {
+        kind: String,
+        vector: Vec<f32>,
+    }
+
+    pub fn serialize<S>(
+        entries: &[(SegmentKind, Vec<f32>)],
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let list: Vec<Entry> = entries
+            .iter()
+            .map(|(k, v)| {
+                let kind = match k {
+                    SegmentKind::Header => "Header",
+                    SegmentKind::Body => "Body",
+                    SegmentKind::Signature => "Signature",
+                    SegmentKind::QuotedThread => "QuotedThread",
+                };
+                Entry {
+                    kind: kind.to_string(),
+                    vector: v.clone(),
+                }
+            })
+            .collect();
+        list.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<Vec<(SegmentKind, Vec<f32>)>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let list: Vec<Entry> = Vec::deserialize(deserializer)?;
+        Ok(list
+            .into_iter()
+            .filter_map(|e| {
+                let kind = match e.kind.as_str() {
+                    "Header" => SegmentKind::Header,
+                    "Body" => SegmentKind::Body,
+                    "Signature" => SegmentKind::Signature,
+                    "QuotedThread" => SegmentKind::QuotedThread,
+                    _ => return None,
+                };
+                Some((kind, e.vector))
+            })
+            .collect())
+    }
+}
+
+/// Resultado de busca ranqueada contendo pontuações combinadas e segmento de maior relevância.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchResult {
+    pub uid: u32,
+    pub score: f64,
+    pub bm25_score: f64,
+    pub semantic_score: f64,
+    #[serde(default, with = "segment_kind_serde")]
+    pub matched_segment: Option<SegmentKind>,
+}
 
 /// Documento indexado com metadados para busca e ranqueamento.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +142,8 @@ pub struct IndexedDoc {
     /// Contagem de frequência de todos os termos (assunto + corpo)
     pub term_frequencies: HashMap<String, u32>,
     pub doc_len: usize,
+    #[serde(default, with = "segment_embeddings_serde")]
+    pub segment_embeddings: Vec<(SegmentKind, Vec<f32>)>,
 }
 
 /// Motor de índice invertido com suporte a BM25 e fuzzy search.
@@ -97,9 +216,187 @@ impl MessageIndex {
             sender_terms: sender_tokens.into_iter().collect(),
             term_frequencies,
             doc_len,
+            segment_embeddings: Vec::new(),
         };
 
         self.documents.insert(uid, doc);
+    }
+
+    /// Indexa uma nova mensagem com dissecação semântica Urupema e geração de embeddings por segmento.
+    pub fn index_message_semantic(
+        &mut self,
+        mailbox: &str,
+        msg: &Message,
+        provider: &dyn EmbeddingProvider,
+    ) {
+        self.index_message(mailbox, msg);
+
+        let headers = HeaderMeta {
+            from: Some(msg.envelope.sender.clone()),
+            to: None,
+            subject: Some(msg.envelope.subject.clone()),
+            date: Some(msg.envelope.date.clone()),
+        };
+        let body_text = msg
+            .txt_auto
+            .as_deref()
+            .or(msg.txt_original.as_deref())
+            .unwrap_or("");
+
+        let config = SegmentationConfig::default();
+        let segments = segment_email(Some(&headers), body_text, &config);
+
+        let mut segment_embeddings = Vec::new();
+        for segment in segments {
+            let trimmed = segment.content.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let vec = provider.embed(trimmed);
+            segment_embeddings.push((segment.kind, vec));
+        }
+
+        if let Some(doc) = self.documents.get_mut(&msg.envelope.uid) {
+            doc.segment_embeddings = segment_embeddings;
+        }
+    }
+
+    /// Executa busca puramente vetorial com Max-Pooling sobre os segmentos semânticos.
+    pub fn search_semantic(
+        &self,
+        query: &str,
+        provider: &dyn EmbeddingProvider,
+    ) -> Vec<SearchResult> {
+        let query_vec = provider.embed(query);
+        let mut results: Vec<SearchResult> = Vec::new();
+
+        for (&uid, doc) in &self.documents {
+            if doc.segment_embeddings.is_empty() {
+                continue;
+            }
+
+            let mut max_sim = 0.0f32;
+            let mut best_kind = None;
+
+            for (kind, emb) in &doc.segment_embeddings {
+                let sim = cosine_similarity(&query_vec, emb);
+                if sim > max_sim {
+                    max_sim = sim;
+                    best_kind = Some(*kind);
+                }
+            }
+
+            if max_sim > 0.0 {
+                results.push(SearchResult {
+                    uid,
+                    score: max_sim as f64,
+                    bm25_score: 0.0,
+                    semantic_score: max_sim as f64,
+                    matched_segment: best_kind,
+                });
+            }
+        }
+
+        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results
+    }
+
+    /// Executa busca híbrida linear combinando BM25 e busca vetorial Urupema.
+    ///
+    /// Parâmetro `alpha`:
+    /// - `alpha = 1.0`: busca exclusivamente BM25
+    /// - `alpha = 0.0`: busca exclusivamente vetorial
+    /// - `0.0 < alpha < 1.0`: fusão ponderada
+    pub fn search_hybrid(
+        &self,
+        query_str: &str,
+        provider: &dyn EmbeddingProvider,
+        alpha: f64,
+    ) -> Vec<SearchResult> {
+        let alpha = alpha.clamp(0.0, 1.0);
+        let query = parse_query(query_str);
+
+        let total_docs = self.documents.len();
+        let avg_doc_len = if total_docs > 0 {
+            self.total_len as f64 / total_docs as f64
+        } else {
+            1.0
+        };
+
+        // 1. BM25 scoring
+        let mut bm25_map: HashMap<u32, f64> = HashMap::new();
+        let mut max_bm25 = 0.0f64;
+
+        if alpha > 0.0 {
+            for (uid, doc) in &self.documents {
+                let mut doc_score = 0.0;
+                let mut matched_any = false;
+
+                if query.clauses.is_empty() {
+                    matched_any = true;
+                    doc_score = 1.0;
+                } else {
+                    for clause in &query.clauses {
+                        if let Some(score) = self.evaluate_clause(doc, clause, total_docs, avg_doc_len) {
+                            doc_score += score;
+                            matched_any = true;
+                        }
+                    }
+                }
+
+                if matched_any && doc_score > 0.0 {
+                    if doc_score > max_bm25 {
+                        max_bm25 = doc_score;
+                    }
+                    bm25_map.insert(*uid, doc_score);
+                }
+            }
+        }
+
+        // 2. Semantic scoring
+        let mut semantic_map: HashMap<u32, (f64, Option<SegmentKind>)> = HashMap::new();
+
+        if alpha < 1.0 {
+            let sem_results = self.search_semantic(query_str, provider);
+            for res in sem_results {
+                semantic_map.insert(res.uid, (res.semantic_score, res.matched_segment));
+            }
+        }
+
+        // 3. Fusion
+        let mut all_uids: HashSet<u32> = HashSet::new();
+        all_uids.extend(bm25_map.keys());
+        all_uids.extend(semantic_map.keys());
+
+        let mut results = Vec::new();
+        for uid in all_uids {
+            let raw_bm25 = bm25_map.get(&uid).copied().unwrap_or(0.0);
+            let norm_bm25 = if max_bm25 > 0.0 {
+                raw_bm25 / max_bm25
+            } else {
+                0.0
+            };
+
+            let (sem_score, matched_segment) = semantic_map
+                .get(&uid)
+                .cloned()
+                .unwrap_or((0.0, None));
+
+            let combined_score = alpha * norm_bm25 + (1.0 - alpha) * sem_score;
+
+            if combined_score > 0.0 {
+                results.push(SearchResult {
+                    uid,
+                    score: combined_score,
+                    bm25_score: raw_bm25,
+                    semantic_score: sem_score,
+                    matched_segment,
+                });
+            }
+        }
+
+        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results
     }
 
     /// Remove uma mensagem do índice.
