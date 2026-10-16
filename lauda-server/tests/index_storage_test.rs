@@ -1,8 +1,7 @@
 use std::collections::HashSet;
-use std::path::Path;
 use tempfile::tempdir;
 
-use lauda_index::{IndexedDoc, MessageIndex, SimpleCpuEmbeddingProvider};
+use lauda_index::{MessageIndex, SimpleCpuEmbeddingProvider};
 use lauda_server::adapters::sqlite_index::SqliteIndexStore;
 use lauda_types::{Message, MessageEnvelope};
 
@@ -57,7 +56,7 @@ fn test_sqlite_index_store_crud_and_reconciliation() {
     index.index_message_semantic("INBOX", &msg2, &provider);
 
     // Salvar documentos indexados no SQLite
-    for (&uid, doc) in index.documents() {
+    for doc in index.documents().values() {
         store
             .save_document("INBOX", doc, 1728560000)
             .expect("salvar documento no sqlite");
@@ -85,7 +84,9 @@ fn test_sqlite_index_store_crud_and_reconciliation() {
     store
         .remove_document("INBOX", 202)
         .expect("remover documento");
-    let uids_after_removal = store.get_indexed_uids("INBOX").expect("obter uids pós remoção");
+    let uids_after_removal = store
+        .get_indexed_uids("INBOX")
+        .expect("obter uids pós remoção");
     assert_eq!(uids_after_removal.len(), 1);
     assert!(uids_after_removal.contains(&201));
     assert!(!uids_after_removal.contains(&202));

@@ -212,7 +212,10 @@ impl SqliteIndexStore {
         }
         to_remove.sort();
 
-        Ok(ReconcileResult { to_index, to_remove })
+        Ok(ReconcileResult {
+            to_index,
+            to_remove,
+        })
     }
 
     /// Carrega o índice em memória estruturado a partir do banco SQLite para busca veloz.
@@ -357,14 +360,14 @@ impl SqliteIndexStore {
                 embeddings_blob,
             ) = r?;
 
-            if let Ok(parsed_date) = DateTime::parse_from_rfc3339(&date) {
-                if parsed_date.with_timezone(&Utc) < cutoff_date {
-                    continue;
-                }
-            } else if let Ok(parsed_date) = DateTime::parse_from_rfc2822(&date) {
-                if parsed_date.with_timezone(&Utc) < cutoff_date {
-                    continue;
-                }
+            if let Ok(parsed_date) = DateTime::parse_from_rfc3339(&date)
+                && parsed_date.with_timezone(&Utc) < cutoff_date
+            {
+                continue;
+            } else if let Ok(parsed_date) = DateTime::parse_from_rfc2822(&date)
+                && parsed_date.with_timezone(&Utc) < cutoff_date
+            {
+                continue;
             }
 
             let term_frequencies: HashMap<String, u32> =

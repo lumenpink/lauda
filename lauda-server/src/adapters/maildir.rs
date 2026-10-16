@@ -1050,9 +1050,11 @@ impl MailBackend for MaildirBackend {
             let active_uids: HashSet<u32> = uid_to_prefix.keys().copied().collect();
 
             // 1. Reconciliação inteligente com dovecot-uidlist / active_uids
-            let reconcile = store.reconcile_mailbox(mailbox, &active_uids).map_err(|e| {
-                BackendError::Internal(format!("Erro ao reconciliar índice SQLite: {}", e))
-            })?;
+            let reconcile = store
+                .reconcile_mailbox(mailbox, &active_uids)
+                .map_err(|e| {
+                    BackendError::Internal(format!("Erro ao reconciliar índice SQLite: {}", e))
+                })?;
 
             // Expurgar e-mails excluídos do SQLite
             for del_uid in reconcile.to_remove {
@@ -1142,9 +1144,9 @@ impl MailBackend for MaildirBackend {
                 let active_uids: HashSet<u32> = uid_to_prefix.keys().copied().collect();
                 let _ = store.reconcile_mailbox(mailbox, &active_uids);
             }
-            store
-                .get_recent_slice(mailbox, days)
-                .map_err(|e| BackendError::Internal(format!("Erro ao obter fatia de índice: {}", e)))
+            store.get_recent_slice(mailbox, days).map_err(|e| {
+                BackendError::Internal(format!("Erro ao obter fatia de índice: {}", e))
+            })
         } else {
             Ok(Vec::new())
         }
