@@ -325,10 +325,18 @@ fn test_search_threshold_and_feedback_rules() {
 
     // Queries curtas (< 3) NÃO filtram o vetor (mantêm a lista original intacta, evitando falso negativo)
     let under_threshold = fast_filter_envelopes(&list, "p");
-    assert_eq!(under_threshold.len(), 2, "1 caractere não deve esvaziar a lista");
+    assert_eq!(
+        under_threshold.len(),
+        2,
+        "1 caractere não deve esvaziar a lista"
+    );
 
     let under_threshold2 = fast_filter_envelopes(&list, "pi");
-    assert_eq!(under_threshold2.len(), 2, "2 caracteres não devem esvaziar a lista");
+    assert_eq!(
+        under_threshold2.len(),
+        2,
+        "2 caracteres não devem esvaziar a lista"
+    );
 
     // Query de 3 caracteres aciona o filtro
     let exact_threshold = fast_filter_envelopes(&list, "pix");
