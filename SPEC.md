@@ -1,7 +1,7 @@
 # LAUDA — Especificação do Smolclient & Micro-Daemon de Correio
 
 **Versão da Norma:** GOST `1.0.0`  
-**Status:** `IN_PROGRESS` (Branch: `feat/70-client-offline-hybrid-search`)  
+**Status:** `CONCLUÍDO` (Branch: `feat/70-client-offline-hybrid-search`)  
 **Licença:** GPL-3.0 (com satélites `LICENSE-MEDIA` CC-BY-SA-4.0 e `LICENSE-LOGO` CC-BY-ND-4.0)  
 **Ticket de Referência:** `#70` (Anteriores: `#69`, `#68`, `#67`, `#66`, `#65`, `#64`, `#63`, `#62`, `#1`)
 
@@ -745,9 +745,9 @@ Clientes móveis (Android NDK) e desktops (Linux x86_64) operam frequentemente e
    - Sincroniza a fatia de índice periodicamente em segundo plano.
 
 ### 24.3 Critérios de Aceite (Ticket #70)
-- [ ] `HttpApiClient` implementa `fetch_index_slice` consumindo a rota do servidor.
-- [ ] `LocalMessageCache` persiste e hidrata `IndexedDoc`s e constrói `MessageIndex` em memória.
-- [ ] Fallback automático para busca híbrida local quando offline ou sem sinal.
-- [ ] Interface exibe feedback explícito informando o modo offline e a janela de 90 dias.
-- [ ] Testes automatizados herméticos cobrindo serialização de fatia, busca offline e fallback.
-- [ ] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
+- [x] `HttpApiClient` implementa `fetch_index_slice` consumindo a rota do servidor.
+- [x] `LocalMessageCache` persiste e hidrata `IndexedDoc`s e constrói `MessageIndex` em memória.
+- [x] Fallback automático para busca híbrida local quando offline ou sem sinal.
+- [x] Interface exibe feedback explícito informando o modo offline e a janela de 90 dias.
+- [x] Testes automatizados herméticos cobrindo serialização de fatia, busca offline e fallback.
+- [x] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
