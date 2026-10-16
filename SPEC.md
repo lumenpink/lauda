@@ -1,9 +1,9 @@
 # LAUDA — Especificação do Smolclient & Micro-Daemon de Correio
 
 **Versão da Norma:** GOST `1.0.0`  
-**Status:** `CONCLUÍDO` (Branch: `feat/67-audit-blocking-operations`)  
+**Status:** `IN_PROGRESS` (Branch: `feat/68-search-threshold-feedback`)  
 **Licença:** GPL-3.0 (com satélites `LICENSE-MEDIA` CC-BY-SA-4.0 e `LICENSE-LOGO` CC-BY-ND-4.0)  
-**Ticket de Referência:** `#67` (Anteriores: `#66`, `#65`, `#64`, `#63`, `#62`, `#1`)
+**Ticket de Referência:** `#68` (Anteriores: `#67`, `#66`, `#65`, `#64`, `#63`, `#62`, `#1`)
 
 ---
 
@@ -653,14 +653,29 @@ Após auditoria dos componentes Dioxus e hooks reativos no `lauda-client`, foram
 - [x] Testes automatizados herméticos cobrindo busca local rápida e memoização de visualização.
 - [x] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
 
+---
 
+## 22. Limiar de Busca em 3 Caracteres e Feedback Visual Explicativo (Ticket #68)
 
+### 22.1 Motivação e Usabilidade
+Ao digitar os primeiros caracteres na barra de pesquisa (1 ou 2 caracteres), a interface exibia prematuramente o aviso de lista vazia *"Nenhuma mensagem corresponde à pesquisa e filtros."*, induzindo o usuário ao falso negativo (acreditar que a busca havia sido concluída com zero resultados quando, na verdade, o sistema nem iniciou o processamento). Além disso, disparar consultas assíncronas ao servidor para termos de 1 ou 2 caracteres causa tráfego de rede e consumo de CPU desnecessários para stop-words.
 
+### 22.2 Regras de Busca e Estados da Interface
+1. **Limiar Mínimo de 3 Caracteres**:
+   - Tanto a requisição assíncrona HTTP (`HttpApiClient::search_messages`) quanto o filtro local instantâneo (`fast_filter_envelopes`) só são ativados quando o termo digitado (`query.trim()`) possuir 3 ou mais caracteres (`query.trim().chars().count() >= 3`).
+   - Com 3 caracteres, acrônimos e termos técnicos essenciais (PIX, DOC, PDF, DEV, XML, CEP, RFC, etc.) são buscados com total precisão.
+2. **Feedback Visual Imediato (Anti-Falso Negativo)**:
+   - Quando o campo de pesquisa contiver 1 ou 2 caracteres (`0 < query.trim().chars().count() < 3`), a interface exibe um aviso explicativo no estilo Trash Polka:
+     `"DIGITE AO MENOS 3 CARACTERES PARA PESQUISAR..."`.
+   - A listagem de mensagens da pasta ativa permanece visível (respeitando os filtros de abas como TODOS, NÃO LIDOS, etc.), evitando que a tela esvazie abruptamente antes do usuário completar a palavra.
+   - Caso a pasta ativa esteja vazia com busca incompleta, o estado vazio reforça a mensagem explicativa de digitação mínima em vez de alegar falso negativo de busca.
+3. **Feedback de Busca Concluída**:
+   - Quando a busca for válida ($\ge 3$ caracteres) e retornar 0 resultados, o aviso informa claramente: `"Nenhuma mensagem encontrada para '<query>' nos filtros ativos."`.
 
-
-
-
-
-
-
-
+### 22.3 Critérios de Aceite (Ticket #68)
+- [ ] Requisição assíncrona de busca ao backend é suprimida se `query.trim().chars().count() < 3`.
+- [ ] Filtro local não esvazia a listagem quando `query.trim().chars().count() < 3`.
+- [ ] Banner / aviso explicativo `"DIGITE AO MENOS 3 CARACTERES PARA PESQUISAR..."` é exibido quando houver 1 ou 2 caracteres.
+- [ ] Mensagem de lista vazia com busca ativa ($\ge 3$) informa explicitamente o termo pesquisado.
+- [ ] Testes unitários herméticos no cliente validando a lógica de limiar de busca e feedback.
+- [ ] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
