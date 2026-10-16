@@ -1,7 +1,7 @@
 # LAUDA — Especificação do Smolclient & Micro-Daemon de Correio
 
 **Versão da Norma:** GOST `1.0.0`  
-**Status:** `IN_PROGRESS` (Branch: `feat/69-persistent-sqlite-indexer`)  
+**Status:** `CONCLUÍDO` (Branch: `feat/69-persistent-sqlite-indexer`)  
 **Licença:** GPL-3.0 (com satélites `LICENSE-MEDIA` CC-BY-SA-4.0 e `LICENSE-LOGO` CC-BY-ND-4.0)  
 **Ticket de Referência:** `#69` (Anteriores: `#68`, `#67`, `#66`, `#65`, `#64`, `#63`, `#62`, `#1`)
 
@@ -709,10 +709,10 @@ Anteriormente, o `MaildirBackend::search_messages` iterava sobre todos os arquiv
    - Rota no servidor que exporta os metadados e vetores dos últimos N dias (padrão: 90 dias) para consumo offline pelos clientes.
 
 ### 23.3 Critérios de Aceite (Ticket #69)
-- [ ] Criação de `SqliteIndexStore` com esquema persistente para documentos, termos BM25 e embeddings binários.
-- [ ] Implementação da reconciliação com `dovecot-uidlist` (detecção de novos e-mails e exclusões).
-- [ ] Worker em background indexando mensagens em lote sem bloqueio de I/O e com 0 MB VRAM.
-- [ ] `search_messages` do `MaildirBackend` utiliza o índice persistente em vez de varredura direta no filesystem.
-- [ ] Endpoint `/mailboxes/{mailbox}/index-slice` ou `/sync/index-slice` retornando mensagens indexadas da janela recente.
-- [ ] Testes automatizados herméticos cobrindo indexação, reconciliação, remoção e busca persistente.
-- [ ] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
+- [x] Criação de `SqliteIndexStore` com esquema persistente para documentos, termos BM25 e embeddings binários.
+- [x] Implementação da reconciliação com `dovecot-uidlist` (detecção de novos e-mails e exclusões).
+- [x] Worker em background indexando mensagens em lote sem bloqueio de I/O e com 0 MB VRAM.
+- [x] `search_messages` do `MaildirBackend` utiliza o índice persistente em vez de varredura direta no filesystem.
+- [x] Endpoint `/mailboxes/{mailbox}/index-slice` ou `/sync/index-slice` retornando mensagens indexadas da janela recente.
+- [x] Testes automatizados herméticos cobrindo indexação, reconciliação, remoção e busca persistente.
+- [x] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
