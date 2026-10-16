@@ -231,7 +231,9 @@ pub fn App() -> Element {
                         is_online.set(true);
                         #[cfg(not(target_arch = "wasm32"))]
                         let _ = cache.save_envelopes(&active_box, &server_msgs);
-                        messages.set(server_msgs);
+                        if *messages.read() != server_msgs && messages.read().len() <= 50 {
+                            messages.set(server_msgs);
+                        }
                     }
 
                     // Pausa assíncrona segura em todas as plataformas (Tokio em desktop/Android, setTimeout em WASM)

@@ -218,11 +218,13 @@ pub fn MessageView(
 
     let raw_txt_auto = message.txt_auto.clone().unwrap_or_default();
     let raw_txt_original = message.txt_original.clone().unwrap_or_default();
-    let txt_auto_body = clean_comment_tags(&raw_txt_auto);
-    let txt_original_body = clean_comment_tags(&raw_txt_original);
     let html_body = message.html_sanitized.clone().unwrap_or_default();
 
-    let rendered_markdown_html = parse_markdown_to_html(&txt_auto_body);
+    let txt_original_body = use_memo(move || clean_comment_tags(&raw_txt_original));
+    let rendered_markdown_html = use_memo(move || {
+        let clean = clean_comment_tags(&raw_txt_auto);
+        parse_markdown_to_html(&clean)
+    });
 
     let server_url = session.read().server_url.clone();
     let token_opt = session.read().token.clone();

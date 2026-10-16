@@ -67,3 +67,21 @@ pub fn clean_comment_tags(text: &str) -> String {
     result.push_str(remaining);
     result
 }
+
+/// Filtra uma lista de envelopes locais a partir de uma busca direta e instantânea no cliente.
+pub fn fast_filter_envelopes(
+    envelopes: &[lauda_types::MessageEnvelope],
+    query: &str,
+) -> Vec<lauda_types::MessageEnvelope> {
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return envelopes.to_vec();
+    }
+
+    envelopes
+        .iter()
+        .filter(|m| m.subject.to_lowercase().contains(&q) || m.sender.to_lowercase().contains(&q))
+        .cloned()
+        .collect()
+}
+

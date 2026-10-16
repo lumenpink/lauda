@@ -129,29 +129,7 @@ pub fn InboxView(
     } else {
         let base_list = match &*search_resource.read() {
             Some(Some(list)) => list.clone(),
-            _ => {
-                // Fallback instantâneo em memória sobre os envelopes da caixa ativa
-                let mut index = lauda_index::MessageIndex::new();
-                let box_name = current_mailbox.read().clone();
-                for env in messages.read().iter() {
-                    let msg = Message {
-                        envelope: env.clone(),
-                        txt_auto: None,
-                        txt_original: None,
-                        html_sanitized: None,
-                        attachments: vec![],
-                    };
-                    index.index_message(&box_name, &msg);
-                }
-
-                let ranked_uids = index.search(&query_str);
-                let msgs_snapshot = messages.read();
-
-                ranked_uids
-                    .into_iter()
-                    .filter_map(|uid| msgs_snapshot.iter().find(|m| m.uid == uid).cloned())
-                    .collect()
-            }
+            _ => crate::domain::fast_filter_envelopes(&messages.read(), &query_str),
         };
 
         base_list

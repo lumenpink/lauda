@@ -262,7 +262,7 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
     });
 
     // Agrupamento temporal para a Timeline Stream
-    let events_list = events.read().clone();
+    let events_read = events.read();
     let today_start_ts = lauda_types::calendar::utc_parts_to_timestamp(y, m, d, 0, 0, 0);
     let today_end_ts = today_start_ts + 86400;
     let tomorrow_end_ts = today_end_ts + 86400;
@@ -271,7 +271,7 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
     let mut tomorrow_events = Vec::new();
     let mut upcoming_events = Vec::new();
 
-    for ev in &events_list {
+    for ev in events_read.iter() {
         let st = ev.start.to_timestamp_utc();
         if st < today_end_ts && st >= today_start_ts {
             today_events.push(ev.clone());
@@ -285,7 +285,7 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
         }
     }
 
-    let upcoming_highlights = select_upcoming_events(&events_list, now_ts, 3);
+    let upcoming_highlights = select_upcoming_events(&events_read, now_ts, 3);
 
     rsx! {
         div {
