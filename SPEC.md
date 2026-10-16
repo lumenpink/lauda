@@ -1,9 +1,9 @@
 # LAUDA — Especificação do Smolclient & Micro-Daemon de Correio
 
 **Versão da Norma:** GOST `1.0.0`  
-**Status:** `IN_PROGRESS` (Branch: `feat/64-vector-search-engine`)  
+**Status:** `IN_PROGRESS` (Branch: `perf/maildir-pagination-mtime`)  
 **Licença:** GPL-3.0 (com satélites `LICENSE-MEDIA` CC-BY-SA-4.0 e `LICENSE-LOGO` CC-BY-ND-4.0)  
-**Ticket de Referência:** `#64` (Anteriores: `#63`, `#62`, `#1`)
+**Ticket de Referência:** `#66` (Anteriores: `#65`, `#64`, `#63`, `#62`, `#1`)
 
 ---
 
@@ -590,6 +590,44 @@ Para expor o motor de busca vetorial e híbrida construído no `lauda-index`, o 
 - [x] Barra de busca do `InboxView` no `lauda-client` conectada à busca assíncrona da API.
 - [x] Testes de integração cobrindo busca no servidor e cliente.
 - [x] Quality Gate 100% verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
+
+---
+
+## 20. Paginação Maildir por `mtime` e Janela de Renderização no Cliente (Ticket #66)
+
+### 20.1 Problema de Desempenho Identificado
+Com caixas de e-mail volumosas (> 10k a 30k mensagens), a listagem ingênua do Maildir causava dois gargalos críticos:
+1. `lauda-server` (`maildir.rs`): executava `read` e parse completo de cabeçalhos RFC 822 para todos os milhares de arquivos em disco de forma síncrona.
+2. `lauda-client` (`inbox_view.rs`): o Dioxus tentava renderizar mais de 10.000 nós no DOM da Web simultaneamente, travando a thread principal do browser WASM.
+3. Além disso, e-mails importados via migração possuem UIDs mais altos que e-mails recentes pré-existentes. A ordenação cronológica precisa usar o `mtime` do arquivo no filesystem, preservado pelo Dovecot/IMAP APPEND.
+
+### 20.2 Especificação da API (`lauda-server` & `lauda-types`)
+- Estender `MessagesQuery` com:
+  - `limit: Option<usize>` (padrão: 50, com teto de segurança)
+  - `offset: Option<usize>` (padrão: 0)
+- Na porta `MailBackend`:
+  - `list_messages(&self, username: &str, mailbox: &str, limit: Option<usize>, offset: Option<usize>) -> Result<Vec<MessageEnvelope>, BackendError>`
+- No adaptador `MaildirBackend`:
+  - Varrer `cur/` e `new/` coletando apenas `(path, filename, mtime)` via `entry.metadata()?.modified()` (sem ler conteúdo dos arquivos).
+  - Ordenar entradas por `mtime` decrescente (mais recentes primeiro).
+  - Aplicar paginação `.skip(offset).take(limit)`.
+  - Ler bytes e executar `MessageParser::parse_headers` **estritamente** para as mensagens da fatia requisitada.
+
+### 20.3 Especificação da Janela de Exibição (`lauda-client`)
+- Na porta `MailApiClient`:
+  - `list_messages(&self, token: &str, mailbox: &str, limit: Option<usize>, offset: Option<usize>) -> Result<Vec<MessageEnvelope>, ClientError>`
+- No componente `InboxView`:
+  - Carregar inicialmente as primeiras 50 mensagens mais recentes.
+  - Disponibilizar ação/botão `[+ CARREGAR MAIS 50 MENSAGENS]` que busca a próxima fatia e anexa à lista reativa de mensagens.
+  - Manter fluidez a 60 FPS com limite de itens renderizados e prevenção de clone inútil de dezenas de milhares de mensagens.
+
+### 20.4 Critérios de Aceite (Ticket #66)
+- [ ] Rota `/messages` aceita `limit` e `offset`.
+- [ ] `MaildirBackend` ordena por `mtime` decrescente e abre apenas a fatia `(offset..offset+limit)` de arquivos.
+- [ ] `InMemoryMailBackend` respeita `limit` e `offset`.
+- [ ] Testes unitários e de integração herméticos validando ordenação por `mtime` e paginação com `limit`/`offset`.
+- [ ] `lauda-client` implementa carregamento paginado mantendo a lista fluida no Dioxus.
+- [ ] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
 
 
 
