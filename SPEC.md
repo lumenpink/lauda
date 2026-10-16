@@ -647,11 +647,11 @@ Após auditoria dos componentes Dioxus e hooks reativos no `lauda-client`, foram
 - **Higiene de Re-render no Background Sync**: Atualizar `messages` no sync em segundo plano apenas se a lista retornada divergir do estado atual ou se o usuário não tiver expandido a janela além da página base.
 
 ### 21.3 Critérios de Aceite (Ticket #67)
-- [ ] Fallback de busca no `inbox_view.rs` opera com filtro direto em sub-milissegundo sem alocação de `MessageIndex`.
-- [ ] Transformações de corpo em `message_view.rs` usam `use_memo` evitando re-parsing de Markdown em re-renders de interação.
-- [ ] `calendar_view.rs` itera sobre eventos sem clonar o vetor raiz.
-- [ ] Testes automatizados herméticos cobrindo busca local rápida e memoização de visualização.
-- [ ] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
+- [x] Fallback de busca no `inbox_view.rs` opera com filtro direto em sub-milissegundo sem alocação de `MessageIndex`.
+- [x] Transformações de corpo em `message_view.rs` usam `use_memo` evitando re-parsing de Markdown em re-renders de interação.
+- [x] `calendar_view.rs` itera sobre eventos sem clonar o vetor raiz.
+- [x] Testes automatizados herméticos cobrindo busca local rápida e memoização de visualização.
+- [x] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
 
 
 
