@@ -100,7 +100,7 @@ pub fn InboxView(
         let box_name = current_mailbox.read().clone();
         let sess = session.read().clone();
         async move {
-            if q.is_empty() {
+            if !crate::domain::is_search_active(&q) {
                 None
             } else if let Some(token) = sess.token {
                 let client = HttpApiClient::new(sess.server_url);
@@ -113,8 +113,9 @@ pub fn InboxView(
 
     let current_filt = *active_filter.read();
     let query_str = search_query.read().trim().to_string();
+    let is_searching = crate::domain::is_search_active(&query_str);
 
-    let filtered_messages: Vec<MessageEnvelope> = if query_str.is_empty() {
+    let filtered_messages: Vec<MessageEnvelope> = if !is_searching {
         messages
             .read()
             .iter()
@@ -281,7 +282,7 @@ pub fn InboxView(
                             span { style: "color: #dc143c; font-weight: bold;", "🔍" }
                             input {
                                 style: "border: none; outline: none; width: 100%; font-family: monospace; font-size: 0.95rem; background: transparent; color: #0a0a0a;",
-                                placeholder: "Pesquisar por assunto ou remetente...",
+                                placeholder: "Pesquisar por assunto ou remetente (mín. 3 caracteres)...",
                                 value: "{search_query.read()}",
                                 oninput: move |e| search_query.set(e.value()),
                             }
@@ -291,6 +292,14 @@ pub fn InboxView(
                                     onclick: move |_| search_query.set(String::new()),
                                     "✕"
                                 }
+                            }
+                        }
+
+                        if crate::domain::should_show_search_hint(&search_query.read()) {
+                            div {
+                                style: "border: 2px solid #dc143c; background: #fff5f5; color: #dc143c; padding: 0.5rem 0.8rem; font-family: monospace; font-size: 0.8rem; font-weight: bold; display: flex; align-items: center; gap: 0.5rem; box-shadow: 2px 2px 0 #0a0a0a;",
+                                span { "ℹ" }
+                                span { "DIGITE AO MENOS 3 CARACTERES PARA PESQUISAR..." }
                             }
                         }
 
@@ -341,10 +350,12 @@ pub fn InboxView(
                     if filtered_messages.is_empty() {
                         div {
                             style: "border: 2px dashed #666; background: #fff; padding: 2rem; text-align: center; color: #555;",
-                            if search_query.read().is_empty() {
-                                "Nenhuma mensagem corresponde aos filtros ativos."
+                            if crate::domain::should_show_search_hint(&query_str) {
+                                "DIGITE AO MENOS 3 CARACTERES PARA PESQUISAR..."
+                            } else if is_searching {
+                                "Nenhuma mensagem encontrada para \"{query_str}\" nos filtros ativos."
                             } else {
-                                "Nenhuma mensagem corresponde à pesquisa e filtros."
+                                "Nenhuma mensagem corresponde aos filtros ativos."
                             }
                         }
                     }
@@ -466,7 +477,7 @@ pub fn InboxView(
                             }
                         }
                     }
-                    if query_str.is_empty() && *has_more.read() && !filtered_messages.is_empty() {
+                    if !is_searching && *has_more.read() && !filtered_messages.is_empty() {
                         button {
                             style: "width: 100%; padding: 0.8rem; margin-top: 1rem; border: 2px solid #0a0a0a; background: #faf9f6; color: #0a0a0a; font-family: monospace; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #dc143c; text-align: center; text-transform: uppercase;",
                             disabled: *is_loading_more.read(),

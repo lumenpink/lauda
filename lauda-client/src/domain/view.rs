@@ -68,13 +68,29 @@ pub fn clean_comment_tags(text: &str) -> String {
     result
 }
 
+/// Limiar mínimo de caracteres para ativar a busca semântica/local no cliente.
+pub const MIN_SEARCH_QUERY_LEN: usize = 3;
+
+/// Informa se a busca deve ser ativada para o termo fornecido.
+pub fn is_search_active(query: &str) -> bool {
+    query.trim().chars().count() >= MIN_SEARCH_QUERY_LEN
+}
+
+/// Informa se o aviso explicativo de digitação mínima deve ser exibido (1 ou 2 caracteres).
+pub fn should_show_search_hint(query: &str) -> bool {
+    let count = query.trim().chars().count();
+    count > 0 && count < MIN_SEARCH_QUERY_LEN
+}
+
 /// Filtra uma lista de envelopes locais a partir de uma busca direta e instantânea no cliente.
+/// Caso o termo possua menos de `MIN_SEARCH_QUERY_LEN` caracteres, a lista original é preservada
+/// para evitar falsos negativos na interface enquanto o usuário digita.
 pub fn fast_filter_envelopes(
     envelopes: &[lauda_types::MessageEnvelope],
     query: &str,
 ) -> Vec<lauda_types::MessageEnvelope> {
     let q = query.trim().to_lowercase();
-    if q.is_empty() {
+    if q.chars().count() < MIN_SEARCH_QUERY_LEN {
         return envelopes.to_vec();
     }
 

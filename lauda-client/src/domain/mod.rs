@@ -24,4 +24,7 @@ pub use session::{
 pub use sync::{ActionType, ActionsQueue, QueuedAction};
 pub use time::{async_sleep, current_unix_timestamp};
 pub use update::{UpdateManifest, UpdateStatus, check_update, fetch_remote_manifest};
-pub use view::{ViewMode, fast_filter_envelopes, filter_aliases, parse_markdown_to_html};
+pub use view::{
+    MIN_SEARCH_QUERY_LEN, ViewMode, fast_filter_envelopes, filter_aliases, is_search_active,
+    parse_markdown_to_html, should_show_search_hint,
+};
