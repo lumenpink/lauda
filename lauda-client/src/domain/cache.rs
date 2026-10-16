@@ -611,11 +611,7 @@ impl LocalMessageCache {
                 }
             }
 
-            if count > 0 {
-                Ok(Some(index))
-            } else {
-                Ok(None)
-            }
+            if count > 0 { Ok(Some(index)) } else { Ok(None) }
         }
         #[cfg(target_arch = "wasm32")]
         {
