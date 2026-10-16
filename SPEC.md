@@ -1,7 +1,7 @@
 # LAUDA — Especificação do Smolclient & Micro-Daemon de Correio
 
 **Versão da Norma:** GOST `1.0.0`  
-**Status:** `IN_PROGRESS` (Branch: `perf/71-client-non-blocking-ui-io`)  
+**Status:** `CONCLUÍDO` (Branch: `perf/71-client-non-blocking-ui-io`)  
 **Licença:** GPL-3.0 (com satélites `LICENSE-MEDIA` CC-BY-SA-4.0 e `LICENSE-LOGO` CC-BY-ND-4.0)  
 **Ticket de Referência:** `#71` (Anteriores: `#70`, `#69`, `#68`, `#67`, `#66`, `#65`, `#64`, `#63`, `#62`, `#1`)
 
@@ -775,9 +775,9 @@ Foram identificados os seguintes gargalos:
    - Sincronização dos manifestos `site/version.json` e `site/version-nightly.json` para garantir conformidade contínua nos testes de distribuição e packaging.
 
 ### 25.3 Critérios de Aceite (Ticket #71)
-- [ ] Salvamento de anexo desacoplado em tarefa assíncrona com feedback não-bloqueante na UI.
-- [ ] Autocomplete de contatos no `compose_view` e `calendar_view` desacoplado da thread de renderização com atualização assíncrona.
-- [ ] Operações de I/O e persistência local protegidas contra travamentos da interface.
-- [ ] Sincronização de manifestos de versão atualizada conforme o arquivo `VERSION`.
-- [ ] Testes automatizados herméticos cobrindo fluxos assíncronos e não-bloqueantes.
-- [ ] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
+- [x] Salvamento de anexo desacoplado em tarefa assíncrona com feedback não-bloqueante na UI.
+- [x] Autocomplete de contatos no `compose_view` e `calendar_view` desacoplado da thread de renderização com atualização assíncrona.
+- [x] Operações de I/O e persistência local protegidas contra travamentos da interface.
+- [x] Sincronização de manifestos de versão atualizada conforme o arquivo `VERSION`.
+- [x] Testes automatizados herméticos cobrindo fluxos assíncronos e não-bloqueantes.
+- [x] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
