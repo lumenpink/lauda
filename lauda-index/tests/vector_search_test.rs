@@ -1,6 +1,4 @@
-use lauda_index::{
-    EmbeddingProvider, MessageIndex, SearchResult, cosine_similarity,
-};
+use lauda_index::{EmbeddingProvider, MessageIndex, SearchResult, cosine_similarity};
 use lauda_types::{Message, MessageEnvelope};
 use urupema::domain::SegmentKind;
 
@@ -249,4 +247,3 @@ fn test_semantic_index_persistence_roundtrip() {
     assert_eq!(results[0].uid, 501);
     assert_eq!(results[0].matched_segment, Some(SegmentKind::Body));
 }
-

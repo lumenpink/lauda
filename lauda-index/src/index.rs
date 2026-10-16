@@ -17,10 +17,7 @@ mod segment_kind_serde {
     use super::*;
     use serde::{Deserializer, Serializer};
 
-    pub fn serialize<S>(
-        kind: &Option<SegmentKind>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(kind: &Option<SegmentKind>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -38,9 +35,7 @@ mod segment_kind_serde {
         }
     }
 
-    pub fn deserialize<'de, D>(
-        deserializer: D,
-    ) -> Result<Option<SegmentKind>, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<SegmentKind>, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -90,9 +85,7 @@ mod segment_embeddings_serde {
         list.serialize(serializer)
     }
 
-    pub fn deserialize<'de, D>(
-        deserializer: D,
-    ) -> Result<Vec<(SegmentKind, Vec<f32>)>, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<(SegmentKind, Vec<f32>)>, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -297,7 +290,11 @@ impl MessageIndex {
             }
         }
 
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results
     }
 
@@ -337,7 +334,9 @@ impl MessageIndex {
                     doc_score = 1.0;
                 } else {
                     for clause in &query.clauses {
-                        if let Some(score) = self.evaluate_clause(doc, clause, total_docs, avg_doc_len) {
+                        if let Some(score) =
+                            self.evaluate_clause(doc, clause, total_docs, avg_doc_len)
+                        {
                             doc_score += score;
                             matched_any = true;
                         }
@@ -377,10 +376,8 @@ impl MessageIndex {
                 0.0
             };
 
-            let (sem_score, matched_segment) = semantic_map
-                .get(&uid)
-                .cloned()
-                .unwrap_or((0.0, None));
+            let (sem_score, matched_segment) =
+                semantic_map.get(&uid).cloned().unwrap_or((0.0, None));
 
             let combined_score = alpha * norm_bm25 + (1.0 - alpha) * sem_score;
 
@@ -395,7 +392,11 @@ impl MessageIndex {
             }
         }
 
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results
     }
 
