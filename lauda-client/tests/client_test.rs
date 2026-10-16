@@ -394,3 +394,42 @@ async fn test_client_offline_index_slice_and_hybrid_search() {
     assert_eq!(results[0].uid, 777);
     assert!(results[0].semantic_score > 0.0);
 }
+
+#[tokio::test]
+async fn test_client_attachment_save_and_status_formatting() {
+    use lauda_client::domain::view::{
+        AttachmentSaveState, format_attachment_status, save_attachment_bytes,
+    };
+    use tempfile::tempdir;
+
+    let temp = tempdir().expect("tempdir");
+    let target = temp.path().join("documento.pdf");
+
+    // 1. Estados e formatação de feedback explicativo
+    let s_downloading = format_attachment_status("documento.pdf", AttachmentSaveState::Downloading);
+    assert_eq!(s_downloading, "⌛ BAIXANDO ANEXO: documento.pdf...");
+
+    let s_saving = format_attachment_status("documento.pdf", AttachmentSaveState::Saving);
+    assert_eq!(s_saving, "💾 SALVANDO EM DISCO: documento.pdf...");
+
+    let s_saved = format_attachment_status(
+        "documento.pdf",
+        AttachmentSaveState::Saved(target.display().to_string()),
+    );
+    assert!(s_saved.starts_with("✓ Salvo em "));
+
+    let s_failed = format_attachment_status(
+        "documento.pdf",
+        AttachmentSaveState::Failed("Sem permissão".to_string()),
+    );
+    assert_eq!(s_failed, "Falha no salvamento: Sem permissão");
+
+    // 2. Gravação assíncrona desacoplada de bytes
+    let payload = b"%PDF-1.4 Relatorio Teste".to_vec();
+    let res = save_attachment_bytes(&target, &payload).await;
+    assert!(res.is_ok());
+    assert!(target.exists());
+    let read_back = std::fs::read(&target).expect("ler arquivo gravado");
+    assert_eq!(read_back, payload);
+}
+
