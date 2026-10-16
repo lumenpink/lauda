@@ -91,4 +91,10 @@ pub trait MailApiClient: Send + Sync {
         token: &str,
         bundle: &lauda_types::sieve::SieveScriptBundle,
     ) -> Result<(), ClientError>;
+    async fn fetch_index_slice(
+        &self,
+        token: &str,
+        mailbox: &str,
+        days: u32,
+    ) -> Result<Vec<lauda_index::IndexedDoc>, ClientError>;
 }

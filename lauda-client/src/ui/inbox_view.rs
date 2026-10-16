@@ -2,6 +2,7 @@ use dioxus::prelude::*;
 use lauda_types::{MailboxInfo, Message, MessageEnvelope, message::SignatureStatus};
 
 use crate::adapters::HttpApiClient;
+use crate::domain::cache::{LocalMessageCache, get_default_cache_dir};
 use crate::domain::ports::MailApiClient;
 use crate::domain::session::{SessionConfig, clear_session};
 use crate::ui::state::Screen;
@@ -56,6 +57,11 @@ pub fn InboxView(
                     has_more.set(msgs.len() == 50);
                     messages.set(msgs);
                 }
+                // Sincroniza a fatia de 90 dias em background no cache local
+                if let Ok(docs) = client.fetch_index_slice(&token, &box_name, 90).await {
+                    let cache = LocalMessageCache::new(get_default_cache_dir());
+                    let _ = cache.save_index_slice(&box_name, &docs);
+                }
                 is_refreshing.set(false);
             });
         }
@@ -104,7 +110,36 @@ pub fn InboxView(
                 None
             } else if let Some(token) = sess.token {
                 let client = HttpApiClient::new(sess.server_url);
-                client.search_messages(&token, &box_name, &q).await.ok()
+                match client.search_messages(&token, &box_name, &q).await {
+                    Ok(list) => Some((list, false)),
+                    Err(_) => {
+                        let cache = LocalMessageCache::new(get_default_cache_dir());
+                        if let Ok(Some(local_index)) = cache.load_index_slice(&box_name) {
+                            let provider = lauda_index::SimpleCpuEmbeddingProvider;
+                            let ranked = local_index.search_hybrid(&q, &provider, 0.5);
+                            let docs = local_index.documents();
+                            let envelopes: Vec<MessageEnvelope> = ranked
+                                .into_iter()
+                                .filter_map(|r| {
+                                    docs.get(&r.uid).map(|doc| MessageEnvelope {
+                                        uid: doc.uid,
+                                        subject: doc.subject.clone(),
+                                        sender: doc.sender.clone(),
+                                        date: doc.date.clone(),
+                                        cc: None,
+                                        has_attachments: doc.has_attachments,
+                                        is_read: doc.is_read,
+                                        is_flagged: doc.is_flagged,
+                                        crypto_meta: None,
+                                    })
+                                })
+                                .collect();
+                            Some((envelopes, true))
+                        } else {
+                            None
+                        }
+                    }
+                }
             } else {
                 None
             }
@@ -114,6 +149,14 @@ pub fn InboxView(
     let current_filt = *active_filter.read();
     let query_str = search_query.read().trim().to_string();
     let is_searching = crate::domain::is_search_active(&query_str);
+
+    let (base_list, is_offline_search) = match &*search_resource.read() {
+        Some(Some((list, is_offline))) => (list.clone(), *is_offline),
+        _ => (
+            crate::domain::fast_filter_envelopes(&messages.read(), &query_str),
+            false,
+        ),
+    };
 
     let filtered_messages: Vec<MessageEnvelope> = if !is_searching {
         messages
@@ -128,11 +171,6 @@ pub fn InboxView(
             .cloned()
             .collect()
     } else {
-        let base_list = match &*search_resource.read() {
-            Some(Some(list)) => list.clone(),
-            _ => crate::domain::fast_filter_envelopes(&messages.read(), &query_str),
-        };
-
         base_list
             .into_iter()
             .filter(|env| match current_filt {
@@ -300,6 +338,14 @@ pub fn InboxView(
                                 style: "border: 2px solid #dc143c; background: #fff5f5; color: #dc143c; padding: 0.5rem 0.8rem; font-family: monospace; font-size: 0.8rem; font-weight: bold; display: flex; align-items: center; gap: 0.5rem; box-shadow: 2px 2px 0 #0a0a0a;",
                                 span { "ℹ" }
                                 span { "DIGITE AO MENOS 3 CARACTERES PARA PESQUISAR..." }
+                            }
+                        }
+
+                        if is_offline_search && is_searching {
+                            div {
+                                style: "border: 2px solid #dc143c; background: #0a0a0a; color: #fff; padding: 0.5rem 0.8rem; font-family: monospace; font-size: 0.8rem; font-weight: bold; display: flex; align-items: center; gap: 0.5rem; box-shadow: 2px 2px 0 #dc143c;",
+                                span { "⚡" }
+                                span { "MODO OFFLINE: PESQUISANDO NO HISTÓRICO LOCAL DOS ÚLTIMOS 90 DIAS" }
                             }
                         }
 

@@ -76,7 +76,16 @@ impl LocalMessageCache {
                 PRIMARY KEY (mailbox, uid)
             );
 
-            CREATE INDEX IF NOT EXISTS idx_messages_date ON cache_messages (date_unix);",
+            CREATE INDEX IF NOT EXISTS idx_messages_date ON cache_messages (date_unix);
+
+            CREATE TABLE IF NOT EXISTS cache_indexed_documents (
+                mailbox TEXT NOT NULL,
+                uid INTEGER NOT NULL,
+                doc_json TEXT NOT NULL,
+                PRIMARY KEY (mailbox, uid)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_indexed_docs_box ON cache_indexed_documents (mailbox);",
         )
         .map_err(|e| std::io::Error::other(e.to_string()))?;
 
@@ -542,6 +551,76 @@ impl LocalMessageCache {
         {
             let _ = cutoff_unix;
             Ok(0)
+        }
+    }
+
+    /// Salva a fatia de documentos pré-indexados (ex: últimos 90 dias) no cache local.
+    pub fn save_index_slice(
+        &self,
+        mailbox: &str,
+        docs: &[lauda_index::IndexedDoc],
+    ) -> std::io::Result<()> {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let conn = self.conn.lock().unwrap();
+            let mut stmt = conn
+                .prepare(
+                    "INSERT OR REPLACE INTO cache_indexed_documents (mailbox, uid, doc_json) VALUES (?1, ?2, ?3)",
+                )
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            for doc in docs {
+                if let Ok(json) = serde_json::to_string(doc) {
+                    let _ = stmt.execute(params![mailbox, doc.uid, json]);
+                }
+            }
+            Ok(())
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = (mailbox, docs);
+            Ok(())
+        }
+    }
+
+    /// Carrega o MessageIndex reconstruído a partir da fatia salva no cache local para busca offline.
+    pub fn load_index_slice(
+        &self,
+        mailbox: &str,
+    ) -> std::io::Result<Option<lauda_index::MessageIndex>> {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let conn = self.conn.lock().unwrap();
+            let mut stmt = conn
+                .prepare("SELECT doc_json FROM cache_indexed_documents WHERE mailbox = ?1")
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            let rows = stmt
+                .query_map(params![mailbox], |row| row.get::<_, String>(0))
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            let mut index = lauda_index::MessageIndex::new();
+            let mut count = 0;
+
+            for r in rows {
+                if let Ok(json) = r
+                    && let Ok(doc) = serde_json::from_str::<lauda_index::IndexedDoc>(&json)
+                {
+                    index.insert_doc(doc);
+                    count += 1;
+                }
+            }
+
+            if count > 0 {
+                Ok(Some(index))
+            } else {
+                Ok(None)
+            }
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = mailbox;
+            Ok(None)
         }
     }
 }

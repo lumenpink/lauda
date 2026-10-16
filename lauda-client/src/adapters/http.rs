@@ -511,4 +511,36 @@ impl MailApiClient for HttpApiClient {
             ))),
         }
     }
+
+    async fn fetch_index_slice(
+        &self,
+        token: &str,
+        mailbox: &str,
+        days: u32,
+    ) -> Result<Vec<lauda_index::IndexedDoc>, ClientError> {
+        let url = format!("{}/mailboxes/{}/index-slice", self.base_url, mailbox);
+        let headers = Self::auth_headers(token)?;
+        let resp = self
+            .client
+            .get(&url)
+            .headers(headers)
+            .query(&[("days", days.to_string())])
+            .send()
+            .await
+            .map_err(|e| ClientError::Network(e.to_string()))?;
+
+        match resp.status() {
+            StatusCode::OK => resp
+                .json::<Vec<lauda_index::IndexedDoc>>()
+                .await
+                .map_err(|e| {
+                    ClientError::Network(format!("Erro ao deserializar fatia de índice: {}", e))
+                }),
+            StatusCode::UNAUTHORIZED => Err(ClientError::AuthFailed),
+            status => Err(ClientError::Network(format!(
+                "Status inesperado ao buscar fatia de índice: {}",
+                status
+            ))),
+        }
+    }
 }

@@ -307,4 +307,13 @@ impl MailApiClient for InMemoryApiClient {
     ) -> Result<(), ClientError> {
         Ok(())
     }
+
+    async fn fetch_index_slice(
+        &self,
+        _token: &str,
+        _mailbox: &str,
+        _days: u32,
+    ) -> Result<Vec<lauda_index::IndexedDoc>, ClientError> {
+        Ok(vec![])
+    }
 }
