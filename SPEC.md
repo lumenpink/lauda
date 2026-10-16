@@ -1,9 +1,9 @@
 # LAUDA — Especificação do Smolclient & Micro-Daemon de Correio
 
 **Versão da Norma:** GOST `1.0.0`  
-**Status:** `CONCLUÍDO` (Branch: `feat/66-maildir-pagination-mtime`)  
+**Status:** `IN_PROGRESS` (Branch: `feat/67-audit-blocking-operations`)  
 **Licença:** GPL-3.0 (com satélites `LICENSE-MEDIA` CC-BY-SA-4.0 e `LICENSE-LOGO` CC-BY-ND-4.0)  
-**Ticket de Referência:** `#66` (Anteriores: `#65`, `#64`, `#63`, `#62`, `#1`)
+**Ticket de Referência:** `#67` (Anteriores: `#66`, `#65`, `#64`, `#63`, `#62`, `#1`)
 
 ---
 
@@ -628,6 +628,31 @@ Com caixas de e-mail volumosas (> 10k a 30k mensagens), a listagem ingênua do M
 - [x] Testes unitários e de integração herméticos validando ordenação por `mtime` e paginação com `limit`/`offset`.
 - [x] `lauda-client` implementa carregamento paginado mantendo a lista fluida no Dioxus.
 - [x] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
+
+---
+
+## 21. Auditoria e Eliminação de Operações Bloqueantes no Cliente (Ticket #67)
+
+### 21.1 Diagnóstico de Gargalos na Thread Principal (WASM UI)
+Após auditoria dos componentes Dioxus e hooks reativos no `lauda-client`, foram mapeados os seguintes gargalos potenciais de bloqueio da thread principal do browser:
+1. **Fallback de Busca Síncrono no Render Body (`inbox_view.rs`)**: A cada caractere digitado na busca, antes do retorno assíncrono do servidor, o Dioxus instanciava um novo `MessageIndex`, iterava sobre todos os envelopes locais criando structs `Message` fictícias e executava o motor BM25 síncrono.
+2. **Re-parsing Pesado de Markdown/HTML a Cada Frame (`message_view.rs`)**: Toda alteração de estado no `MessageView` (como troca de abas, clique em botões ou re-renders reativos) reexecutava `clean_comment_tags` e `parse_markdown_to_html` sobre corpos inteiros de e-mail (até centenas de kilobytes), sem memoização.
+3. **Clonagem Recorrente de Coleções no Render Loop (`calendar_view.rs`)**: A lista de eventos inteira era clonada (`events.read().clone()`) em cada ciclo reativo, seguida de re-particionamento vetorial completo.
+4. **Substituição Agressiva de Estado no Background Sync (`ui/mod.rs`)**: O loop em segundo plano chamava `messages.set(...)` incondicionalmente a cada 10 segundos, forçando um reflow global no DOM mesmo quando não havia alterações.
+
+### 21.2 Especificações das Soluções
+- **Busca Instantânea Zero-Allocation no Cliente**: Substituir a montagem síncrona do índice BM25 no corpo do render por um filtro direto e insensível a maiúsculas/minúsculas sobre `subject` e `sender` dos envelopes locais enquanto a busca semântica completa transita assincronamente via HTTP.
+- **Memoização com `use_memo` no `MessageView`**: Armazenar o resultado de `parse_markdown_to_html` e `clean_comment_tags` em sinais memoizados que só recalculam caso o `active_message` realmente mude.
+- **Iteração por Referência no `CalendarView`**: Eliminar `.clone()` redundante na lista de eventos e particionar a stream por referência.
+- **Higiene de Re-render no Background Sync**: Atualizar `messages` no sync em segundo plano apenas se a lista retornada divergir do estado atual ou se o usuário não tiver expandido a janela além da página base.
+
+### 21.3 Critérios de Aceite (Ticket #67)
+- [ ] Fallback de busca no `inbox_view.rs` opera com filtro direto em sub-milissegundo sem alocação de `MessageIndex`.
+- [ ] Transformações de corpo em `message_view.rs` usam `use_memo` evitando re-parsing de Markdown em re-renders de interação.
+- [ ] `calendar_view.rs` itera sobre eventos sem clonar o vetor raiz.
+- [ ] Testes automatizados herméticos cobrindo busca local rápida e memoização de visualização.
+- [ ] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
+
 
 
 
