@@ -547,12 +547,13 @@ Para alimentar a busca de e-mails com precisão semântica e sem alocar memória
 - Casamento de exatidão para códigos, números de processo, CPF e leis via BM25, e casamento conceitual/linguagem natural via similaridade semântica.
 
 ### 18.5 Critérios de Aceite (Ticket #64)
-- [ ] Trait `EmbeddingProvider` e estruturas vetoriais implementadas em `lauda-index`.
-- [ ] Dissecação via `urupema::domain::segment_email` integrada no `lauda-index`.
-- [ ] Cálculo de similaridade por cosseno, Max-Pooling e seleção de melhor segmento implementados.
-- [ ] Fusão híbrida BM25 + Vetorial com pontuação unificada.
-- [ ] Testes unitários herméticos em `lauda-index/tests/vector_search_test.rs`.
-- [ ] Quality Gate 100% verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test -p lauda-index`).
+- [x] Trait `EmbeddingProvider` e estruturas vetoriais implementadas em `lauda-index`.
+- [x] Dissecação via `urupema::domain::segment_email` integrada no `lauda-index`.
+- [x] Cálculo de similaridade por cosseno, Max-Pooling e seleção de melhor segmento implementados.
+- [x] Fusão híbrida BM25 + Vetorial com pontuação unificada.
+- [x] Testes unitários herméticos em `lauda-index/tests/vector_search_test.rs`.
+- [x] Quality Gate 100% verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test -p lauda-index`).
+
 
 
 
