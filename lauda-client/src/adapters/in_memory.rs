@@ -175,7 +175,8 @@ impl MailApiClient for InMemoryApiClient {
         let box_msgs = msgs.get(mailbox).unwrap_or(&empty);
 
         if query.trim().is_empty() {
-            let mut list: Vec<MessageEnvelope> = box_msgs.iter().map(|m| m.envelope.clone()).collect();
+            let mut list: Vec<MessageEnvelope> =
+                box_msgs.iter().map(|m| m.envelope.clone()).collect();
             list.sort_by_key(|e| std::cmp::Reverse(e.uid));
             return Ok(list);
         }

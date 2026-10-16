@@ -232,4 +232,3 @@ async fn test_in_memory_api_client() {
     assert_eq!(search_res.len(), 1);
     assert_eq!(search_res[0].uid, 102);
 }
-

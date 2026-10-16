@@ -55,7 +55,6 @@ impl EmbeddingProvider for SimpleCpuEmbeddingProvider {
     }
 }
 
-
 mod segment_kind_serde {
     use super::*;
     use serde::{Deserializer, Serializer};

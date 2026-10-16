@@ -166,10 +166,8 @@ async fn test_search_edge_cases_and_unauthorized() {
         .unwrap();
 
     let response = app.clone().oneshot(req).await.unwrap();
-    let token_resp: TokenResponse = serde_json::from_slice(
-        &response.into_body().collect().await.unwrap().to_bytes(),
-    )
-    .unwrap();
+    let token_resp: TokenResponse =
+        serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
     let token = token_resp.token;
 
     // 3. Termo que não casa com nenhuma mensagem
@@ -200,4 +198,3 @@ async fn test_search_edge_cases_and_unauthorized() {
     let results_empty: Vec<MessageEnvelope> = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(results_empty.len(), 2);
 }
-
