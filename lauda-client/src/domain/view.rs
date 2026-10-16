@@ -100,3 +100,109 @@ pub fn fast_filter_envelopes(
         .cloned()
         .collect()
 }
+
+/// Estado do fluxo de download e gravação de anexo.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AttachmentSaveState {
+    Downloading,
+    Saving,
+    Saved(String),
+    Failed(String),
+}
+
+/// Formata a mensagem de status para exibição ao usuário durante o download/salvamento de anexo.
+pub fn format_attachment_status(filename: &str, state: AttachmentSaveState) -> String {
+    match state {
+        AttachmentSaveState::Downloading => format!("⌛ BAIXANDO ANEXO: {filename}..."),
+        AttachmentSaveState::Saving => format!("💾 SALVANDO EM DISCO: {filename}..."),
+        AttachmentSaveState::Saved(path) => format!("✓ Salvo em {path}"),
+        AttachmentSaveState::Failed(err) => format!("Falha no salvamento: {err}"),
+    }
+}
+
+/// Executa uma closure bloqueante fora da thread da UI (via worker thread e oneshot channel em plataformas nativas).
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn run_blocking_task<F, R>(f: F) -> Result<R, String>
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
+{
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    std::thread::spawn(move || {
+        let res = f();
+        let _ = tx.send(res);
+    });
+    rx.await
+        .map_err(|_| "Falha ao executar tarefa em background".to_string())
+}
+
+/// Execução direta para alvos WebAssembly (single-threaded).
+#[cfg(target_arch = "wasm32")]
+pub async fn run_blocking_task<F, R>(f: F) -> Result<R, String>
+where
+    F: FnOnce() -> R + 'static,
+    R: 'static,
+{
+    Ok(f())
+}
+
+/// Grava bytes de um anexo em disco de forma assíncrona desacoplada da thread da interface.
+pub async fn save_attachment_bytes(
+    target: &std::path::Path,
+    bytes: &[u8],
+) -> Result<(), std::io::Error> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let target = target.to_path_buf();
+        let bytes = bytes.to_vec();
+        run_blocking_task(move || {
+            if let Some(parent) = target.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            std::fs::write(&target, bytes)
+        })
+        .await
+        .map_err(std::io::Error::other)?
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = (target, bytes);
+        Ok(())
+    }
+}
+
+/// Busca contatos de forma não-bloqueante para autocomplete na interface.
+pub async fn search_contacts_async(
+    cache_dir: std::path::PathBuf,
+    query: String,
+    limit: usize,
+) -> Vec<lauda_types::contact::ContactEntry> {
+    run_blocking_task(move || {
+        if let Ok(cache) = crate::domain::contacts_cache::LocalContactsCache::open(&cache_dir) {
+            cache.search_contacts(&query, limit).unwrap_or_default()
+        } else {
+            Vec::new()
+        }
+    })
+    .await
+    .unwrap_or_default()
+}
+
+/// Busca difusa (fuzzy) de contatos de forma não-bloqueante para autocomplete na agenda.
+pub async fn search_contacts_fuzzy_async(
+    cache_dir: std::path::PathBuf,
+    query: String,
+    limit: usize,
+) -> Vec<lauda_types::contact::ContactEntry> {
+    run_blocking_task(move || {
+        if let Ok(cache) = crate::domain::contacts_cache::LocalContactsCache::open(&cache_dir) {
+            cache
+                .search_contacts_fuzzy(&query, limit)
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        }
+    })
+    .await
+    .unwrap_or_default()
+}

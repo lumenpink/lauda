@@ -179,14 +179,15 @@ pub fn ComposeView(
                         oninput: move |evt| {
                             let val = evt.value();
                             to_input.set(val.clone());
-                            let cache_dir = crate::domain::cache::get_default_cache_dir();
-                            if let Ok(cache) = crate::domain::contacts_cache::LocalContactsCache::open(&cache_dir) {
-                                if !val.trim().is_empty() {
-                                    let matches = cache.search_contacts(val.trim(), 5).unwrap_or_default();
+                            let query = val.trim().to_string();
+                            if query.is_empty() {
+                                to_suggestions.set(Vec::new());
+                            } else {
+                                spawn(async move {
+                                    let cache_dir = crate::domain::cache::get_default_cache_dir();
+                                    let matches = crate::domain::view::search_contacts_async(cache_dir, query, 5).await;
                                     to_suggestions.set(matches);
-                                } else {
-                                    to_suggestions.set(Vec::new());
-                                }
+                                });
                             }
                         },
                         placeholder: "destinatario@dominio.com",

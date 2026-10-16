@@ -433,3 +433,33 @@ async fn test_client_attachment_save_and_status_formatting() {
     assert_eq!(read_back, payload);
 }
 
+#[tokio::test]
+async fn test_client_async_contact_search_non_blocking() {
+    use lauda_client::domain::contacts_cache::LocalContactsCache;
+    use lauda_client::domain::view::{search_contacts_async, search_contacts_fuzzy_async};
+    use tempfile::tempdir;
+
+    let temp = tempdir().expect("tempdir");
+    let cache = LocalContactsCache::open(temp.path()).expect("abrir cache contatos");
+
+    let c1 = lauda_client::domain::contacts_cache::create_local_contact(
+        "maria",
+        Some("Maria Silva"),
+        "maria@empresa.com",
+        None,
+    );
+    cache
+        .apply_sync_delta(std::slice::from_ref(&c1), &[], "tok:1")
+        .expect("gravar contato");
+
+    // 1. Busca assíncrona desacoplada da UI
+    let results = search_contacts_async(temp.path().to_path_buf(), "maria".to_string(), 5).await;
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].primary_email, "maria@empresa.com");
+
+    // 2. Busca fuzzy assíncrona desacoplada da UI
+    let fuzzy_results =
+        search_contacts_fuzzy_async(temp.path().to_path_buf(), "marya".to_string(), 5).await;
+    assert_eq!(fuzzy_results.len(), 1);
+    assert_eq!(fuzzy_results[0].id, c1.id);
+}

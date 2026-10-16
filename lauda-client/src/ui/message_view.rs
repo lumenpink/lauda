@@ -651,7 +651,13 @@ pub fn MessageView(
                                                         let sess = sess.clone();
                                                         let box_name = box_name.clone();
                                                         let fname = fname.clone();
-                                                        download_status.set(Some((att_id, "Baixando...".to_string())));
+                                                        download_status.set(Some((
+                                                            att_id,
+                                                            crate::domain::view::format_attachment_status(
+                                                                &fname,
+                                                                crate::domain::view::AttachmentSaveState::Downloading,
+                                                            ),
+                                                        )));
                                                         if let Some(token) = sess.token {
                                                             spawn(async move {
                                                                 let client = HttpApiClient::new(sess.server_url);
@@ -660,20 +666,51 @@ pub fn MessageView(
                                                                         #[cfg(target_arch = "wasm32")]
                                                                         {
                                                                             let _ = bytes;
-                                                                            download_status.set(Some((att_id, format!("✓ Use o botão LINK para salvar {}", fname))));
+                                                                            download_status.set(Some((
+                                                                                att_id,
+                                                                                format!("✓ Use o botão LINK para salvar {}", fname),
+                                                                            )));
                                                                         }
                                                                         #[cfg(not(target_arch = "wasm32"))]
                                                                         {
+                                                                            download_status.set(Some((
+                                                                                att_id,
+                                                                                crate::domain::view::format_attachment_status(
+                                                                                    &fname,
+                                                                                    crate::domain::view::AttachmentSaveState::Saving,
+                                                                                ),
+                                                                            )));
                                                                             let target = resolve_download_dir().join(&fname);
-                                                                            if std::fs::write(&target, bytes).is_ok() {
-                                                                                download_status.set(Some((att_id, format!("✓ Salvo em {}", target.display()))));
-                                                                            } else {
-                                                                                download_status.set(Some((att_id, "Erro ao gravar arquivo no disco".to_string())));
+                                                                            match crate::domain::view::save_attachment_bytes(&target, &bytes).await {
+                                                                                Ok(()) => {
+                                                                                    download_status.set(Some((
+                                                                                        att_id,
+                                                                                        crate::domain::view::format_attachment_status(
+                                                                                            &fname,
+                                                                                            crate::domain::view::AttachmentSaveState::Saved(target.display().to_string()),
+                                                                                        ),
+                                                                                    )));
+                                                                                }
+                                                                                Err(e) => {
+                                                                                    download_status.set(Some((
+                                                                                        att_id,
+                                                                                        crate::domain::view::format_attachment_status(
+                                                                                            &fname,
+                                                                                            crate::domain::view::AttachmentSaveState::Failed(e.to_string()),
+                                                                                        ),
+                                                                                    )));
+                                                                                }
                                                                             }
                                                                         }
                                                                     }
                                                                     Err(e) => {
-                                                                        download_status.set(Some((att_id, format!("Falha no download: {e}"))));
+                                                                        download_status.set(Some((
+                                                                            att_id,
+                                                                            crate::domain::view::format_attachment_status(
+                                                                                &fname,
+                                                                                crate::domain::view::AttachmentSaveState::Failed(e.to_string()),
+                                                                            ),
+                                                                        )));
                                                                     }
                                                                 }
                                                             });

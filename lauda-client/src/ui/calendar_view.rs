@@ -5,7 +5,6 @@ use lauda_types::calendar::{
 };
 
 use crate::domain::calendar_cache::LocalCalendarCache;
-use crate::domain::contacts_cache::LocalContactsCache;
 use crate::domain::session::SessionConfig;
 use crate::domain::time::current_unix_timestamp;
 use crate::ui::state::Screen;
@@ -361,13 +360,14 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
                                     && let Some(ref name) = att.name
                                     && dismissed_query.read().as_str() != name.as_str()
                                 {
-                                    let cache_dir = crate::domain::cache::get_default_cache_dir();
-                                    if let Ok(cache) = LocalContactsCache::open(&cache_dir) {
-                                        let matches = cache.search_contacts_fuzzy(name, 5).unwrap_or_default();
+                                    let name_clone = name.clone();
+                                    spawn(async move {
+                                        let cache_dir = crate::domain::cache::get_default_cache_dir();
+                                        let matches = crate::domain::view::search_contacts_fuzzy_async(cache_dir, name_clone, 5).await;
                                         contact_suggestions.set(matches);
                                         active_suggestion_index.set(None);
-                                        return;
-                                    }
+                                    });
+                                    return;
                                 }
                                 contact_suggestions.set(Vec::new());
                                 active_suggestion_index.set(None);
