@@ -622,12 +622,12 @@ Com caixas de e-mail volumosas (> 10k a 30k mensagens), a listagem ingênua do M
   - Manter fluidez a 60 FPS com limite de itens renderizados e prevenção de clone inútil de dezenas de milhares de mensagens.
 
 ### 20.4 Critérios de Aceite (Ticket #66)
-- [ ] Rota `/messages` aceita `limit` e `offset`.
-- [ ] `MaildirBackend` ordena por `mtime` decrescente e abre apenas a fatia `(offset..offset+limit)` de arquivos.
-- [ ] `InMemoryMailBackend` respeita `limit` e `offset`.
-- [ ] Testes unitários e de integração herméticos validando ordenação por `mtime` e paginação com `limit`/`offset`.
-- [ ] `lauda-client` implementa carregamento paginado mantendo a lista fluida no Dioxus.
-- [ ] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
+- [x] Rota `/messages` aceita `limit` e `offset`.
+- [x] `MaildirBackend` ordena por `mtime` decrescente e abre apenas a fatia `(offset..offset+limit)` de arquivos.
+- [x] `InMemoryMailBackend` respeita `limit` e `offset`.
+- [x] Testes unitários e de integração herméticos validando ordenação por `mtime` e paginação com `limit`/`offset`.
+- [x] `lauda-client` implementa carregamento paginado mantendo a lista fluida no Dioxus.
+- [x] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
 
 
 
