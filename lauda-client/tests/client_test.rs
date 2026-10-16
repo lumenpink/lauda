@@ -344,6 +344,40 @@ fn test_search_threshold_and_feedback_rules() {
     assert_eq!(exact_threshold[0].uid, 1);
 }
 
+#[test]
+fn test_format_search_hint_dynamic_countdown() {
+    use lauda_client::domain::format_search_hint;
+
+    // 0 caracteres ou espaços em branco -> None
+    assert_eq!(format_search_hint(""), None);
+    assert_eq!(format_search_hint("   "), None);
+
+    // 1 caractere digitado -> faltam 2
+    assert_eq!(
+        format_search_hint("a"),
+        Some("FALTAM 2 CARACTERES PARA PESQUISAR...".to_string())
+    );
+    assert_eq!(
+        format_search_hint("  p  "),
+        Some("FALTAM 2 CARACTERES PARA PESQUISAR...".to_string())
+    );
+
+    // 2 caracteres digitados -> falta 1 (singular)
+    assert_eq!(
+        format_search_hint("ab"),
+        Some("FALTA 1 CARACTERE PARA PESQUISAR...".to_string())
+    );
+    assert_eq!(
+        format_search_hint("  pi "),
+        Some("FALTA 1 CARACTERE PARA PESQUISAR...".to_string())
+    );
+
+    // 3 ou mais caracteres -> None (busca ativa)
+    assert_eq!(format_search_hint("abc"), None);
+    assert_eq!(format_search_hint("pix"), None);
+    assert_eq!(format_search_hint("relatorio"), None);
+}
+
 #[tokio::test]
 async fn test_client_offline_index_slice_and_hybrid_search() {
     use lauda_client::domain::LocalMessageCache;
