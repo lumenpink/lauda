@@ -1,9 +1,9 @@
 # LAUDA — Especificação do Smolclient & Micro-Daemon de Correio
 
 **Versão da Norma:** GOST `1.0.0`  
-**Status:** `CONCLUDED` (Branch: `feat/1-data-contracts`)  
+**Status:** `IN_PROGRESS` (Branch: `feat/64-vector-search-engine`)  
 **Licença:** GPL-3.0 (com satélites `LICENSE-MEDIA` CC-BY-SA-4.0 e `LICENSE-LOGO` CC-BY-ND-4.0)  
-**Ticket de Referência:** `#1`
+**Ticket de Referência:** `#64` (Anteriores: `#63`, `#62`, `#1`)
 
 ---
 
@@ -513,6 +513,47 @@ A identidade visual do ícone soberano do aplicativo **Lauda** (`in.twolp.lauda`
 - [x] Todas as 5 densidades Android geradas nos formatos padrão e circular.
 - [x] Teste automatizado de validação de dimensões, formato e paleta aprovado.
 - [x] Conformidade integral com `cargo fmt --check`, `cargo clippy` e `cccp check --strict`.
+
+---
+
+## 18. Motor de Busca Vetorial com Max-Pooling e Fatiamento Semântico Urupema (Ticket #64)
+
+Para alimentar a busca de e-mails com precisão semântica e sem alocar memória de vídeo na GPU (mantendo 100% da VRAM dedicada a Baquara), o crate `lauda-index` é expandido para combinar BM25 com busca vetorial baseada em embeddings na CPU.
+
+### 18.1 Fatiamento Semântico no `lauda-index`
+- Cada e-mail indexado é fatiado via `urupema::domain::segment_email`.
+- São extraídos blocos tipados:
+  - `SegmentKind::Header`: Metadados essenciais (De, Para, Assunto, Data).
+  - `SegmentKind::Body`: Chunks do corpo fatiados com limite de janela e estratégia Cabeça-Cauda (até 5 blocos).
+  - `SegmentKind::Signature`: Fechos e assinaturas isolados.
+- Cada segmento é mantido individualmente na estrutura `IndexedDoc`, gerando uma matriz de embeddings $K \times D$, onde $K \le 6$ e $D = 384$.
+
+### 18.2 Motor de Embeddings em CPU (384 Dimensões)
+- Embeddings gerados na CPU em float32 normalizados pela norma L2 ($\|v\|_2 = 1$).
+- Modelo canônico: `multilingual-e5-small` (384 floats), especializado em Português, Inglês e Espanhol.
+- 0 MB de VRAM consumida.
+- O `lauda-index` provê trait e implementação padrão de `EmbeddingProvider` permitindo injeção de dependência e testes unitários determinísticos herméticos sem download de pesos de rede durante a compilação/testes.
+
+### 18.3 Similaridade por Cosseno & Max-Pooling
+- Dado um vetor de consulta $Q$ (normalizado L2) e uma matriz de segmentos de documento $\{S_1, \dots, S_K\}$:
+  $$\text{sim}(Q, S_k) = Q \cdot S_k$$
+  $$\text{Score}_{\text{sem}}(D) = \max_{k=1..K} \text{sim}(Q, S_k)$$
+- O resultado da busca semântica inclui não apenas o UID do documento, mas também o `best_segment` (tipo de segmento que causou o match) e a pontuação semântica.
+
+### 18.4 Ranqueamento Híbrido (BM25 + Vetorial)
+- Fusão linear balanceada:
+  $$\text{Score}_{\text{híbrido}} = \alpha \cdot \text{Score}_{\text{BM25}} + (1 - \alpha) \cdot \text{Score}_{\text{sem}}$$
+  com $\alpha = 0.5$ configurável.
+- Casamento de exatidão para códigos, números de processo, CPF e leis via BM25, e casamento conceitual/linguagem natural via similaridade semântica.
+
+### 18.5 Critérios de Aceite (Ticket #64)
+- [ ] Trait `EmbeddingProvider` e estruturas vetoriais implementadas em `lauda-index`.
+- [ ] Dissecação via `urupema::domain::segment_email` integrada no `lauda-index`.
+- [ ] Cálculo de similaridade por cosseno, Max-Pooling e seleção de melhor segmento implementados.
+- [ ] Fusão híbrida BM25 + Vetorial com pontuação unificada.
+- [ ] Testes unitários herméticos em `lauda-index/tests/vector_search_test.rs`.
+- [ ] Quality Gate 100% verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test -p lauda-index`).
+
 
 
 
