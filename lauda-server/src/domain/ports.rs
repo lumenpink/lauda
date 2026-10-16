@@ -83,4 +83,13 @@ pub trait MailBackend: Send + Sync {
         let _ = (username, script);
         Ok(())
     }
+    async fn get_index_slice(
+        &self,
+        username: &str,
+        mailbox: &str,
+        days: u32,
+    ) -> Result<Vec<lauda_index::IndexedDoc>, BackendError> {
+        let _ = (username, mailbox, days);
+        Ok(Vec::new())
+    }
 }

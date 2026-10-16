@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
@@ -12,12 +12,14 @@ use lauda_types::{
 };
 use mail_parser::{Address, MessageParser, MimeHeaders};
 
+use crate::adapters::sqlite_index::SqliteIndexStore;
 use crate::domain::ports::{BackendError, MailBackend};
 
 /// Backend de correio baseado em armazenamento Maildir real (padrão Dovecot).
 pub struct MaildirBackend {
     base_dir: PathBuf,
     users: RwLock<HashMap<String, String>>, // username -> password
+    sqlite_index: Option<SqliteIndexStore>,
 }
 
 /// Verifica se o ambiente atual é de testes ou CI para suprimir envio real de e-mails
@@ -27,10 +29,18 @@ pub fn is_sendmail_suppressed_for_tests() -> bool {
 
 impl MaildirBackend {
     pub fn new(base_dir: impl Into<PathBuf>) -> Self {
+        let dir: PathBuf = base_dir.into();
+        let db_path = dir.join(".lauda_index.db");
+        let sqlite_index = SqliteIndexStore::open(&db_path).ok();
         Self {
-            base_dir: base_dir.into(),
+            base_dir: dir,
             users: RwLock::new(HashMap::new()),
+            sqlite_index,
         }
+    }
+
+    pub fn sqlite_index(&self) -> Option<&SqliteIndexStore> {
+        self.sqlite_index.as_ref()
     }
 
     pub fn add_user(&self, username: impl Into<String>, password: impl Into<String>) {
@@ -1034,30 +1044,110 @@ impl MailBackend for MaildirBackend {
         mailbox: &str,
         query: &str,
     ) -> Result<Vec<MessageEnvelope>, BackendError> {
-        let envelopes = self.list_messages(username, mailbox, None, None).await?;
-        if query.trim().is_empty() {
-            return Ok(envelopes);
-        }
+        if let Some(ref store) = self.sqlite_index {
+            let dir = self.resolve_mailbox_dir(mailbox)?;
+            let (_, uid_to_prefix) = self.load_uid_maps(&dir);
+            let active_uids: HashSet<u32> = uid_to_prefix.keys().copied().collect();
 
-        let mut index = lauda_index::MessageIndex::new();
-        let provider = lauda_index::SimpleCpuEmbeddingProvider;
+            // 1. Reconciliação inteligente com dovecot-uidlist / active_uids
+            let reconcile = store.reconcile_mailbox(mailbox, &active_uids).map_err(|e| {
+                BackendError::Internal(format!("Erro ao reconciliar índice SQLite: {}", e))
+            })?;
 
-        for env in &envelopes {
-            if let Ok(msg) = self.get_message(username, mailbox, env.uid).await {
-                index.index_message_semantic(mailbox, &msg, &provider);
+            // Expurgar e-mails excluídos do SQLite
+            for del_uid in reconcile.to_remove {
+                let _ = store.remove_document(mailbox, del_uid);
             }
-        }
 
-        let results = index.search_hybrid(query, &provider, 0.5);
-
-        let mut ranked = Vec::new();
-        for res in results {
-            if let Some(found) = envelopes.iter().find(|e| e.uid == res.uid) {
-                ranked.push(found.clone());
+            // Indexar novos e-mails pendentes
+            let provider = lauda_index::SimpleCpuEmbeddingProvider;
+            for new_uid in reconcile.to_index {
+                if let Ok(msg) = self.get_message(username, mailbox, new_uid).await {
+                    let mut temp_index = lauda_index::MessageIndex::new();
+                    temp_index.index_message_semantic(mailbox, &msg, &provider);
+                    if let Some(doc) = temp_index.documents().get(&new_uid) {
+                        let _ = store.save_document(mailbox, doc, 0);
+                    }
+                }
             }
-        }
 
-        Ok(ranked)
+            if query.trim().is_empty() {
+                return self.list_messages(username, mailbox, None, None).await;
+            }
+
+            // 2. Busca ultrarrápida direta do índice SQLite
+            let index = store.load_mailbox_index(mailbox).map_err(|e| {
+                BackendError::Internal(format!("Erro ao carregar índice SQLite: {}", e))
+            })?;
+
+            let results = index.search_hybrid(query, &provider, 0.5);
+
+            let mut ranked = Vec::new();
+            for res in results {
+                if let Some(doc) = index.documents().get(&res.uid) {
+                    ranked.push(MessageEnvelope {
+                        uid: doc.uid,
+                        subject: doc.subject.clone(),
+                        sender: doc.sender.clone(),
+                        date: doc.date.clone(),
+                        cc: None,
+                        has_attachments: doc.has_attachments,
+                        is_read: doc.is_read,
+                        is_flagged: doc.is_flagged,
+                        crypto_meta: None,
+                    });
+                }
+            }
+
+            Ok(ranked)
+        } else {
+            let envelopes = self.list_messages(username, mailbox, None, None).await?;
+            if query.trim().is_empty() {
+                return Ok(envelopes);
+            }
+
+            let mut index = lauda_index::MessageIndex::new();
+            let provider = lauda_index::SimpleCpuEmbeddingProvider;
+
+            for env in &envelopes {
+                if let Ok(msg) = self.get_message(username, mailbox, env.uid).await {
+                    index.index_message_semantic(mailbox, &msg, &provider);
+                }
+            }
+
+            let results = index.search_hybrid(query, &provider, 0.5);
+
+            let mut ranked = Vec::new();
+            for res in results {
+                if let Some(found) = envelopes.iter().find(|e| e.uid == res.uid) {
+                    ranked.push(found.clone());
+                }
+            }
+
+            Ok(ranked)
+        }
+    }
+
+    async fn get_index_slice(
+        &self,
+        username: &str,
+        mailbox: &str,
+        days: u32,
+    ) -> Result<Vec<lauda_index::IndexedDoc>, BackendError> {
+        let _ = username;
+        if let Some(ref store) = self.sqlite_index {
+            // Garante reconciliação antes de exportar o slice
+            if let Ok(dir) = self.resolve_mailbox_dir(mailbox) {
+                let (_, uid_to_prefix) = self.load_uid_maps(&dir);
+                let active_uids: HashSet<u32> = uid_to_prefix.keys().copied().collect();
+                let _ = store.reconcile_mailbox(mailbox, &active_uids);
+            }
+            store
+                .get_recent_slice(mailbox, days)
+                .map_err(|e| BackendError::Internal(format!("Erro ao obter fatia de índice: {}", e)))
+        } else {
+            Ok(Vec::new())
+        }
     }
 
     async fn get_sieve_script(&self, username: &str) -> Result<String, BackendError> {

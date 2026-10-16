@@ -5,6 +5,7 @@ pub mod in_memory;
 pub mod maildir;
 pub mod sqlite_calendar;
 pub mod sqlite_contacts;
+pub mod sqlite_index;
 
 pub use caldav::caldav_routes;
 pub use carddav::carddav_routes;
@@ -13,3 +14,4 @@ pub use in_memory::InMemoryMailBackend;
 pub use maildir::MaildirBackend;
 pub use sqlite_calendar::SqliteCalendarStore;
 pub use sqlite_contacts::SqliteContactsStore;
+pub use sqlite_index::{ReconcileResult, SqliteIndexStore};

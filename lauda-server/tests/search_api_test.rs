@@ -198,3 +198,39 @@ async fn test_search_edge_cases_and_unauthorized() {
     let results_empty: Vec<MessageEnvelope> = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(results_empty.len(), 2);
 }
+
+#[tokio::test]
+async fn test_mailbox_index_slice_endpoint() {
+    let backend = setup_search_backend();
+    let app = app_router(backend, TEST_SECRET);
+
+    // Login
+    let login_body = serde_json::to_string(&LoginRequest {
+        username: "lumen".to_string(),
+        password: "senha123".to_string(),
+    })
+    .unwrap();
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/auth/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(login_body))
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    let token_resp: TokenResponse =
+        serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    let token = token_resp.token;
+
+    // Index-slice endpoint
+    let req_slice = Request::builder()
+        .method("GET")
+        .uri("/mailboxes/INBOX/index-slice?days=90")
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+
+    let resp_slice = app.clone().oneshot(req_slice).await.unwrap();
+    assert_eq!(resp_slice.status(), StatusCode::OK);
+}

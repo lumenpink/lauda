@@ -108,6 +108,26 @@ async fn search_mailbox_handler(
 }
 
 #[derive(Debug, Deserialize)]
+pub struct IndexSliceQuery {
+    pub days: Option<u32>,
+}
+
+async fn get_index_slice_handler(
+    State(state): State<AppState>,
+    AuthUser(username): AuthUser,
+    Path(mailbox): Path<String>,
+    Query(query): Query<IndexSliceQuery>,
+) -> Result<Json<Vec<lauda_index::IndexedDoc>>, (StatusCode, String)> {
+    let days = query.days.unwrap_or(90);
+    let slice = state
+        .backend
+        .get_index_slice(&username, &mailbox, days)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(slice))
+}
+
+#[derive(Debug, Deserialize)]
 pub struct MarkReadQuery {
     pub r#box: Option<String>,
     pub read: Option<bool>,
@@ -459,6 +479,10 @@ fn build_router(state: AppState) -> Router {
         .route("/contacts/sync", post(sync_contacts_handler))
         .route("/mailboxes", get(list_mailboxes_handler))
         .route("/mailboxes/{mailbox}/search", get(search_mailbox_handler))
+        .route(
+            "/mailboxes/{mailbox}/index-slice",
+            get(get_index_slice_handler),
+        )
         .route("/messages", get(list_messages_handler))
         .route("/messages/search", get(search_messages_handler))
         .route(

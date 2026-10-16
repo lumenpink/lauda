@@ -197,6 +197,24 @@ impl MessageIndex {
         Self::default()
     }
 
+    /// Retorna uma referência imutável a todos os documentos indexados.
+    pub fn documents(&self) -> &HashMap<u32, IndexedDoc> {
+        &self.documents
+    }
+
+    /// Insere diretamente um documento pré-processado no índice.
+    pub fn insert_doc(&mut self, doc: IndexedDoc) {
+        self.remove_message(doc.uid);
+        self.total_len += doc.doc_len;
+        for term in doc.term_frequencies.keys() {
+            self.inverted_index
+                .entry(term.clone())
+                .or_default()
+                .insert(doc.uid);
+        }
+        self.documents.insert(doc.uid, doc);
+    }
+
     /// Indexa uma nova mensagem de forma incremental.
     pub fn index_message(&mut self, mailbox: &str, msg: &Message) {
         let uid = msg.envelope.uid;
