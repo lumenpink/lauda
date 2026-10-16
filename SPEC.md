@@ -1,7 +1,7 @@
 # LAUDA — Especificação do Smolclient & Micro-Daemon de Correio
 
 **Versão da Norma:** GOST `1.0.0`  
-**Status:** `IN_PROGRESS` (Branch: `feat/72-search-dynamic-hint`)  
+**Status:** `CONCLUÍDO` (Branch: `feat/72-search-dynamic-hint`)  
 **Licença:** GPL-3.0 (com satélites `LICENSE-MEDIA` CC-BY-SA-4.0 e `LICENSE-LOGO` CC-BY-ND-4.0)  
 **Ticket de Referência:** `#72` (Anteriores: `#71`, `#70`, `#69`, `#68`, `#67`, `#66`, `#65`, `#64`, `#63`, `#62`, `#1`)
 
@@ -799,9 +799,9 @@ A fim de fornecer clareza visual instantânea e progressiva ao usuário enquanto
    - Aplicação da mesma mensagem dinâmica no placeholder central quando a caixa de mensagens estiver vazia.
 
 ### 26.2 Critérios de Aceite (Ticket #72)
-- [ ] Função pura `format_search_hint(query)` implementada com concordância singular/plural.
-- [ ] Retorno `None` para buscas ativas ($\ge 3$ caracteres) ou campo vazio.
-- [ ] Badge visual compacto sob a barra de busca integrado sem deslocamento excessivo de layout.
-- [ ] Placeholder de listagem vazia sincronizado com `format_search_hint`.
-- [ ] Testes unitários herméticos cobrindo todos os cenários em `client_test.rs`.
-- [ ] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
+- [x] Função pura `format_search_hint(query)` implementada com concordância singular/plural.
+- [x] Retorno `None` para buscas ativas ($\ge 3$ caracteres) ou campo vazio.
+- [x] Badge visual compacto sob a barra de busca integrado sem deslocamento excessivo de layout.
+- [x] Placeholder de listagem vazia sincronizado com `format_search_hint`.
+- [x] Testes unitários herméticos cobrindo todos os cenários em `client_test.rs`.
+- [x] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
