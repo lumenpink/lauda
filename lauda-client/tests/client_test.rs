@@ -277,4 +277,3 @@ fn test_fast_filter_envelopes_instant_and_accurate() {
     let empty = fast_filter_envelopes(&list, "inexistente");
     assert!(empty.is_empty());
 }
-
