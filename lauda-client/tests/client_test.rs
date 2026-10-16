@@ -343,3 +343,54 @@ fn test_search_threshold_and_feedback_rules() {
     assert_eq!(exact_threshold.len(), 1);
     assert_eq!(exact_threshold[0].uid, 1);
 }
+
+#[tokio::test]
+async fn test_client_offline_index_slice_and_hybrid_search() {
+    use lauda_client::domain::LocalMessageCache;
+    use lauda_index::{MessageIndex, SimpleCpuEmbeddingProvider};
+    use tempfile::tempdir;
+
+    let temp = tempdir().expect("tempdir");
+    let cache = LocalMessageCache::open(temp.path()).expect("abrir cache local");
+
+    // Cria documento indexado simulado vindo do servidor
+    let mut server_index = MessageIndex::new();
+    let provider = SimpleCpuEmbeddingProvider;
+
+    let msg = Message {
+        envelope: MessageEnvelope {
+            uid: 777,
+            subject: "Comprovante PIX Salário".to_string(),
+            sender: "empresa@rh.com".to_string(),
+            date: "2026-10-15T12:00:00Z".to_string(),
+            cc: None,
+            has_attachments: false,
+            is_read: true,
+            is_flagged: false,
+            crypto_meta: None,
+        },
+        attachments: vec![],
+        txt_auto: Some("Depósito PIX efetuado com sucesso.".to_string()),
+        txt_original: None,
+        html_sanitized: None,
+    };
+
+    server_index.index_message_semantic("INBOX", &msg, &provider);
+    let docs: Vec<_> = server_index.documents().values().cloned().collect();
+
+    // 1. Salvar fatia de 90 dias no SQLite do cliente
+    cache
+        .save_index_slice("INBOX", &docs)
+        .expect("salvar fatia local");
+
+    // 2. Carregar fatia offline e executar busca híbrida
+    let local_index = cache
+        .load_index_slice("INBOX")
+        .expect("carregar fatia local")
+        .expect("indice deve existir");
+
+    let results = local_index.search_hybrid("pix", &provider, 0.5);
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].uid, 777);
+    assert!(results[0].semantic_score > 0.0);
+}
