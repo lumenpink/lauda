@@ -86,8 +86,16 @@ impl MailApiClient for HttpApiClient {
         &self,
         token: &str,
         mailbox: &str,
+        limit: Option<usize>,
+        offset: Option<usize>,
     ) -> Result<Vec<MessageEnvelope>, ClientError> {
-        let url = format!("{}/messages?box={}", self.base_url, mailbox);
+        let mut url = format!("{}/messages?box={}", self.base_url, mailbox);
+        if let Some(l) = limit {
+            url.push_str(&format!("&limit={}", l));
+        }
+        if let Some(o) = offset {
+            url.push_str(&format!("&offset={}", o));
+        }
         let headers = Self::auth_headers(token)?;
         let resp = self
             .client

@@ -100,7 +100,7 @@ pub fn ComposeView(
                         match client.send_message(&token, &item.form).await {
                             Ok(_) => {
                                 let _ = queue.remove(&item.id);
-                                if let Ok(msgs) = client.list_messages(&token, &box_name).await {
+                                if let Ok(msgs) = client.list_messages(&token, &box_name, Some(50), Some(0)).await {
                                     messages.set(msgs);
                                 }
                             }

@@ -25,6 +25,8 @@ pub fn InboxView(
     mut active_message: Signal<Option<Message>>,
 ) -> Element {
     let mut is_refreshing = use_signal(|| false);
+    let mut is_loading_more = use_signal(|| false);
+    let mut has_more = use_signal(|| true);
     let mut search_query = use_signal(String::new);
     let mut active_filter = use_signal(|| InboxFilter::All);
     let mut is_drawer_open = use_signal(|| false);
@@ -42,10 +44,31 @@ pub fn InboxView(
                 if let Ok(boxes) = client.list_mailboxes(&token).await {
                     mailboxes.set(boxes);
                 }
-                if let Ok(msgs) = client.list_messages(&token, &box_name).await {
+                if let Ok(msgs) = client.list_messages(&token, &box_name, Some(50), Some(0)).await {
+                    has_more.set(msgs.len() == 50);
                     messages.set(msgs);
                 }
                 is_refreshing.set(false);
+            });
+        }
+    };
+
+    let handle_load_more = move |_| {
+        let sess = session.read().clone();
+        if let Some(token) = sess.token.clone() {
+            let box_name = current_mailbox.read().clone();
+            let current_count = messages.read().len();
+            is_loading_more.set(true);
+
+            spawn(async move {
+                let client = HttpApiClient::new(sess.server_url);
+                if let Ok(more_msgs) = client.list_messages(&token, &box_name, Some(50), Some(current_count)).await {
+                    if more_msgs.len() < 50 {
+                        has_more.set(false);
+                    }
+                    messages.write().extend(more_msgs);
+                }
+                is_loading_more.set(false);
             });
         }
     };
@@ -451,6 +474,18 @@ pub fn InboxView(
                                         "{subject}"
                                     }
                                 }
+                            }
+                        }
+                    }
+                    if query_str.is_empty() && *has_more.read() && !filtered_messages.is_empty() {
+                        button {
+                            style: "width: 100%; padding: 0.8rem; margin-top: 1rem; border: 2px solid #0a0a0a; background: #faf9f6; color: #0a0a0a; font-family: monospace; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #dc143c; text-align: center; text-transform: uppercase;",
+                            disabled: *is_loading_more.read(),
+                            onclick: handle_load_more,
+                            if *is_loading_more.read() {
+                                "CARREGANDO MAIS MENSAGENS..."
+                            } else {
+                                "[ + CARREGAR MAIS 50 MENSAGENS ]"
                             }
                         }
                     }

@@ -224,7 +224,7 @@ pub fn App() -> Element {
                         }
                     }
 
-                    if let Ok(server_msgs) = client.list_messages(&token, &active_box).await {
+                    if let Ok(server_msgs) = client.list_messages(&token, &active_box, Some(50), Some(0)).await {
                         is_online.set(true);
                         #[cfg(not(target_arch = "wasm32"))]
                         let _ = cache.save_envelopes(&active_box, &server_msgs);

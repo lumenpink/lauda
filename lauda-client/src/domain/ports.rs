@@ -26,6 +26,8 @@ pub trait MailApiClient: Send + Sync {
         &self,
         token: &str,
         mailbox: &str,
+        limit: Option<usize>,
+        offset: Option<usize>,
     ) -> Result<Vec<MessageEnvelope>, ClientError>;
     async fn get_message(
         &self,

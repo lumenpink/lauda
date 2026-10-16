@@ -62,10 +62,20 @@ impl MailApiClient for InMemoryApiClient {
         &self,
         _token: &str,
         mailbox: &str,
+        limit: Option<usize>,
+        offset: Option<usize>,
     ) -> Result<Vec<MessageEnvelope>, ClientError> {
         let msgs = self.messages.read().unwrap();
         if let Some(box_msgs) = msgs.get(mailbox) {
-            return Ok(box_msgs.iter().map(|m| m.envelope.clone()).collect());
+            let offset = offset.unwrap_or(0);
+            let envelopes: Vec<MessageEnvelope> =
+                box_msgs.iter().map(|m| m.envelope.clone()).collect();
+            let paged = if let Some(limit) = limit {
+                envelopes.into_iter().skip(offset).take(limit).collect()
+            } else {
+                envelopes.into_iter().skip(offset).collect()
+            };
+            return Ok(paged);
         }
         Ok(Vec::new())
     }

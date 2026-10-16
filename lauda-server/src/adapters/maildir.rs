@@ -447,16 +447,25 @@ impl MailBackend for MaildirBackend {
         &self,
         _username: &str,
         mailbox: &str,
+        limit: Option<usize>,
+        offset: Option<usize>,
     ) -> Result<Vec<MessageEnvelope>, BackendError> {
         let dir = self.resolve_mailbox_dir(mailbox)?;
         let (prefix_to_uid, _) = self.load_uid_maps(&dir);
-        let mut envelopes = Vec::new();
-        let mut fallback_uid = 1000u32;
+
+        struct FileEntry {
+            path: std::path::PathBuf,
+            filename: String,
+            sub: &'static str,
+            mtime: std::time::SystemTime,
+        }
+
+        let mut entries = Vec::new();
 
         for sub in &["new", "cur"] {
             let sub_path = dir.join(sub);
-            if let Ok(entries) = std::fs::read_dir(sub_path) {
-                for entry in entries.flatten() {
+            if let Ok(dir_entries) = std::fs::read_dir(sub_path) {
+                for entry in dir_entries.flatten() {
                     let path = entry.path();
                     if !path.is_file() {
                         continue;
@@ -467,64 +476,83 @@ impl MailBackend for MaildirBackend {
                         continue;
                     }
 
-                    let prefix = filename.split(":2,").next().unwrap_or(&filename);
-                    let uid = prefix_to_uid.get(prefix).copied().unwrap_or_else(|| {
-                        fallback_uid += 1;
-                        fallback_uid
+                    let mtime = entry
+                        .metadata()
+                        .and_then(|m| m.modified())
+                        .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+
+                    entries.push(FileEntry {
+                        path,
+                        filename,
+                        sub,
+                        mtime,
                     });
-
-                    let (is_read, is_flagged) = Self::parse_maildir_flags(sub, &filename);
-
-                    if let Ok(bytes) = std::fs::read(&path)
-                        && let Some(parsed) = MessageParser::default().parse_headers(&bytes)
-                    {
-                        let subject = parsed.subject().unwrap_or("(Sem assunto)").to_string();
-                        let sender = parsed
-                            .from()
-                            .map(Self::format_address)
-                            .unwrap_or_else(|| "Desconhecido".to_string());
-                        let date = parsed.date().map(|d| d.to_rfc3339()).unwrap_or_else(|| {
-                            if let Ok(metadata) = entry.metadata()
-                                && let Ok(modified) = metadata.modified()
-                            {
-                                let datetime: chrono::DateTime<chrono::Utc> = modified.into();
-                                return datetime.to_rfc3339();
-                            }
-                            "2026-10-05T00:00:00Z".to_string()
-                        });
-
-                        let cc = parsed.cc().map(Self::format_address);
-                        let has_attachments = parsed
-                            .content_type()
-                            .map(|ct| {
-                                ct.c_type.eq_ignore_ascii_case("multipart")
-                                    && !ct
-                                        .subtype()
-                                        .map(|s| s.eq_ignore_ascii_case("alternative"))
-                                        .unwrap_or(false)
-                            })
-                            .unwrap_or(false);
-
-                        let crypto_meta = Self::extract_crypto_meta_from_headers(&parsed);
-
-                        envelopes.push(MessageEnvelope {
-                            uid,
-                            subject,
-                            sender,
-                            date,
-                            is_read,
-                            is_flagged,
-                            cc,
-                            has_attachments,
-                            crypto_meta,
-                        });
-                    }
                 }
             }
         }
 
-        // Ordenar do mais novo para o mais antigo (UID decrescente)
-        envelopes.sort_by_key(|a| std::cmp::Reverse(a.uid));
+        // Ordenar do mais novo para o mais antigo (mtime decrescente, secundário por filename)
+        entries.sort_by(|a, b| b.mtime.cmp(&a.mtime).then_with(|| b.filename.cmp(&a.filename)));
+
+        let offset = offset.unwrap_or(0);
+        let selected_entries: Vec<FileEntry> = if let Some(limit) = limit {
+            entries.into_iter().skip(offset).take(limit).collect()
+        } else {
+            entries.into_iter().skip(offset).collect()
+        };
+
+        let mut envelopes = Vec::with_capacity(selected_entries.len());
+        let mut fallback_uid = 1000u32;
+
+        for item in selected_entries {
+            let prefix = item.filename.split(":2,").next().unwrap_or(&item.filename);
+            let uid = prefix_to_uid.get(prefix).copied().unwrap_or_else(|| {
+                fallback_uid += 1;
+                fallback_uid
+            });
+
+            let (is_read, is_flagged) = Self::parse_maildir_flags(item.sub, &item.filename);
+
+            if let Ok(bytes) = std::fs::read(&item.path)
+                && let Some(parsed) = MessageParser::default().parse_headers(&bytes)
+            {
+                let subject = parsed.subject().unwrap_or("(Sem assunto)").to_string();
+                let sender = parsed
+                    .from()
+                    .map(Self::format_address)
+                    .unwrap_or_else(|| "Desconhecido".to_string());
+                let date = parsed.date().map(|d| d.to_rfc3339()).unwrap_or_else(|| {
+                    let datetime: chrono::DateTime<chrono::Utc> = item.mtime.into();
+                    datetime.to_rfc3339()
+                });
+
+                let cc = parsed.cc().map(Self::format_address);
+                let has_attachments = parsed
+                    .content_type()
+                    .map(|ct| {
+                        ct.c_type.eq_ignore_ascii_case("multipart")
+                            && !ct
+                                .subtype()
+                                .map(|s| s.eq_ignore_ascii_case("alternative"))
+                                .unwrap_or(false)
+                    })
+                    .unwrap_or(false);
+
+                let crypto_meta = Self::extract_crypto_meta_from_headers(&parsed);
+
+                envelopes.push(MessageEnvelope {
+                    uid,
+                    subject,
+                    sender,
+                    date,
+                    is_read,
+                    is_flagged,
+                    cc,
+                    has_attachments,
+                    crypto_meta,
+                });
+            }
+        }
 
         Ok(envelopes)
     }
@@ -1002,7 +1030,7 @@ impl MailBackend for MaildirBackend {
         mailbox: &str,
         query: &str,
     ) -> Result<Vec<MessageEnvelope>, BackendError> {
-        let envelopes = self.list_messages(username, mailbox).await?;
+        let envelopes = self.list_messages(username, mailbox, None, None).await?;
         if query.trim().is_empty() {
             return Ok(envelopes);
         }

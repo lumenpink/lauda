@@ -72,12 +72,22 @@ impl MailBackend for InMemoryMailBackend {
         &self,
         username: &str,
         mailbox: &str,
+        limit: Option<usize>,
+        offset: Option<usize>,
     ) -> Result<Vec<MessageEnvelope>, BackendError> {
         let msgs = self.messages.read().unwrap();
         if let Some(user_boxes) = msgs.get(username)
             && let Some(box_msgs) = user_boxes.get(mailbox)
         {
-            return Ok(box_msgs.iter().map(|m| m.envelope.clone()).collect());
+            let offset = offset.unwrap_or(0);
+            let envelopes: Vec<MessageEnvelope> =
+                box_msgs.iter().map(|m| m.envelope.clone()).collect();
+            let paged = if let Some(limit) = limit {
+                envelopes.into_iter().skip(offset).take(limit).collect()
+            } else {
+                envelopes.into_iter().skip(offset).collect()
+            };
+            return Ok(paged);
         }
         Ok(Vec::new())
     }

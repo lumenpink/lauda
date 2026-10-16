@@ -66,7 +66,7 @@ pub fn LoginView(
                         mailboxes.set(boxes);
                     }
                     current_mailbox.set("INBOX".to_string());
-                    if let Ok(msgs) = client.list_messages(&token_resp.token, "INBOX").await {
+                    if let Ok(msgs) = client.list_messages(&token_resp.token, "INBOX", Some(50), Some(0)).await {
                         messages.set(msgs);
                     }
 

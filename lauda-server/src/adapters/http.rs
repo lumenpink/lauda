@@ -64,6 +64,8 @@ impl FromRequestParts<AppState> for AuthUser {
 #[derive(Debug, Deserialize)]
 pub struct MessagesQuery {
     pub r#box: Option<String>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -156,7 +158,7 @@ async fn list_messages_handler(
     let mailbox = query.r#box.as_deref().unwrap_or("INBOX");
     let msgs = state
         .backend
-        .list_messages(&username, mailbox)
+        .list_messages(&username, mailbox, query.limit, query.offset)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     Ok(Json(msgs))

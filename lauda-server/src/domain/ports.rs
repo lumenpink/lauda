@@ -21,6 +21,8 @@ pub trait MailBackend: Send + Sync {
         &self,
         username: &str,
         mailbox: &str,
+        limit: Option<usize>,
+        offset: Option<usize>,
     ) -> Result<Vec<MessageEnvelope>, BackendError>;
     async fn get_message(
         &self,
