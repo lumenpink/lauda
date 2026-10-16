@@ -1,7 +1,7 @@
 # LAUDA — Especificação do Smolclient & Micro-Daemon de Correio
 
 **Versão da Norma:** GOST `1.0.0`  
-**Status:** `CONCLUÍDO` (Branch: `perf/71-client-non-blocking-ui-io`)  
+**Status:** `CONCLUÍDO` (Branch: `feat/71-client-non-blocking-ui-io`)  
 **Licença:** GPL-3.0 (com satélites `LICENSE-MEDIA` CC-BY-SA-4.0 e `LICENSE-LOGO` CC-BY-ND-4.0)  
 **Ticket de Referência:** `#71` (Anteriores: `#70`, `#69`, `#68`, `#67`, `#66`, `#65`, `#64`, `#63`, `#62`, `#1`)
 
