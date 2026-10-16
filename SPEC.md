@@ -1,9 +1,9 @@
 # LAUDA — Especificação do Smolclient & Micro-Daemon de Correio
 
 **Versão da Norma:** GOST `1.0.0`  
-**Status:** `CONCLUÍDO` (Branch: `feat/71-client-non-blocking-ui-io`)  
+**Status:** `IN_PROGRESS` (Branch: `feat/72-search-dynamic-hint`)  
 **Licença:** GPL-3.0 (com satélites `LICENSE-MEDIA` CC-BY-SA-4.0 e `LICENSE-LOGO` CC-BY-ND-4.0)  
-**Ticket de Referência:** `#71` (Anteriores: `#70`, `#69`, `#68`, `#67`, `#66`, `#65`, `#64`, `#63`, `#62`, `#1`)
+**Ticket de Referência:** `#72` (Anteriores: `#71`, `#70`, `#69`, `#68`, `#67`, `#66`, `#65`, `#64`, `#63`, `#62`, `#1`)
 
 ---
 
@@ -781,3 +781,27 @@ Foram identificados os seguintes gargalos:
 - [x] Sincronização de manifestos de versão atualizada conforme o arquivo `VERSION`.
 - [x] Testes automatizados herméticos cobrindo fluxos assíncronos e não-bloqueantes.
 - [x] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
+
+---
+
+## 26. Indicador Dinâmico de Caracteres Restantes na Busca & Layout Compacto (Ticket #72)
+
+### 26.1 Arquitetura & Especificação UX
+A fim de fornecer clareza visual instantânea e progressiva ao usuário enquanto digita na barra de busca rápida do `lauda-client`:
+1. **Contagem Regressiva e Concordância Gramatical**:
+   - `format_search_hint(query: &str) -> Option<String>`
+   - Para 0 caracteres ou $\ge 3$ caracteres: retorna `None`.
+   - Para 1 caractere digitado (faltam 2 para o limiar de 3): retorna `"FALTAM 2 CARACTERES PARA PESQUISAR..."`.
+   - Para 2 caracteres digitados (falta 1 para o limiar de 3): retorna `"FALTA 1 CARACTERE PARA PESQUISAR..."`.
+2. **Layout Visual Compacto**:
+   - Redução do padding vertical do badge de aviso sob a barra de busca no `InboxView`.
+   - Coerência estética com a paleta *Trash Polka* minimalista.
+   - Aplicação da mesma mensagem dinâmica no placeholder central quando a caixa de mensagens estiver vazia.
+
+### 26.2 Critérios de Aceite (Ticket #72)
+- [ ] Função pura `format_search_hint(query)` implementada com concordância singular/plural.
+- [ ] Retorno `None` para buscas ativas ($\ge 3$ caracteres) ou campo vazio.
+- [ ] Badge visual compacto sob a barra de busca integrado sem deslocamento excessivo de layout.
+- [ ] Placeholder de listagem vazia sincronizado com `format_search_hint`.
+- [ ] Testes unitários herméticos cobrindo todos os cenários em `client_test.rs`.
+- [ ] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
