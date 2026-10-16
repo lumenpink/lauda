@@ -277,3 +277,61 @@ fn test_fast_filter_envelopes_instant_and_accurate() {
     let empty = fast_filter_envelopes(&list, "inexistente");
     assert!(empty.is_empty());
 }
+
+#[test]
+fn test_search_threshold_and_feedback_rules() {
+    use lauda_client::domain::{
+        MIN_SEARCH_QUERY_LEN, fast_filter_envelopes, is_search_active, should_show_search_hint,
+    };
+
+    assert_eq!(MIN_SEARCH_QUERY_LEN, 3);
+
+    // Queries com menos de 3 caracteres não devem ativar a busca nem filtrar a listagem
+    assert!(!is_search_active(""));
+    assert!(!is_search_active("a"));
+    assert!(!is_search_active("al"));
+    assert!(!is_search_active("  al  "));
+
+    // Queries com 3 ou mais caracteres ativam a busca
+    assert!(is_search_active("pix"));
+    assert!(is_search_active("PIX"));
+    assert!(is_search_active("doc"));
+    assert!(is_search_active("  dev  "));
+    assert!(is_search_active("relatorio"));
+
+    // O aviso visual (hint) de digitação mínima só aparece para 1 ou 2 caracteres
+    assert!(!should_show_search_hint(""));
+    assert!(!should_show_search_hint("   "));
+    assert!(should_show_search_hint("a"));
+    assert!(should_show_search_hint("al"));
+    assert!(should_show_search_hint("  al  "));
+    assert!(!should_show_search_hint("pix"));
+    assert!(!should_show_search_hint("relatorio"));
+
+    // Validação de fast_filter_envelopes com limiar
+    let env1 = MessageEnvelope {
+        uid: 1,
+        subject: "PIX Recebido".to_string(),
+        sender: "banco@2lp.in".to_string(),
+        ..Default::default()
+    };
+    let env2 = MessageEnvelope {
+        uid: 2,
+        subject: "Relatório Mensal".to_string(),
+        sender: "gestao@2lp.in".to_string(),
+        ..Default::default()
+    };
+    let list = vec![env1, env2];
+
+    // Queries curtas (< 3) NÃO filtram o vetor (mantêm a lista original intacta, evitando falso negativo)
+    let under_threshold = fast_filter_envelopes(&list, "p");
+    assert_eq!(under_threshold.len(), 2, "1 caractere não deve esvaziar a lista");
+
+    let under_threshold2 = fast_filter_envelopes(&list, "pi");
+    assert_eq!(under_threshold2.len(), 2, "2 caracteres não devem esvaziar a lista");
+
+    // Query de 3 caracteres aciona o filtro
+    let exact_threshold = fast_filter_envelopes(&list, "pix");
+    assert_eq!(exact_threshold.len(), 1);
+    assert_eq!(exact_threshold[0].uid, 1);
+}
