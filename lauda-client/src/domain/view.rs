@@ -82,6 +82,22 @@ pub fn should_show_search_hint(query: &str) -> bool {
     count > 0 && count < MIN_SEARCH_QUERY_LEN
 }
 
+/// Formata a mensagem dinâmica de caracteres restantes para a busca rápida.
+/// Retorna `None` se o termo estiver vazio ou já possuir caracteres suficientes (>= MIN_SEARCH_QUERY_LEN).
+pub fn format_search_hint(query: &str) -> Option<String> {
+    let count = query.trim().chars().count();
+    if count == 0 || count >= MIN_SEARCH_QUERY_LEN {
+        None
+    } else {
+        let remaining = MIN_SEARCH_QUERY_LEN - count;
+        if remaining == 1 {
+            Some("FALTA 1 CARACTERE PARA PESQUISAR...".to_string())
+        } else {
+            Some(format!("FALTAM {remaining} CARACTERES PARA PESQUISAR..."))
+        }
+    }
+}
+
 /// Filtra uma lista de envelopes locais a partir de uma busca direta e instantânea no cliente.
 /// Caso o termo possua menos de `MIN_SEARCH_QUERY_LEN` caracteres, a lista original é preservada
 /// para evitar falsos negativos na interface enquanto o usuário digita.

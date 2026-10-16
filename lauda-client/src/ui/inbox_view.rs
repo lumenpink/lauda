@@ -333,11 +333,11 @@ pub fn InboxView(
                             }
                         }
 
-                        if crate::domain::should_show_search_hint(&search_query.read()) {
+                        if let Some(hint_msg) = crate::domain::format_search_hint(&search_query.read()) {
                             div {
-                                style: "border: 2px solid #dc143c; background: #fff5f5; color: #dc143c; padding: 0.5rem 0.8rem; font-family: monospace; font-size: 0.8rem; font-weight: bold; display: flex; align-items: center; gap: 0.5rem; box-shadow: 2px 2px 0 #0a0a0a;",
+                                style: "border: 1px solid #0a0a0a; background: #fff5f5; color: #dc143c; padding: 0.3rem 0.6rem; font-family: monospace; font-size: 0.75rem; font-weight: bold; display: flex; align-items: center; gap: 0.4rem; box-shadow: 2px 2px 0 #0a0a0a;",
                                 span { "ℹ" }
-                                span { "DIGITE AO MENOS 3 CARACTERES PARA PESQUISAR..." }
+                                span { "{hint_msg}" }
                             }
                         }
 
@@ -396,8 +396,8 @@ pub fn InboxView(
                     if filtered_messages.is_empty() {
                         div {
                             style: "border: 2px dashed #666; background: #fff; padding: 2rem; text-align: center; color: #555;",
-                            if crate::domain::should_show_search_hint(&query_str) {
-                                "DIGITE AO MENOS 3 CARACTERES PARA PESQUISAR..."
+                            if let Some(hint_msg) = crate::domain::format_search_hint(&query_str) {
+                                "{hint_msg}"
                             } else if is_searching {
                                 "Nenhuma mensagem encontrada para \"{query_str}\" nos filtros ativos."
                             } else {
