@@ -33,6 +33,11 @@ pub fn InboxView(
     let mut error_msg = use_signal(|| None::<String>);
     let mut loading_uid = use_signal(|| None::<u32>);
 
+    use_effect(move || {
+        let _ = current_mailbox.read();
+        has_more.set(true);
+    });
+
     let handle_refresh = move |_| {
         let sess = session.read().clone();
         if let Some(token) = sess.token.clone() {
