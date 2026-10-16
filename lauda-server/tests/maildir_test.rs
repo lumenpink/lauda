@@ -424,3 +424,49 @@ async fn test_maildir_txt_auto_falls_back_to_plain_when_no_html() {
     let txt_auto = full_msg.txt_auto.unwrap();
     assert!(txt_auto.contains("Relatorio de backup executado com sucesso."));
 }
+
+#[tokio::test]
+async fn test_maildir_pagination_and_mtime_sorting() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+
+    std::fs::create_dir_all(root.join("cur")).unwrap();
+    std::fs::create_dir_all(root.join("new")).unwrap();
+
+    let backend = MaildirBackend::new(root);
+    backend.add_user("lumen", "senha123");
+
+    // Criar 4 mensagens com mtimes distintos
+    let base_time = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1700000000);
+    for i in 1..=4 {
+        let filename = format!("170000000{i}.M123P456.test:2,S");
+        let path = root.join("cur").join(&filename);
+        let content = format!(
+            "From: test{i}@2lp.in\nSubject: Mensagem {i}\nDate: Mon, 05 Oct 2026 12:00:00 +0000\n\nCorpo {i}"
+        );
+        std::fs::write(&path, content).unwrap();
+        let file = std::fs::File::options().write(true).open(&path).unwrap();
+        let mtime = base_time + std::time::Duration::from_secs(i * 100);
+        let times = std::fs::FileTimes::new().set_modified(mtime);
+        file.set_times(times).unwrap();
+    }
+
+    // Página 1: limit 2, offset 0 -> deve retornar msg 4 e msg 3 (mtimes mais recentes)
+    let p1 = backend
+        .list_messages("lumen", "INBOX", Some(2), Some(0))
+        .await
+        .expect("pagina 1");
+    assert_eq!(p1.len(), 2);
+    assert_eq!(p1[0].subject, "Mensagem 4");
+    assert_eq!(p1[1].subject, "Mensagem 3");
+
+    // Página 2: limit 2, offset 2 -> deve retornar msg 2 e msg 1
+    let p2 = backend
+        .list_messages("lumen", "INBOX", Some(2), Some(2))
+        .await
+        .expect("pagina 2");
+    assert_eq!(p2.len(), 2);
+    assert_eq!(p2[0].subject, "Mensagem 2");
+    assert_eq!(p2[1].subject, "Mensagem 1");
+}
+
