@@ -154,3 +154,99 @@ fn test_hybrid_search_fusion() {
     assert!(results[0].semantic_score > 0.0);
     assert!(results[0].score > 0.0);
 }
+
+#[test]
+fn test_hybrid_search_alpha_extremes() {
+    let mut index = MessageIndex::new();
+    let provider = MockEmbeddingProvider;
+
+    let msg = Message {
+        envelope: MessageEnvelope {
+            uid: 301,
+            subject: "Vacinação Militar".to_string(),
+            sender: "saude@exemplo.gov.br".to_string(),
+            date: "2026-10-15".to_string(),
+            ..Default::default()
+        },
+        txt_auto: Some("Campanha de saúde no hospital geral militar.".to_string()),
+        ..Default::default()
+    };
+
+    index.index_message_semantic("INBOX", &msg, &provider);
+
+    // Alpha = 1.0 (somente BM25): score semântico deve ser 0.0
+    let res_bm25 = index.search_hybrid("Vacinação", &provider, 1.0);
+    assert!(!res_bm25.is_empty());
+    assert_eq!(res_bm25[0].uid, 301);
+    assert!(res_bm25[0].bm25_score > 0.0);
+    assert_eq!(res_bm25[0].semantic_score, 0.0);
+
+    // Alpha = 0.0 (somente Semântica): bm25 score deve ser 0.0
+    let res_sem = index.search_hybrid("médico", &provider, 0.0);
+    assert!(!res_sem.is_empty());
+    assert_eq!(res_sem[0].uid, 301);
+    assert_eq!(res_sem[0].bm25_score, 0.0);
+    assert!(res_sem[0].semantic_score > 0.0);
+}
+
+#[test]
+fn test_semantic_search_empty_and_no_match() {
+    let mut index = MessageIndex::new();
+    let provider = MockEmbeddingProvider;
+
+    let msg = Message {
+        envelope: MessageEnvelope {
+            uid: 401,
+            subject: "Sem Conteúdo".to_string(),
+            sender: "null@exemplo.gov.br".to_string(),
+            date: "2026-10-15".to_string(),
+            ..Default::default()
+        },
+        txt_auto: None,
+        txt_original: None,
+        ..Default::default()
+    };
+
+    index.index_message_semantic("INBOX", &msg, &provider);
+
+    // Termo desconhecido sem similaridade
+    let res = index.search_semantic("termo_inexistente_xyz_123", &provider);
+    assert!(res.is_empty());
+
+    // Query vazia
+    let res_empty = index.search_semantic("", &provider);
+    assert!(res_empty.is_empty());
+}
+
+#[test]
+fn test_semantic_index_persistence_roundtrip() {
+    let mut index = MessageIndex::new();
+    let provider = MockEmbeddingProvider;
+
+    let msg = Message {
+        envelope: MessageEnvelope {
+            uid: 501,
+            subject: "Aviso Geral".to_string(),
+            sender: "comando@exemplo.gov.br".to_string(),
+            date: "2026-10-15".to_string(),
+            ..Default::default()
+        },
+        txt_auto: Some("Diretrizes de armamento e estande de tiro militar.".to_string()),
+        ..Default::default()
+    };
+
+    index.index_message_semantic("INBOX", &msg, &provider);
+
+    let temp_file = tempfile::NamedTempFile::new().expect("temp file");
+    index.save_to_file(temp_file.path()).expect("save index");
+
+    let loaded = MessageIndex::load_from_file(temp_file.path())
+        .expect("load index")
+        .expect("index exists");
+
+    let results = loaded.search_semantic("armamento", &provider);
+    assert!(!results.is_empty());
+    assert_eq!(results[0].uid, 501);
+    assert_eq!(results[0].matched_segment, Some(SegmentKind::Body));
+}
+
