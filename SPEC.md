@@ -1,9 +1,9 @@
 # LAUDA — Especificação do Smolclient & Micro-Daemon de Correio
 
 **Versão da Norma:** GOST `1.0.0`  
-**Status:** `CONCLUÍDO` (Branch: `feat/69-persistent-sqlite-indexer`)  
+**Status:** `IN_PROGRESS` (Branch: `feat/70-client-offline-hybrid-search`)  
 **Licença:** GPL-3.0 (com satélites `LICENSE-MEDIA` CC-BY-SA-4.0 e `LICENSE-LOGO` CC-BY-ND-4.0)  
-**Ticket de Referência:** `#69` (Anteriores: `#68`, `#67`, `#66`, `#65`, `#64`, `#63`, `#62`, `#1`)
+**Ticket de Referência:** `#70` (Anteriores: `#69`, `#68`, `#67`, `#66`, `#65`, `#64`, `#63`, `#62`, `#1`)
 
 ---
 
@@ -716,3 +716,38 @@ Anteriormente, o `MaildirBackend::search_messages` iterava sobre todos os arquiv
 - [x] Endpoint `/mailboxes/{mailbox}/index-slice` ou `/sync/index-slice` retornando mensagens indexadas da janela recente.
 - [x] Testes automatizados herméticos cobrindo indexação, reconciliação, remoção e busca persistente.
 - [x] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
+
+---
+
+## 24. Busca Offline Híbrida com Sincronização da Fatia de 90 Dias (Ticket #70)
+
+### 24.1 Arquitetura Offline-First no Cliente
+Clientes móveis (Android NDK) e desktops (Linux x86_64) operam frequentemente em condições intermitentes ou sem conectividade (modo avião, metrô, áreas sem cobertura 4G/5G). Para preservar a experiência de busca inteligente por IA sem conexão:
+1. O servidor disponibiliza a fatia pré-computada dos últimos 90 dias via `/mailboxes/{mailbox}/index-slice`.
+2. O cliente sincroniza essa fatia em seu SQLite local (`LocalMessageCache`).
+3. Quando desconectado, o cliente vetoriza a pergunta na CPU local com `SimpleCpuEmbeddingProvider` (< 0,05 ms) e executa busca híbrida instantânea (BM25 + vetores semânticos) sobre os dados locais.
+
+### 24.2 Especificação das Camadas do Cliente
+1. **Contrato de API (`ports.rs` / `HttpApiClient`)**:
+   - `fetch_index_slice(&self, token: &str, mailbox: &str, days: u32) -> Result<Vec<lauda_index::IndexedDoc>, ClientError>`.
+2. **Persistência Local no `LocalMessageCache` (`cache.rs`)**:
+   - Tabela `cache_indexed_documents (mailbox TEXT, uid INTEGER, doc_json TEXT, PRIMARY KEY (mailbox, uid))`.
+   - Método `save_index_slice(&self, mailbox: &str, docs: &[IndexedDoc])`.
+   - Método `load_index_slice(&self, mailbox: &str) -> Option<MessageIndex>`.
+3. **Resolução de Busca no `InboxView` (`inbox_view.rs`)**:
+   - Tenta requisição assíncrona HTTP ao backend.
+   - Em caso de indisponibilidade de rede ou erro HTTP:
+     - Realiza fallback automático para `load_index_slice`.
+     - Executa `search_hybrid` localmente na CPU (0 MB VRAM).
+     - Renderiza aviso visual estilizado em *Trash Polka*:
+       `"⚡ MODO OFFLINE: PESQUISANDO NO HISTÓRICO LOCAL DOS ÚLTIMOS 90 DIAS"`.
+4. **Sincronização em Background (`ui/mod.rs`)**:
+   - Sincroniza a fatia de índice periodicamente em segundo plano.
+
+### 24.3 Critérios de Aceite (Ticket #70)
+- [ ] `HttpApiClient` implementa `fetch_index_slice` consumindo a rota do servidor.
+- [ ] `LocalMessageCache` persiste e hidrata `IndexedDoc`s e constrói `MessageIndex` em memória.
+- [ ] Fallback automático para busca híbrida local quando offline ou sem sinal.
+- [ ] Interface exibe feedback explícito informando o modo offline e a janela de 90 dias.
+- [ ] Testes automatizados herméticos cobrindo serialização de fatia, busca offline e fallback.
+- [ ] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
