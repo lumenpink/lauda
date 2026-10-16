@@ -1,9 +1,9 @@
 # LAUDA — Especificação do Smolclient & Micro-Daemon de Correio
 
 **Versão da Norma:** GOST `1.0.0`  
-**Status:** `CONCLUÍDO` (Branch: `feat/68-search-threshold-feedback`)  
+**Status:** `IN_PROGRESS` (Branch: `feat/69-persistent-sqlite-indexer`)  
 **Licença:** GPL-3.0 (com satélites `LICENSE-MEDIA` CC-BY-SA-4.0 e `LICENSE-LOGO` CC-BY-ND-4.0)  
-**Ticket de Referência:** `#68` (Anteriores: `#67`, `#66`, `#65`, `#64`, `#63`, `#62`, `#1`)
+**Ticket de Referência:** `#69` (Anteriores: `#68`, `#67`, `#66`, `#65`, `#64`, `#63`, `#62`, `#1`)
 
 ---
 
@@ -679,3 +679,40 @@ Ao digitar os primeiros caracteres na barra de pesquisa (1 ou 2 caracteres), a i
 - [x] Mensagem de lista vazia com busca ativa ($\ge 3$) informa explicitamente o termo pesquisado.
 - [x] Testes unitários herméticos no cliente validando a lógica de limiar de busca e feedback.
 - [x] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
+
+---
+
+## 23. Indexador Persistente SQLite em Background para Caixas Volumosas (Ticket #69)
+
+### 23.1 Diagnóstico do Gargalo de Busca
+Anteriormente, o `MaildirBackend::search_messages` iterava sobre todos os arquivos do Maildir da pasta requisitada a cada chamada de busca, lendo o arquivo de cada e-mail e recalculando embeddings na hora. Em caixas reais com dezenas de milhares de mensagens (ex: 10.000 a 30.000 e-mails), essa abordagem tornava a busca inutilizável e bloqueava o I/O do servidor.
+
+### 23.2 Arquitetura do `SqliteIndexStore` e Worker em Background
+1. **Persistência em SQLite Local (`sqlite_index.rs`)**:
+   - Componente `SqliteIndexStore` em `lauda-server`, gerenciando um banco SQLite dedicado (`.lauda_index.db` no diretório raiz do Maildir do usuário).
+   - Modo WAL ativado para concorrência segura entre leituras de busca e escritas do worker.
+   - Tabelas gerenciadas:
+     - `indexed_documents`: metadados do envelope (`mailbox`, `uid`, `mtime`, `subject`, `sender`, `date`, `is_read`, `is_flagged`, `has_attachments`), `doc_len`, frequências de termos em JSON e embeddings vetoriais binários compactos (`BLOB` de floats `f32` para os segmentos semânticos).
+     - `inverted_index`: mapeamento `(term, mailbox, uid, tf)` para busca lexical e cálculo de BM25 instantâneo.
+2. **Reconciliação com `dovecot-uidlist`**:
+   - O arquivo `dovecot-uidlist` de cada pasta Maildir é a autoridade canônica dos UIDs válidos.
+   - O indexador compara o conjunto de UIDs ativos com os UIDs já gravados no SQLite:
+     - UIDs ausentes no SQLite são enfileirados para indexação incremental em background.
+     - UIDs que deixaram de existir no `dovecot-uidlist` (excluídos via IMAP/Dovecot) são expurgados do SQLite.
+     - Flags de leitura/favorito são sincronizadas de forma leve caso tenham mudado.
+3. **Worker em Background (0 MB VRAM, CPU Pura)**:
+   - Processamento de mensagens em lotes assíncronos (fatias de 20 a 50 mensagens por iteração), cedendo CPU (`tokio::task::yield_now` / pausas curtas) para garantir zero impacto na latência dos endpoints HTTP do daemon.
+   - Vetorização semântica determinística com `SimpleCpuEmbeddingProvider` de 384 dimensões do `lauda-index`.
+4. **Busca Híbrida Direta em Sub-Milissegundo**:
+   - `search_messages` no `MaildirBackend` utiliza o `SqliteIndexStore` e executa a busca lexical e vetorial diretamente sobre o banco persistente, retornando os envelopes ranqueados sem tocar no sistema de arquivos durante a busca.
+5. **Endpoint de Fatia de Sincronização (`/sync/index-slice`)**:
+   - Rota no servidor que exporta os metadados e vetores dos últimos N dias (padrão: 90 dias) para consumo offline pelos clientes.
+
+### 23.3 Critérios de Aceite (Ticket #69)
+- [ ] Criação de `SqliteIndexStore` com esquema persistente para documentos, termos BM25 e embeddings binários.
+- [ ] Implementação da reconciliação com `dovecot-uidlist` (detecção de novos e-mails e exclusões).
+- [ ] Worker em background indexando mensagens em lote sem bloqueio de I/O e com 0 MB VRAM.
+- [ ] `search_messages` do `MaildirBackend` utiliza o índice persistente em vez de varredura direta no filesystem.
+- [ ] Endpoint `/mailboxes/{mailbox}/index-slice` ou `/sync/index-slice` retornando mensagens indexadas da janela recente.
+- [ ] Testes automatizados herméticos cobrindo indexação, reconciliação, remoção e busca persistente.
+- [ ] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
