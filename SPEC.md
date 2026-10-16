@@ -584,12 +584,12 @@ Para expor o motor de busca vetorial e híbrida construído no `lauda-index`, o 
   - Manutenção dos filtros de status (`TODOS`, `NÃO LIDOS`, `FAVORITOS`, `COM ANEXOS`) aplicados sobre o resultado ranqueado.
 
 ### 19.3 Critérios de Aceite (Ticket #65)
-- [ ] Método `search_messages` adicionado à porta `MailBackend` e implementado nos adapters (`MaildirBackend` e `InMemoryMailBackend`).
-- [ ] Endpoints HTTP de busca registrados e funcionais no router do `lauda-server`.
-- [ ] Método `search_messages` implementado na porta `MailApiClient` e adapters do `lauda-client`.
-- [ ] Barra de busca do `InboxView` no `lauda-client` conectada à busca assíncrona da API.
-- [ ] Testes de integração cobrindo busca no servidor e cliente.
-- [ ] Quality Gate 100% verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
+- [x] Método `search_messages` adicionado à porta `MailBackend` e implementado nos adapters (`MaildirBackend` e `InMemoryMailBackend`).
+- [x] Endpoints HTTP de busca registrados e funcionais no router do `lauda-server`.
+- [x] Método `search_messages` implementado na porta `MailApiClient` e adapters do `lauda-client`.
+- [x] Barra de busca do `InboxView` no `lauda-client` conectada à busca assíncrona da API.
+- [x] Testes de integração cobrindo busca no servidor e cliente.
+- [x] Quality Gate 100% verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
 
 
 
