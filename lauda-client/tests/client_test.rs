@@ -223,4 +223,13 @@ async fn test_in_memory_api_client() {
     assert_eq!(contacts.len(), 2);
     assert!(contacts.iter().any(|c| c.email == "colleague@2lp.in"));
     assert!(contacts.iter().any(|c| c.email == "a@b.com"));
+
+    // 11. Search Messages
+    let search_res = client
+        .search_messages(token, "Archive", "relatorio")
+        .await
+        .unwrap();
+    assert_eq!(search_res.len(), 1);
+    assert_eq!(search_res[0].uid, 102);
 }
+
