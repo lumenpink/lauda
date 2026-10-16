@@ -244,3 +244,37 @@ async fn test_in_memory_api_client() {
     assert_eq!(search_res.len(), 1);
     assert_eq!(search_res[0].uid, 102);
 }
+
+#[test]
+fn test_fast_filter_envelopes_instant_and_accurate() {
+    use lauda_client::domain::fast_filter_envelopes;
+    let env1 = MessageEnvelope {
+        uid: 1,
+        subject: "Projeto Alfa 2026".to_string(),
+        sender: "dev@2lp.in".to_string(),
+        ..Default::default()
+    };
+    let env2 = MessageEnvelope {
+        uid: 2,
+        subject: "Relatório Financeiro".to_string(),
+        sender: "finance@2lp.in".to_string(),
+        ..Default::default()
+    };
+    let env3 = MessageEnvelope {
+        uid: 3,
+        subject: "Urgente: deploy".to_string(),
+        sender: "alfa-lead@2lp.in".to_string(),
+        ..Default::default()
+    };
+
+    let list = vec![env1, env2, env3];
+
+    let res = fast_filter_envelopes(&list, "alfa");
+    assert_eq!(res.len(), 2);
+    assert_eq!(res[0].uid, 1);
+    assert_eq!(res[1].uid, 3);
+
+    let empty = fast_filter_envelopes(&list, "inexistente");
+    assert!(empty.is_empty());
+}
+
