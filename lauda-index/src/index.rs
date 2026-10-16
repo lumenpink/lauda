@@ -332,7 +332,7 @@ impl MessageIndex {
                 }
             }
 
-            if max_sim > 0.0 {
+            if max_sim >= 0.15 {
                 results.push(SearchResult {
                     uid,
                     score: max_sim as f64,

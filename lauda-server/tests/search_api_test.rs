@@ -135,3 +135,69 @@ async fn test_server_search_endpoint() {
     assert!(!results_hosp.is_empty());
     assert_eq!(results_hosp[0].uid, 102);
 }
+
+#[tokio::test]
+async fn test_search_edge_cases_and_unauthorized() {
+    let backend = setup_search_backend();
+    let app = app_router(backend.clone(), TEST_SECRET);
+
+    // 1. Acesso sem token deve retornar 401 Unauthorized
+    let req_unauth = Request::builder()
+        .method("GET")
+        .uri("/messages/search?box=INBOX&q=armamento")
+        .body(Body::empty())
+        .unwrap();
+
+    let resp_unauth = app.clone().oneshot(req_unauth).await.unwrap();
+    assert_eq!(resp_unauth.status(), StatusCode::UNAUTHORIZED);
+
+    // 2. Com token válido
+    let login_body = serde_json::to_string(&LoginRequest {
+        username: "lumen".to_string(),
+        password: "senha123".to_string(),
+    })
+    .unwrap();
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/auth/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(login_body))
+        .unwrap();
+
+    let response = app.clone().oneshot(req).await.unwrap();
+    let token_resp: TokenResponse = serde_json::from_slice(
+        &response.into_body().collect().await.unwrap().to_bytes(),
+    )
+    .unwrap();
+    let token = token_resp.token;
+
+    // 3. Termo que não casa com nenhuma mensagem
+    let req_nomatch = Request::builder()
+        .method("GET")
+        .uri("/messages/search?box=INBOX&q=xkz987qwv123")
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+
+    let resp_nomatch = app.clone().oneshot(req_nomatch).await.unwrap();
+    assert_eq!(resp_nomatch.status(), StatusCode::OK);
+    let bytes = resp_nomatch.into_body().collect().await.unwrap().to_bytes();
+    let results: Vec<MessageEnvelope> = serde_json::from_slice(&bytes).unwrap();
+    assert!(results.is_empty());
+
+    // 4. Query vazia deve retornar todas as mensagens da caixa
+    let req_empty = Request::builder()
+        .method("GET")
+        .uri("/messages/search?box=INBOX&q=")
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+
+    let resp_empty = app.clone().oneshot(req_empty).await.unwrap();
+    assert_eq!(resp_empty.status(), StatusCode::OK);
+    let bytes = resp_empty.into_body().collect().await.unwrap().to_bytes();
+    let results_empty: Vec<MessageEnvelope> = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(results_empty.len(), 2);
+}
+
