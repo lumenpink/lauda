@@ -554,6 +554,44 @@ Para alimentar a busca de e-mails com precisão semântica e sem alocar memória
 - [x] Testes unitários herméticos em `lauda-index/tests/vector_search_test.rs`.
 - [x] Quality Gate 100% verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test -p lauda-index`).
 
+---
+
+## 19. Endpoint de Busca Semântica no Servidor e Integração no Cliente (Ticket #65)
+
+Para expor o motor de busca vetorial e híbrida construído no `lauda-index`, o `lauda-server` adiciona rota de busca para as caixas postais e o `lauda-client` conecta sua barra de pesquisa à API remota.
+
+### 19.1 Especificação do Endpoint HTTP (`lauda-server`)
+- Rota: `GET /messages/search` e `GET /mailboxes/{mailbox}/search`
+- Parâmetros Query:
+  - `box`: Nome da caixa postal (padrão: `INBOX`, se acessado via `/messages/search`).
+  - `q`: Termo de busca textual ou semântica.
+  - `mode`: Modo de busca (`hybrid` [padrão], `semantic`, `bm25`).
+  - `alpha`: Coeficiente de fusão linear para modo híbrido (padrão: `0.5`).
+- Cabeçalho de autorização: `Authorization: Bearer <JWT>`
+- Resposta: `200 OK` com `Vec<MessageEnvelope>` ordenados por relevância decrescente.
+- Comportamento:
+  - Disseca mensagens da caixa postal com `urupema::domain::segment_email`.
+  - Executa ranqueamento via `lauda-index::MessageIndex::search_hybrid`.
+  - Retorna envelopes ordenados pela pontuação combinada.
+
+### 19.2 Integração no Smoliclient (`lauda-client`)
+- Extensão do trait `MailApiClient`:
+  - Adição do método assíncrono `search_messages(&self, token: &str, mailbox: &str, query: &str) -> Result<Vec<MessageEnvelope>, ClientError>`.
+  - Implementação correspondente em `HttpApiClient` e `InMemoryApiClient`.
+- Componente `InboxView`:
+  - Hook reativo `use_resource` para busca assíncrona ao digitar na barra de pesquisa.
+  - Fallback instantâneo em memória enquanto a requisição transita pela rede.
+  - Manutenção dos filtros de status (`TODOS`, `NÃO LIDOS`, `FAVORITOS`, `COM ANEXOS`) aplicados sobre o resultado ranqueado.
+
+### 19.3 Critérios de Aceite (Ticket #65)
+- [ ] Método `search_messages` adicionado à porta `MailBackend` e implementado nos adapters (`MaildirBackend` e `InMemoryMailBackend`).
+- [ ] Endpoints HTTP de busca registrados e funcionais no router do `lauda-server`.
+- [ ] Método `search_messages` implementado na porta `MailApiClient` e adapters do `lauda-client`.
+- [ ] Barra de busca do `InboxView` no `lauda-client` conectada à busca assíncrona da API.
+- [ ] Testes de integração cobrindo busca no servidor e cliente.
+- [ ] Quality Gate 100% verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
+
+
 
 
 
