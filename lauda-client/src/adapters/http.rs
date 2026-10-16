@@ -295,6 +295,35 @@ impl MailApiClient for HttpApiClient {
         }
     }
 
+    async fn search_messages(
+        &self,
+        token: &str,
+        mailbox: &str,
+        query: &str,
+    ) -> Result<Vec<MessageEnvelope>, ClientError> {
+        let url = format!("{}/messages/search", self.base_url);
+        let headers = Self::auth_headers(token)?;
+        let resp = self
+            .client
+            .get(&url)
+            .headers(headers)
+            .query(&[("box", mailbox), ("q", query)])
+            .send()
+            .await
+            .map_err(|e| ClientError::Network(e.to_string()))?;
+
+        match resp.status() {
+            StatusCode::OK => resp.json::<Vec<MessageEnvelope>>().await.map_err(|e| {
+                ClientError::Network(format!("Erro ao deserializar resultados de busca: {}", e))
+            }),
+            StatusCode::UNAUTHORIZED => Err(ClientError::AuthFailed),
+            status => Err(ClientError::Network(format!(
+                "Status inesperado na busca: {}",
+                status
+            ))),
+        }
+    }
+
     fn attachment_url(&self, mailbox: &str, uid: u32, attachment_id: usize) -> String {
         format!(
             "{}/messages/{}/attachments/{}?box={}",

@@ -67,6 +67,45 @@ pub struct MessagesQuery {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct SearchQuery {
+    pub r#box: Option<String>,
+    pub q: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MailboxSearchQuery {
+    pub q: String,
+}
+
+async fn search_messages_handler(
+    State(state): State<AppState>,
+    AuthUser(username): AuthUser,
+    Query(query): Query<SearchQuery>,
+) -> Result<Json<Vec<MessageEnvelope>>, (StatusCode, String)> {
+    let mailbox = query.r#box.as_deref().unwrap_or("INBOX");
+    let results = state
+        .backend
+        .search_messages(&username, mailbox, &query.q)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(results))
+}
+
+async fn search_mailbox_handler(
+    State(state): State<AppState>,
+    AuthUser(username): AuthUser,
+    Path(mailbox): Path<String>,
+    Query(query): Query<MailboxSearchQuery>,
+) -> Result<Json<Vec<MessageEnvelope>>, (StatusCode, String)> {
+    let results = state
+        .backend
+        .search_messages(&username, &mailbox, &query.q)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(results))
+}
+
+#[derive(Debug, Deserialize)]
 pub struct MarkReadQuery {
     pub r#box: Option<String>,
     pub read: Option<bool>,
@@ -417,7 +456,9 @@ fn build_router(state: AppState) -> Router {
         .route("/contacts", get(list_contacts_handler))
         .route("/contacts/sync", post(sync_contacts_handler))
         .route("/mailboxes", get(list_mailboxes_handler))
+        .route("/mailboxes/{mailbox}/search", get(search_mailbox_handler))
         .route("/messages", get(list_messages_handler))
+        .route("/messages/search", get(search_messages_handler))
         .route(
             "/messages/{uid}",
             get(get_message_handler).delete(delete_message_handler),

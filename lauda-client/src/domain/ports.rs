@@ -55,6 +55,12 @@ pub trait MailApiClient: Send + Sync {
         src_box: &str,
         dest_box: &str,
     ) -> Result<(), ClientError>;
+    async fn search_messages(
+        &self,
+        token: &str,
+        mailbox: &str,
+        query: &str,
+    ) -> Result<Vec<MessageEnvelope>, ClientError>;
     fn attachment_url(&self, mailbox: &str, uid: u32, attachment_id: usize) -> String;
     async fn fetch_attachment(
         &self,

@@ -67,6 +67,12 @@ pub trait MailBackend: Send + Sync {
         &self,
         username: &str,
     ) -> Result<Vec<lauda_types::ContactInfo>, BackendError>;
+    async fn search_messages(
+        &self,
+        username: &str,
+        mailbox: &str,
+        query: &str,
+    ) -> Result<Vec<MessageEnvelope>, BackendError>;
     async fn get_sieve_script(&self, username: &str) -> Result<String, BackendError> {
         let _ = username;
         Ok(String::new())

@@ -267,6 +267,43 @@ impl MailBackend for InMemoryMailBackend {
         Ok(contacts)
     }
 
+    async fn search_messages(
+        &self,
+        username: &str,
+        mailbox: &str,
+        query: &str,
+    ) -> Result<Vec<MessageEnvelope>, BackendError> {
+        let msgs_lock = self.messages.read().unwrap();
+        let empty_map = HashMap::new();
+        let user_boxes = msgs_lock.get(username).unwrap_or(&empty_map);
+        let empty_vec = Vec::new();
+        let msgs = user_boxes.get(mailbox).unwrap_or(&empty_vec);
+
+        if query.trim().is_empty() {
+            let mut list: Vec<MessageEnvelope> = msgs.iter().map(|m| m.envelope.clone()).collect();
+            list.sort_by_key(|e| std::cmp::Reverse(e.uid));
+            return Ok(list);
+        }
+
+        let mut index = lauda_index::MessageIndex::new();
+        let provider = lauda_index::SimpleCpuEmbeddingProvider;
+
+        for msg in msgs {
+            index.index_message_semantic(mailbox, msg, &provider);
+        }
+
+        let results = index.search_hybrid(query, &provider, 0.5);
+
+        let mut envelopes = Vec::new();
+        for res in results {
+            if let Some(found) = msgs.iter().find(|m| m.envelope.uid == res.uid) {
+                envelopes.push(found.envelope.clone());
+            }
+        }
+
+        Ok(envelopes)
+    }
+
     async fn get_sieve_script(&self, username: &str) -> Result<String, BackendError> {
         let scripts = self.sieve_scripts.read().unwrap();
         Ok(scripts.get(username).cloned().unwrap_or_default())

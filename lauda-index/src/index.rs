@@ -13,6 +13,49 @@ pub trait EmbeddingProvider: Send + Sync {
     fn embed(&self, text: &str) -> Vec<f32>;
 }
 
+/// Provedor determinístico em CPU de 384 dimensões baseado em hashing FNV-1a de n-gramas e normalização L2.
+/// Garante 0 MB de VRAM e busca semântica preliminar sem necessidade de modelos pesados em disco.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct SimpleCpuEmbeddingProvider;
+
+impl EmbeddingProvider for SimpleCpuEmbeddingProvider {
+    fn embed(&self, text: &str) -> Vec<f32> {
+        let mut vec = vec![0.0f32; 384];
+        let lower = text.to_lowercase();
+        let words: Vec<&str> = lower.split_whitespace().collect();
+        for word in &words {
+            let bytes = word.as_bytes();
+            if bytes.len() >= 3 {
+                for window in bytes.windows(3) {
+                    let mut hash: u64 = 0xcbf29ce484222325;
+                    for &b in window {
+                        hash ^= b as u64;
+                        hash = hash.wrapping_mul(0x100000001b3);
+                    }
+                    let idx = (hash % 384) as usize;
+                    vec[idx] += 1.0;
+                }
+            } else {
+                let mut hash: u64 = 0xcbf29ce484222325;
+                for &b in bytes {
+                    hash ^= b as u64;
+                    hash = hash.wrapping_mul(0x100000001b3);
+                }
+                let idx = (hash % 384) as usize;
+                vec[idx] += 1.0;
+            }
+        }
+        let norm: f32 = vec.iter().map(|v| v * v).sum::<f32>().sqrt();
+        if norm > 0.0 {
+            for v in &mut vec {
+                *v /= norm;
+            }
+        }
+        vec
+    }
+}
+
+
 mod segment_kind_serde {
     use super::*;
     use serde::{Deserializer, Serializer};
@@ -174,6 +217,10 @@ impl MessageIndex {
         } else if let Some(ref raw) = msg.txt_original {
             body_tokens.extend(tokenize(raw));
         }
+        for att in &msg.attachments {
+            let att_norm = normalize(&att.filename);
+            body_tokens.extend(tokenize(&att_norm));
+        }
 
         let mut term_frequencies: HashMap<String, u32> = HashMap::new();
         for t in &subject_tokens {
@@ -236,8 +283,14 @@ impl MessageIndex {
             .or(msg.txt_original.as_deref())
             .unwrap_or("");
 
+        let mut full_body = body_text.to_string();
+        for att in &msg.attachments {
+            full_body.push_str("\nAnexo: ");
+            full_body.push_str(&att.filename);
+        }
+
         let config = SegmentationConfig::default();
-        let segments = segment_email(Some(&headers), body_text, &config);
+        let segments = segment_email(Some(&headers), &full_body, &config);
 
         let mut segment_embeddings = Vec::new();
         for segment in segments {

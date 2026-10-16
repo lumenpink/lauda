@@ -61,6 +61,22 @@ pub fn InboxView(
 
     let username = session.read().username.clone();
 
+    let search_resource = use_resource(move || {
+        let q = search_query.read().trim().to_string();
+        let box_name = current_mailbox.read().clone();
+        let sess = session.read().clone();
+        async move {
+            if q.is_empty() {
+                None
+            } else if let Some(token) = sess.token {
+                let client = HttpApiClient::new(sess.server_url);
+                client.search_messages(&token, &box_name, &q).await.ok()
+            } else {
+                None
+            }
+        }
+    });
+
     let current_filt = *active_filter.read();
     let query_str = search_query.read().trim().to_string();
 
@@ -77,26 +93,35 @@ pub fn InboxView(
             .cloned()
             .collect()
     } else {
-        // Construir índice em memória sob demanda sobre os envelopes da caixa ativa
-        let mut index = lauda_index::MessageIndex::new();
-        let box_name = current_mailbox.read().clone();
-        for env in messages.read().iter() {
-            let msg = Message {
-                envelope: env.clone(),
-                txt_auto: None,
-                txt_original: None,
-                html_sanitized: None,
-                attachments: vec![],
-            };
-            index.index_message(&box_name, &msg);
-        }
+        let base_list = match &*search_resource.read() {
+            Some(Some(list)) => list.clone(),
+            _ => {
+                // Fallback instantâneo em memória sobre os envelopes da caixa ativa
+                let mut index = lauda_index::MessageIndex::new();
+                let box_name = current_mailbox.read().clone();
+                for env in messages.read().iter() {
+                    let msg = Message {
+                        envelope: env.clone(),
+                        txt_auto: None,
+                        txt_original: None,
+                        html_sanitized: None,
+                        attachments: vec![],
+                    };
+                    index.index_message(&box_name, &msg);
+                }
 
-        let ranked_uids = index.search(&query_str);
-        let msgs_snapshot = messages.read();
+                let ranked_uids = index.search(&query_str);
+                let msgs_snapshot = messages.read();
 
-        ranked_uids
+                ranked_uids
+                    .into_iter()
+                    .filter_map(|uid| msgs_snapshot.iter().find(|m| m.uid == uid).cloned())
+                    .collect()
+            }
+        };
+
+        base_list
             .into_iter()
-            .filter_map(|uid| msgs_snapshot.iter().find(|m| m.uid == uid).cloned())
             .filter(|env| match current_filt {
                 InboxFilter::All => true,
                 InboxFilter::Unread => !env.is_read,

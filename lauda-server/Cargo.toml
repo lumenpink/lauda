@@ -25,6 +25,8 @@ tokio-stream = { version = "0.1", features = ["sync"] }
 rusqlite = { version = "0.33", features = ["bundled"] }
 base64 = "0.22"
 html2text = "0.12"
+lauda-index = { path = "../lauda-index" }
+urupema = { path = "../../urupema" }
 
 [dev-dependencies]
 base64 = "0.22"

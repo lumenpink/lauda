@@ -996,6 +996,38 @@ impl MailBackend for MaildirBackend {
         Ok(contacts)
     }
 
+    async fn search_messages(
+        &self,
+        username: &str,
+        mailbox: &str,
+        query: &str,
+    ) -> Result<Vec<MessageEnvelope>, BackendError> {
+        let envelopes = self.list_messages(username, mailbox).await?;
+        if query.trim().is_empty() {
+            return Ok(envelopes);
+        }
+
+        let mut index = lauda_index::MessageIndex::new();
+        let provider = lauda_index::SimpleCpuEmbeddingProvider;
+
+        for env in &envelopes {
+            if let Ok(msg) = self.get_message(username, mailbox, env.uid).await {
+                index.index_message_semantic(mailbox, &msg, &provider);
+            }
+        }
+
+        let results = index.search_hybrid(query, &provider, 0.5);
+
+        let mut ranked = Vec::new();
+        for res in results {
+            if let Some(found) = envelopes.iter().find(|e| e.uid == res.uid) {
+                ranked.push(found.clone());
+            }
+        }
+
+        Ok(ranked)
+    }
+
     async fn get_sieve_script(&self, username: &str) -> Result<String, BackendError> {
         let _ = username;
         // Caminho do script de usuário no home do Maildir ou na raiz do Maildir

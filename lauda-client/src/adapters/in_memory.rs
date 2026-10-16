@@ -164,6 +164,41 @@ impl MailApiClient for InMemoryApiClient {
         Ok(())
     }
 
+    async fn search_messages(
+        &self,
+        _token: &str,
+        mailbox: &str,
+        query: &str,
+    ) -> Result<Vec<MessageEnvelope>, ClientError> {
+        let msgs = self.messages.read().unwrap();
+        let empty = Vec::new();
+        let box_msgs = msgs.get(mailbox).unwrap_or(&empty);
+
+        if query.trim().is_empty() {
+            let mut list: Vec<MessageEnvelope> = box_msgs.iter().map(|m| m.envelope.clone()).collect();
+            list.sort_by_key(|e| std::cmp::Reverse(e.uid));
+            return Ok(list);
+        }
+
+        let mut index = lauda_index::MessageIndex::new();
+        let provider = lauda_index::SimpleCpuEmbeddingProvider;
+
+        for msg in box_msgs {
+            index.index_message_semantic(mailbox, msg, &provider);
+        }
+
+        let results = index.search_hybrid(query, &provider, 0.5);
+
+        let mut envelopes = Vec::new();
+        for res in results {
+            if let Some(found) = box_msgs.iter().find(|m| m.envelope.uid == res.uid) {
+                envelopes.push(found.envelope.clone());
+            }
+        }
+
+        Ok(envelopes)
+    }
+
     fn attachment_url(&self, mailbox: &str, uid: u32, attachment_id: usize) -> String {
         format!("in-memory://{mailbox}/{uid}/{attachment_id}")
     }

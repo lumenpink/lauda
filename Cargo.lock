@@ -3738,6 +3738,7 @@ dependencies = [
  "ishcondidim",
  "jsonwebtoken",
  "lauda-client",
+ "lauda-index",
  "lauda-types",
  "mail-parser 0.11.9",
  "minijinja",
