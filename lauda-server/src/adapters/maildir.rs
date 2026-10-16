@@ -492,7 +492,11 @@ impl MailBackend for MaildirBackend {
         }
 
         // Ordenar do mais novo para o mais antigo (mtime decrescente, secundário por filename)
-        entries.sort_by(|a, b| b.mtime.cmp(&a.mtime).then_with(|| b.filename.cmp(&a.filename)));
+        entries.sort_by(|a, b| {
+            b.mtime
+                .cmp(&a.mtime)
+                .then_with(|| b.filename.cmp(&a.filename))
+        });
 
         let offset = offset.unwrap_or(0);
         let selected_entries: Vec<FileEntry> = if let Some(limit) = limit {

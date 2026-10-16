@@ -103,7 +103,10 @@ async fn test_hermetic_maildir_lifecycle() {
     assert_eq!(inbox.unread_messages, 1);
 
     // 2. Listar mensagens
-    let msgs = backend.list_messages("testuser", "INBOX", None, None).await.unwrap();
+    let msgs = backend
+        .list_messages("testuser", "INBOX", None, None)
+        .await
+        .unwrap();
     assert_eq!(msgs.len(), 1);
     assert_eq!(msgs[0].uid, 100);
     assert_eq!(msgs[0].subject, "Teste Hermetico");
@@ -119,7 +122,10 @@ async fn test_hermetic_maildir_lifecycle() {
         .mark_message_read("testuser", "INBOX", 100, true)
         .await
         .unwrap();
-    let msgs_after_read = backend.list_messages("testuser", "INBOX", None, None).await.unwrap();
+    let msgs_after_read = backend
+        .list_messages("testuser", "INBOX", None, None)
+        .await
+        .unwrap();
     assert!(msgs_after_read[0].is_read);
 
     // 5. Enviar mensagem
@@ -132,7 +138,10 @@ async fn test_hermetic_maildir_lifecycle() {
         attachments: vec![],
     };
     backend.send_message("testuser", &compose).await.unwrap();
-    let sent_msgs = backend.list_messages("testuser", "Sent", None, None).await.unwrap();
+    let sent_msgs = backend
+        .list_messages("testuser", "Sent", None, None)
+        .await
+        .unwrap();
     assert_eq!(sent_msgs.len(), 1);
     assert_eq!(sent_msgs[0].subject, "Resposta de Teste");
 
@@ -141,10 +150,16 @@ async fn test_hermetic_maildir_lifecycle() {
         .delete_message("testuser", "INBOX", 100)
         .await
         .unwrap();
-    let inbox_after_del = backend.list_messages("testuser", "INBOX", None, None).await.unwrap();
+    let inbox_after_del = backend
+        .list_messages("testuser", "INBOX", None, None)
+        .await
+        .unwrap();
     assert!(inbox_after_del.is_empty());
 
-    let trash_msgs = backend.list_messages("testuser", "Trash", None, None).await.unwrap();
+    let trash_msgs = backend
+        .list_messages("testuser", "Trash", None, None)
+        .await
+        .unwrap();
     assert_eq!(trash_msgs.len(), 1);
 
     // 7. Excluir permanentemente da Lixeira
@@ -153,7 +168,10 @@ async fn test_hermetic_maildir_lifecycle() {
         .delete_message("testuser", "Trash", trash_uid)
         .await
         .unwrap();
-    let trash_after_del = backend.list_messages("testuser", "Trash", None, None).await.unwrap();
+    let trash_after_del = backend
+        .list_messages("testuser", "Trash", None, None)
+        .await
+        .unwrap();
     assert!(trash_after_del.is_empty());
 }
 
@@ -220,7 +238,10 @@ SGVsbG8gTGF1ZGEh\n\
         .mark_message_flagged("testuser", "INBOX", 200, true)
         .await
         .unwrap();
-    let msgs = backend.list_messages("testuser", "INBOX", None, None).await.unwrap();
+    let msgs = backend
+        .list_messages("testuser", "INBOX", None, None)
+        .await
+        .unwrap();
     assert!(msgs[0].is_flagged);
 
     // 4. Mover para a pasta Archive
@@ -228,10 +249,16 @@ SGVsbG8gTGF1ZGEh\n\
         .move_message("testuser", "INBOX", "Archive", 200)
         .await
         .unwrap();
-    let inbox_after = backend.list_messages("testuser", "INBOX", None, None).await.unwrap();
+    let inbox_after = backend
+        .list_messages("testuser", "INBOX", None, None)
+        .await
+        .unwrap();
     assert!(inbox_after.is_empty());
 
-    let archive_after = backend.list_messages("testuser", "Archive", None, None).await.unwrap();
+    let archive_after = backend
+        .list_messages("testuser", "Archive", None, None)
+        .await
+        .unwrap();
     assert_eq!(archive_after.len(), 1);
     assert_eq!(archive_after[0].subject, "Proposta com Anexo");
 
@@ -257,7 +284,10 @@ SGVsbG8gTGF1ZGEh\n\
         .send_message("testuser", &compose_with_att)
         .await
         .unwrap();
-    let sent_msgs = backend.list_messages("testuser", "Sent", None, None).await.unwrap();
+    let sent_msgs = backend
+        .list_messages("testuser", "Sent", None, None)
+        .await
+        .unwrap();
     assert_eq!(sent_msgs.len(), 1);
     assert_eq!(sent_msgs[0].subject, "Contrato Assinado");
     assert!(sent_msgs[0].has_attachments);
@@ -303,7 +333,10 @@ async fn test_dovecot_maildir_flag_parsing_with_size_metadata() {
     assert_eq!(inbox.unread_messages, 2); // f1 e f4 não lidos
 
     // Verificar mensagens individuais
-    let msgs = backend.list_messages("testuser", "INBOX", None, None).await.unwrap();
+    let msgs = backend
+        .list_messages("testuser", "INBOX", None, None)
+        .await
+        .unwrap();
     let m1 = msgs.iter().find(|m| m.uid == 10).unwrap();
     assert!(!m1.is_read);
     assert!(!m1.is_flagged);
@@ -469,4 +502,3 @@ async fn test_maildir_pagination_and_mtime_sorting() {
     assert_eq!(p2[0].subject, "Mensagem 2");
     assert_eq!(p2[1].subject, "Mensagem 1");
 }
-

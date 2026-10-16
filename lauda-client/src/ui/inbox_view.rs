@@ -49,7 +49,10 @@ pub fn InboxView(
                 if let Ok(boxes) = client.list_mailboxes(&token).await {
                     mailboxes.set(boxes);
                 }
-                if let Ok(msgs) = client.list_messages(&token, &box_name, Some(50), Some(0)).await {
+                if let Ok(msgs) = client
+                    .list_messages(&token, &box_name, Some(50), Some(0))
+                    .await
+                {
                     has_more.set(msgs.len() == 50);
                     messages.set(msgs);
                 }
@@ -67,7 +70,10 @@ pub fn InboxView(
 
             spawn(async move {
                 let client = HttpApiClient::new(sess.server_url);
-                if let Ok(more_msgs) = client.list_messages(&token, &box_name, Some(50), Some(current_count)).await {
+                if let Ok(more_msgs) = client
+                    .list_messages(&token, &box_name, Some(50), Some(current_count))
+                    .await
+                {
                     if more_msgs.len() < 50 {
                         has_more.set(false);
                     }

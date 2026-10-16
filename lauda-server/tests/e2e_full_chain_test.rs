@@ -405,7 +405,7 @@ async fn test_live_tcp_lauda_server_client_trifocal_and_compose() {
 
     // D. Listagem de Mensagens
     let messages = client
-        .list_messages(&token, "INBOX")
+        .list_messages(&token, "INBOX", None, None)
         .await
         .expect("Listagem de mensagens");
     assert_eq!(messages.len(), 1);

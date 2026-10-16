@@ -130,7 +130,10 @@ async fn test_in_memory_api_client() {
         },
     );
 
-    let list = client.list_messages(token, "INBOX", None, None).await.unwrap();
+    let list = client
+        .list_messages(token, "INBOX", None, None)
+        .await
+        .unwrap();
     assert_eq!(list.len(), 1);
     assert_eq!(list[0].uid, 101);
 
@@ -164,7 +167,10 @@ async fn test_in_memory_api_client() {
     // 6. Delete Message
     let del_res = client.delete_message(token, "INBOX", 101).await;
     assert!(del_res.is_ok());
-    let list_after = client.list_messages(token, "INBOX", None, None).await.unwrap();
+    let list_after = client
+        .list_messages(token, "INBOX", None, None)
+        .await
+        .unwrap();
     assert!(list_after.is_empty());
 
     // 7. Flagging
@@ -212,9 +218,15 @@ async fn test_in_memory_api_client() {
     // 9. Move Message
     let move_res = client.move_message(token, 102, "INBOX", "Archive").await;
     assert!(move_res.is_ok());
-    let inbox_msgs = client.list_messages(token, "INBOX", None, None).await.unwrap();
+    let inbox_msgs = client
+        .list_messages(token, "INBOX", None, None)
+        .await
+        .unwrap();
     assert!(inbox_msgs.is_empty());
-    let archive_msgs = client.list_messages(token, "Archive", None, None).await.unwrap();
+    let archive_msgs = client
+        .list_messages(token, "Archive", None, None)
+        .await
+        .unwrap();
     assert_eq!(archive_msgs.len(), 1);
     assert_eq!(archive_msgs[0].uid, 102);
 

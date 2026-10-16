@@ -362,7 +362,7 @@ async fn test_e2e_apk_mobile_client_live_server_full_loop() {
 
     // F. Passo 3 do Ciclo: Listagem e Recuperação de Mensagem com Visualização Trifásica
     let messages = client
-        .list_messages(token, "INBOX")
+        .list_messages(token, "INBOX", None, None)
         .await
         .expect("Listar mensagens da INBOX");
     assert_eq!(messages.len(), 1);

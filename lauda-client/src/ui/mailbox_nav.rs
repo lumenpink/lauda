@@ -26,7 +26,10 @@ pub fn MailboxNavigation(
         if let Some(token) = sess.token.clone() {
             spawn(async move {
                 let client = HttpApiClient::new(sess.server_url);
-                if let Ok(msgs) = client.list_messages(&token, &raw_name, Some(50), Some(0)).await {
+                if let Ok(msgs) = client
+                    .list_messages(&token, &raw_name, Some(50), Some(0))
+                    .await
+                {
                     messages.set(msgs);
                 }
             });
