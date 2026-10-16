@@ -1,9 +1,9 @@
 # LAUDA — Especificação do Smolclient & Micro-Daemon de Correio
 
 **Versão da Norma:** GOST `1.0.0`  
-**Status:** `CONCLUÍDO` (Branch: `feat/70-client-offline-hybrid-search`)  
+**Status:** `IN_PROGRESS` (Branch: `perf/71-client-non-blocking-ui-io`)  
 **Licença:** GPL-3.0 (com satélites `LICENSE-MEDIA` CC-BY-SA-4.0 e `LICENSE-LOGO` CC-BY-ND-4.0)  
-**Ticket de Referência:** `#70` (Anteriores: `#69`, `#68`, `#67`, `#66`, `#65`, `#64`, `#63`, `#62`, `#1`)
+**Ticket de Referência:** `#71` (Anteriores: `#70`, `#69`, `#68`, `#67`, `#66`, `#65`, `#64`, `#63`, `#62`, `#1`)
 
 ---
 
@@ -751,3 +751,33 @@ Clientes móveis (Android NDK) e desktops (Linux x86_64) operam frequentemente e
 - [x] Interface exibe feedback explícito informando o modo offline e a janela de 90 dias.
 - [x] Testes automatizados herméticos cobrindo serialização de fatia, busca offline e fallback.
 - [x] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
+
+---
+
+## 25. Desacoplamento de Operações Bloqueantes de I/O e Persistência na Interface (Ticket #71)
+
+### 25.1 Diagnóstico de Bloqueio da UI Thread
+Em interfaces reativas baseadas em Dioxus no desktop e mobile, quaisquer operações de I/O síncrono no sistema de arquivos ou consultas SQLite executadas diretamente nos event handlers de clique ou digitação (`oninput`) bloqueiam o loop de renderização da aplicação.
+Foram identificados os seguintes gargalos:
+1. **Gravação Síncrona de Anexos**: `message_view.rs` executava `std::fs::write(&target, bytes)` no handler síncrono do clique em "SALVAR ANEXO".
+2. **Autocomplete Síncrono de Contatos**: `compose_view.rs` e `calendar_view.rs` executavam `cache.search_contacts` / `cache.search_contacts_fuzzy` diretamente durante `oninput`, consultando SQLite síncrono a cada pressionamento de tecla.
+3. **Mutações Síncronas de Agenda e Contatos**: `calendar_view.rs` e `contacts_view.rs` invocando escritas e leituras síncronas na thread principal da interface.
+
+### 25.2 Arquitetura de Desacoplamento Assíncrono
+1. **I/O de Anexos em Background**:
+   - O salvamento de anexo deve ser delegado a uma task assíncrona (`spawn(async move { ... })`), executando a gravação de arquivos fora da thread de renderização da interface.
+   - A interface deve exibir feedback visual instantâneo (ex: status "SALVANDO ANEXO...", "ANEXO SALVO COM SUCESSO: <caminho>" ou mensagem de erro).
+2. **Autocomplete Reativo Desacoplado**:
+   - A busca de contatos no `compose_view` e `calendar_view` deve ser disparada de forma não-bloqueante via `spawn`, atualizando um sinal reativo assincronamente sem congelar a digitação.
+3. **Persistência e Mutações Locais Não-Bloqueantes**:
+   - Operações de cache de contatos e agenda devem rodar em segundo plano (`spawn`), mantendo a UI fluida a 60/120 FPS.
+4. **Sincronização de Manifestos de Versão**:
+   - Sincronização dos manifestos `site/version.json` e `site/version-nightly.json` para garantir conformidade contínua nos testes de distribuição e packaging.
+
+### 25.3 Critérios de Aceite (Ticket #71)
+- [ ] Salvamento de anexo desacoplado em tarefa assíncrona com feedback não-bloqueante na UI.
+- [ ] Autocomplete de contatos no `compose_view` e `calendar_view` desacoplado da thread de renderização com atualização assíncrona.
+- [ ] Operações de I/O e persistência local protegidas contra travamentos da interface.
+- [ ] Sincronização de manifestos de versão atualizada conforme o arquivo `VERSION`.
+- [ ] Testes automatizados herméticos cobrindo fluxos assíncronos e não-bloqueantes.
+- [ ] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
