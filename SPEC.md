@@ -1,7 +1,7 @@
 # LAUDA — Especificação do Smolclient & Micro-Daemon de Correio
 
 **Versão da Norma:** GOST `1.0.0`  
-**Status:** `IN_PROGRESS` (Branch: `feat/68-search-threshold-feedback`)  
+**Status:** `CONCLUÍDO` (Branch: `feat/68-search-threshold-feedback`)  
 **Licença:** GPL-3.0 (com satélites `LICENSE-MEDIA` CC-BY-SA-4.0 e `LICENSE-LOGO` CC-BY-ND-4.0)  
 **Ticket de Referência:** `#68` (Anteriores: `#67`, `#66`, `#65`, `#64`, `#63`, `#62`, `#1`)
 
@@ -673,9 +673,9 @@ Ao digitar os primeiros caracteres na barra de pesquisa (1 ou 2 caracteres), a i
    - Quando a busca for válida ($\ge 3$ caracteres) e retornar 0 resultados, o aviso informa claramente: `"Nenhuma mensagem encontrada para '<query>' nos filtros ativos."`.
 
 ### 22.3 Critérios de Aceite (Ticket #68)
-- [ ] Requisição assíncrona de busca ao backend é suprimida se `query.trim().chars().count() < 3`.
-- [ ] Filtro local não esvazia a listagem quando `query.trim().chars().count() < 3`.
-- [ ] Banner / aviso explicativo `"DIGITE AO MENOS 3 CARACTERES PARA PESQUISAR..."` é exibido quando houver 1 ou 2 caracteres.
-- [ ] Mensagem de lista vazia com busca ativa ($\ge 3$) informa explicitamente o termo pesquisado.
-- [ ] Testes unitários herméticos no cliente validando a lógica de limiar de busca e feedback.
-- [ ] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
+- [x] Requisição assíncrona de busca ao backend é suprimida se `query.trim().chars().count() < 3`.
+- [x] Filtro local não esvazia a listagem quando `query.trim().chars().count() < 3`.
+- [x] Banner / aviso explicativo `"DIGITE AO MENOS 3 CARACTERES PARA PESQUISAR..."` é exibido quando houver 1 ou 2 caracteres.
+- [x] Mensagem de lista vazia com busca ativa ($\ge 3$) informa explicitamente o termo pesquisado.
+- [x] Testes unitários herméticos no cliente validando a lógica de limiar de busca e feedback.
+- [x] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
