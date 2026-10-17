@@ -76,4 +76,17 @@ if [ "$VER_NAME" = "9.9.9-mutacao" ]; then
 fi
 echo "✅ Teste de mutação validado com sucesso!"
 
+echo "-> Validando gatilho de automação da Pratilera no CI..."
+CI_WORKFLOW="$REPO_ROOT/.forgejo/workflows/ci.yml"
+if [ ! -f "$CI_WORKFLOW" ]; then
+    echo "ERRO: $CI_WORKFLOW não encontrado."
+    exit 1
+fi
+if ! grep -q "Trigger Pratilera Store Update" "$CI_WORKFLOW" || \
+   ! grep -q "https://codeberg.org/api/v1/repos/lumenpink/banca/actions/workflows/ci.yml/dispatches" "$CI_WORKFLOW"; then
+    echo "ERRO: .forgejo/workflows/ci.yml deve conter o step Trigger Pratilera Store Update apontando para a API de dispatches da banca."
+    exit 1
+fi
+echo "✅ Gatilho de automação da Pratilera no CI validado com sucesso!"
+
 echo "🎉 Todos os testes de metadados do APK passaram!"
