@@ -65,7 +65,7 @@ echo "-> Configurando packaging e versão em $GRADLE_BUILD_KTS..."
 sed -i "s/versionCode = [0-9]\+/versionCode = $VERSION_CODE/g" "$GRADLE_BUILD_KTS"
 sed -i "s/versionName = \".*\"/versionName = \"$BASE_VERSION\"/g" "$GRADLE_BUILD_KTS"
 sed -i 's/applicationId = ".*"/applicationId = "in.twolp.lauda"/g' "$GRADLE_BUILD_KTS"
-sed -i 's/namespace = ".*"/namespace = "in.twolp.lauda"/g' "$GRADLE_BUILD_KTS"
+rm -f "$REPO_ROOT/target/dx/lauda-client/release/android/app/app/src/main/res"/mipmap-*/*.webp 2>/dev/null || true
 
 # Injetar useLegacyPackaging se não estiver presente
 if ! grep -q "useLegacyPackaging = true" "$GRADLE_BUILD_KTS"; then
