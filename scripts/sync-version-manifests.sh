@@ -26,7 +26,7 @@ cat <<EOF > "$SITE_DIR/version.json"
 {
   "version": "$CANONICAL_VERSION",
   "min_compatible_version": "0.1.0",
-  "apk_url": "https://lauda.2lp.in/lauda-latest.apk",
+  "apk_url": "https://bucket.2lp.in/lauda.apk",
   "package_id": "in.twolp.lauda",
   "release_notes": "Build contínua do Lauda Smolclient (commit $GIT_HASH).",
   "published_at": "$PUBLISHED_AT"

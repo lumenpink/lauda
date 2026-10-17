@@ -5,13 +5,24 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TARGET_APK="$REPO_ROOT/site/lauda-latest.apk"
+TARGET_APK="$REPO_ROOT/site/lauda.apk"
 VERSION_FILE="$REPO_ROOT/VERSION"
+VERSION_JSON="$REPO_ROOT/site/version.json"
 
 echo "-> Verificando presença do APK e arquivo VERSION..."
 if [ ! -f "$TARGET_APK" ]; then
     echo "ERRO: $TARGET_APK não encontrado."
     exit 1
+fi
+if [ ! -f "$VERSION_FILE" ]; then
+    echo "ERRO: $VERSION_FILE não encontrado."
+    exit 1
+fi
+if [ -f "$VERSION_JSON" ]; then
+    if ! grep -q "https://bucket.2lp.in/lauda.apk" "$VERSION_JSON"; then
+        echo "ERRO: site/version.json deve apontar para https://bucket.2lp.in/lauda.apk"
+        exit 1
+    fi
 fi
 if [ ! -f "$VERSION_FILE" ]; then
     echo "ERRO: $VERSION_FILE não encontrado."
@@ -30,12 +41,15 @@ if command -v aapt >/dev/null 2>&1; then
     echo "   versionName: $VER_NAME"
     echo "   Esperado:    $EXPECTED_VERSION"
 
+    EXPECTED_BASE="$(echo "$EXPECTED_VERSION" | cut -d'-' -f1)"
+    VER_BASE="$(echo "$VER_NAME" | cut -d'-' -f1)"
+
     if [ "$PKG" != "in.twolp.lauda" ]; then
         echo "ERRO: Pacote inválido: $PKG (esperado: in.twolp.lauda)"
         exit 1
     fi
-    if [ "$VER_NAME" != "$EXPECTED_VERSION" ]; then
-        echo "ERRO: versionName divergente: $VER_NAME != $EXPECTED_VERSION"
+    if [ "$VER_BASE" != "$EXPECTED_BASE" ]; then
+        echo "ERRO: Versão base SemVer divergente: $VER_BASE != $EXPECTED_BASE ($VER_NAME vs $EXPECTED_VERSION)"
         exit 1
     fi
     echo "✅ Metadados aapt validados com sucesso!"

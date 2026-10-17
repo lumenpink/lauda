@@ -176,8 +176,9 @@ jobs:
       - name: "Package Android APK & Sign Soberano"
         run: |
           ./scripts/package-all.sh --apk || true
-          if [ -f scripts/sign-release.sh ] && [ -f site/lauda-latest.apk ]; then
-            ./scripts/sign-release.sh site/lauda-latest.apk || true
+          if [ -f scripts/sign-release.sh ]; then
+            [ -f site/lauda.apk ] && ./scripts/sign-release.sh site/lauda.apk || true
+            [ -f site/lauda-latest.apk ] && ./scripts/sign-release.sh site/lauda-latest.apk || true
           fi
       - name: "Sync with Pratilera"
         run: |
@@ -187,9 +188,14 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -f site/lauda-latest.apk ]; then
-            npx wrangler r2 object put "lauda-downloads/lauda-latest.apk" --file="site/lauda-latest.apk" --remote || true
-            npx wrangler r2 object put "lauda-downloads/lauda-nightly.apk" --file="site/lauda-nightly.apk" --remote || true
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            if [ -f site/lauda.apk ]; then
+              npx wrangler r2 object put "twolp-bucket/lauda.apk" --file="site/lauda.apk" --remote || true
+              npx wrangler r2 object put "twolp-bucket/lauda-latest.apk" --file="site/lauda.apk" --remote || true
+            elif [ -f site/lauda-latest.apk ]; then
+              npx wrangler r2 object put "twolp-bucket/lauda.apk" --file="site/lauda-latest.apk" --remote || true
+              npx wrangler r2 object put "twolp-bucket/lauda-latest.apk" --file="site/lauda-latest.apk" --remote || true
+            fi
           else
             echo "Cloudflare token ausente ou APK ausente, mantendo distribuição estática."
           fi

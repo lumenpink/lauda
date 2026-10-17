@@ -6,31 +6,40 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-APK_PATH="$REPO_ROOT/site/lauda-latest.apk"
-BUCKET_NAME="lauda-downloads"
-REMOTE_KEY="lauda-latest.apk"
+APK_PATH="$REPO_ROOT/site/lauda.apk"
+BUCKET_NAME="twolp-bucket"
+REMOTE_KEY="lauda.apk"
 
 echo "================================================================="
 echo "Lauda — Publicação no Cloudflare R2 & Deploy Cloudflare Worker"
 echo "================================================================="
 
 if [ ! -f "$APK_PATH" ]; then
-    echo "ERRO: APK não encontrado em $APK_PATH."
-    echo "Gere o APK primeiro compilando o cliente Android."
-    exit 1
+    if [ -f "$REPO_ROOT/site/lauda-latest.apk" ]; then
+        cp "$REPO_ROOT/site/lauda-latest.apk" "$APK_PATH"
+    else
+        echo "ERRO: APK não encontrado em $APK_PATH."
+        echo "Gere o APK primeiro compilando o cliente Android."
+        exit 1
+    fi
 fi
 
 APK_SIZE=$(du -h "$APK_PATH" | cut -f1)
 echo "-> APK encontrado: $APK_PATH ($APK_SIZE)"
 
-# 1. Upload do APK para o Bucket R2
+# 1. Upload do APK para o Bucket R2 (lauda.apk e lauda-latest.apk)
 echo "-> Enviando $REMOTE_KEY para o bucket R2: $BUCKET_NAME..."
 npx wrangler r2 object put "$BUCKET_NAME/$REMOTE_KEY" \
     --file="$APK_PATH" \
     --content-type="application/vnd.android.package-archive" \
     --remote
 
-echo "✅ Upload do APK concluído com sucesso no Cloudflare R2."
+npx wrangler r2 object put "$BUCKET_NAME/lauda-latest.apk" \
+    --file="$APK_PATH" \
+    --content-type="application/vnd.android.package-archive" \
+    --remote || true
+
+echo "✅ Upload do APK concluído com sucesso no Cloudflare R2 ($BUCKET_NAME)."
 
 # 2. Deploy do Worker e Assets
 echo "-> Fazendo deploy do Worker e Static Assets (lauda.2lp.in)..."
