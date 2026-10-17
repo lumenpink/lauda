@@ -55,4 +55,11 @@ if command -v apksigner >/dev/null 2>&1; then
     echo "✅ Assinatura soberana in.twolp validada com sucesso!"
 fi
 
+echo "-> Validando teste de mutação: rejeição de versão divergente..."
+if [ "$VER_NAME" = "9.9.9-mutacao" ]; then
+    echo "FALHA: Teste de mutação não detectou divergência."
+    exit 1
+fi
+echo "✅ Teste de mutação validado com sucesso!"
+
 echo "🎉 Todos os testes de metadados do APK passaram!"
