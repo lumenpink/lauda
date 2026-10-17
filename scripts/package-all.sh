@@ -129,6 +129,7 @@ if [ "$DO_BUILD_APK" = true ]; then
     else
         echo "-> Ambiente Android NDK/SDK não disponível diretamente; mantendo APK existente em $SITE_DIR/lauda-latest.apk"
     fi
+    "$REPO_ROOT/tests/test-apk-metadata.sh"
 fi
 
 # 5. Sincronizar com Obizero Local (lauda.lohn.in)
