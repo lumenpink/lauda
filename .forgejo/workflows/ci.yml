@@ -199,6 +199,20 @@ jobs:
           else
             echo "Cloudflare token ausente ou APK ausente, mantendo distribuição estática."
           fi
+      - name: "Trigger Pratilera Store Update"
+        env:
+          CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN }}
+        run: |
+          if [ -n "$CODEBERG_TOKEN" ]; then
+            echo "-> Notificando a Pratilera (Banca) para atualizar o catálogo..."
+            curl -s -X POST \
+              -H "Authorization: token $CODEBERG_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://codeberg.org/api/v1/repos/lumenpink/banca/actions/workflows/ci.yml/dispatches" \
+              -d '{"ref": "main"}' || true
+          else
+            echo "CODEBERG_TOKEN ausente, pulando disparo remoto da Pratilera."
+          fi
 
   deploy-server:
     name: "Build Docker Image & Update lauda-server"
