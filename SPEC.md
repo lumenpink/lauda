@@ -805,3 +805,21 @@ A fim de fornecer clareza visual instantânea e progressiva ao usuário enquanto
 - [x] Placeholder de listagem vazia sincronizado com `format_search_hint`.
 - [x] Testes unitários herméticos cobrindo todos os cenários em `client_test.rs`.
 - [x] Quality gate estrito verde (`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`).
+
+---
+
+## 27. Atualização Automática da Vitrine Pratilera no CI via Dispatch (Ticket #75)
+
+### 27.1 Arquitetura & Automação da Esteira
+A fim de manter a loja soberana Pratilera (`banca`) sempre sincronizada com os últimos lançamentos do Lauda sem intervenção manual:
+1. **Gatilho de Dispatch Pós-Publicação**:
+   - Logo após o upload bem-sucedido de `lauda.apk` para o bucket Cloudflare R2 (`twolp-bucket`), o workflow de CI em `.forgejo/workflows/ci.yml` dispara a regeneração do catálogo oficial da Banca via chamada de API no Forgejo/Codeberg:
+     `POST https://codeberg.org/api/v1/repos/lumenpink/banca/actions/workflows/ci.yml/dispatches`
+2. **Autenticação Segura**:
+   - Utilização do token soberano `secrets.CODEBERG_TOKEN` com escopo de automação de actions.
+
+### 27.2 Critérios de Aceite (Ticket #75)
+- [x] Step `Trigger Pratilera Store Update` declarado no job de deploy de `.forgejo/workflows/ci.yml`.
+- [x] Invocação de API no Codeberg via curl com cabeçalho de autenticação e payload `{"ref": "main"}`.
+- [x] Teste de validação em `tests/distribution_test.rs` garantindo a presença do gatilho no workflow.
+- [x] Quality gate estrito verde (`cccp check --strict`).
