@@ -509,5 +509,16 @@ fn build_router(state: AppState) -> Router {
     let carddav = crate::adapters::carddav::carddav_routes();
     let caldav = crate::adapters::caldav::caldav_routes();
 
-    base.merge(carddav).merge(caldav).with_state(state)
+    let mut router = base.merge(carddav).merge(caldav).with_state(state);
+
+    let web_dir = std::env::var("LAUDA_WEB_DIR").unwrap_or_else(|_| "/app/web".to_string());
+    let web_path = std::path::Path::new(&web_dir);
+    if web_path.is_dir() {
+        let index_file = web_path.join("index.html");
+        let serve_dir = tower_http::services::ServeDir::new(web_path)
+            .fallback(tower_http::services::ServeFile::new(index_file));
+        router = router.fallback_service(serve_dir);
+    }
+
+    router
 }

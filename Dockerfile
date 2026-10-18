@@ -35,9 +35,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY --from=builder /usr/src/lauda/target/release/lauda-server /usr/local/bin/lauda-server
+COPY site/app /app/web
 
 ENV LAUDA_LISTEN_ADDR="0.0.0.0:8432"
 ENV LAUDA_MAILDIR_PATH="/var/mail/lumen.pink/hi"
+ENV LAUDA_WEB_DIR="/app/web"
 
 EXPOSE 8432
 
