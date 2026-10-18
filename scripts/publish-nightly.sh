@@ -142,37 +142,19 @@ fi
 
 cp "$GEN_APK" "$NIGHTLY_APK_PATH"
 cp "$GEN_APK" "$SITE_DIR/lauda-latest.apk"
+cp "$GEN_APK" "$SITE_DIR/lauda.apk"
 if [ -f "$REPO_ROOT/scripts/sign-release.sh" ]; then
     echo "-> Assinando APKs soberanamente com in_twolp_release.keystore..."
     "$REPO_ROOT/scripts/sign-release.sh" "$NIGHTLY_APK_PATH" || echo "Aviso: Assinatura de nightly falhou."
     "$REPO_ROOT/scripts/sign-release.sh" "$SITE_DIR/lauda-latest.apk" || echo "Aviso: Assinatura de latest falhou."
+    "$REPO_ROOT/scripts/sign-release.sh" "$SITE_DIR/lauda.apk" || echo "Aviso: Assinatura de lauda.apk falhou."
 fi
-APK_SIZE="$(du -h "$NIGHTLY_APK_PATH" | cut -f1)"
-echo "✅ APK gerado e assinado em $NIGHTLY_APK_PATH ($APK_SIZE)"
+APK_SIZE="$(du -h "$SITE_DIR/lauda.apk" | cut -f1)"
+echo "✅ APK gerado e assinado em $SITE_DIR/lauda.apk ($APK_SIZE)"
 
-# 7. Gerar manifestos site/version-nightly.json e site/version.json
+# 7. Sincronizar manifestos de versão canônicos
 echo "-> Atualizando manifestos de versão..."
-cat <<EOF > "$MANIFEST_PATH"
-{
-  "version": "$NIGHTLY_VERSION",
-  "min_compatible_version": "0.1.0",
-  "apk_url": "https://lauda.2lp.in/lauda-nightly.apk",
-  "package_id": "in.twolp.lauda",
-  "release_notes": "Build contínua do Lauda Smolclient (commit $GIT_HASH).",
-  "published_at": "$PUBLISHED_AT"
-}
-EOF
-
-cat <<EOF > "$SITE_DIR/version.json"
-{
-  "version": "$NIGHTLY_VERSION",
-  "min_compatible_version": "0.1.0",
-  "apk_url": "https://lauda.2lp.in/lauda-latest.apk",
-  "package_id": "in.twolp.lauda",
-  "release_notes": "Build contínua do Lauda Smolclient (commit $GIT_HASH).",
-  "published_at": "$PUBLISHED_AT"
-}
-EOF
+"$SCRIPT_DIR/sync-version-manifests.sh"
 
 # 7. Compilar WebApp WebAssembly (Dioxus Web) e atualizar site/app
 echo "-> Compilando WebApp WebAssembly com dx (target web)..."
@@ -225,6 +207,16 @@ if [ -n "${CLOUDFLARE_API_TOKEN:-}" ] || npx wrangler whoami >/dev/null 2>&1; th
         --file="$SITE_DIR/lauda-latest.apk" \
         --content-type="application/vnd.android.package-archive" \
         --remote || echo "Aviso: Upload de lauda-latest.apk para R2 falhou."
+
+    npx wrangler r2 object put "twolp-bucket/lauda.apk" \
+        --file="$SITE_DIR/lauda.apk" \
+        --content-type="application/vnd.android.package-archive" \
+        --remote || echo "Aviso: Upload de lauda.apk para twolp-bucket falhou."
+
+    npx wrangler r2 object put "twolp-bucket/lauda-latest.apk" \
+        --file="$SITE_DIR/lauda.apk" \
+        --content-type="application/vnd.android.package-archive" \
+        --remote || echo "Aviso: Upload de lauda-latest.apk para twolp-bucket falhou."
     echo "✅ Upload dos APKs concluído com sucesso no R2."
 else
     echo "Aviso: Credenciais Cloudflare não detectadas; pulando upload R2."

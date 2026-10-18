@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **client:** resolver comparacao de versao com LAUDA_APP_VERSION (#61)
 
 ### Bug Fixes
+- **ci:** estabilizar esteira com imagem funcional e publicacao de apk (closes #77)
 - **client:** definir servidor padrao localhost:8432 em instalacao limpa (closes #75)
 - **pratilera:** sincronizar versao 0.5.0 do apk com a pratilera (closes #73)
 - **calendar:** formatacao amigavel de tempo relativo e tique reativo (#59)

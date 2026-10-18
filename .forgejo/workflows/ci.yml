@@ -14,7 +14,7 @@ jobs:
     name: "Rust Test, Lint & E2E (GOST-CI)"
     runs-on: ubuntu-latest
     container:
-      image: codeberg.org/lumenpink/gost-ci-lauda:latest
+      image: docker.io/lumenpink/gost-ci-wasm:latest
     steps:
       - name: "Install Node.js Runtime for Runner Actions"
         run: |
@@ -23,10 +23,20 @@ jobs:
           fi
       - name: "Checkout repository"
         uses: https://github.com/actions/checkout@v4
-      - name: "Link Hermetic Dependencies"
+      - name: "Checkout sibling dependencies"
         run: |
-          if [ -d /opt/gost/deps ]; then
+          mkdir -p ../ishcondidim ../papeli ../urupema
+          if [ -d /opt/gost/deps/ishcondidim ]; then
             ln -sf /opt/gost/deps/* ../ 2>/dev/null || true
+          fi
+          if [ ! -f ../ishcondidim/Cargo.toml ]; then
+            git clone --depth 1 https://codeberg.org/lumenpink/ishcondidim.git ../ishcondidim
+          fi
+          if [ ! -f ../papeli/Cargo.toml ]; then
+            git clone --depth 1 https://codeberg.org/lumenpink/papeli.git ../papeli
+          fi
+          if [ ! -f ../urupema/Cargo.toml ]; then
+            git clone --depth 1 https://codeberg.org/lumenpink/urupema.git ../urupema
           fi
       - name: "Sync Version Manifests"
         run: ./scripts/sync-version-manifests.sh
@@ -199,7 +209,13 @@ jobs:
           else
             echo "Cloudflare token ausente ou APK ausente, mantendo distribuição estática."
           fi
-      - name: "Trigger Pratilera Store Update"
+  trigger-pratilera:
+    name: "Trigger Pratilera Store Update"
+    runs-on: ubuntu-latest
+    needs: [deploy-apk]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: "Trigger Pratilera Workflow Dispatch"
         env:
           CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN }}
         run: |
