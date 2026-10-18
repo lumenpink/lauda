@@ -116,11 +116,7 @@ impl MaildirBackend {
                     if filename.starts_with('.') {
                         continue;
                     }
-                    let raw_prefix = filename
-                        .split(":2,")
-                        .next()
-                        .unwrap_or(&filename);
-                    let prefix = raw_prefix.split(',').next().unwrap_or(raw_prefix);
+                    let prefix = Self::extract_prefix(&filename);
                     if !prefix_to_uid.contains_key(prefix) && unmapped_set.insert(prefix.to_string()) {
                         unmapped.push(prefix.to_string());
                     }
