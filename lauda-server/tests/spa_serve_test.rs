@@ -5,10 +5,14 @@ use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use lauda_server::adapters::in_memory::InMemoryMailBackend;
 use lauda_server::app_router;
+use std::sync::Mutex;
 use tower::ServiceExt;
+
+static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 #[tokio::test]
 async fn test_spa_static_files_and_fallback_serving() {
+    let _lock = ENV_LOCK.lock().unwrap();
     let tmp = tempfile::tempdir().unwrap();
     let web_dir = tmp.path();
 
@@ -68,7 +72,22 @@ async fn test_spa_static_files_and_fallback_serving() {
     let body = res.into_body().collect().await.unwrap().to_bytes();
     assert!(String::from_utf8_lossy(&body).contains("LAUDA SPA"));
 
-    // 4. POST /auth/login -> Rota da API não deve ser sobrescrita pelo fallback
+    // 4. GET /inbox?tab=unread (rota SPA com query string) -> Deve retornar index.html
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/inbox?tab=unread")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body = res.into_body().collect().await.unwrap().to_bytes();
+    assert!(String::from_utf8_lossy(&body).contains("LAUDA SPA"));
+
+    // 5. POST /auth/login -> Rota da API não deve ser sobrescrita pelo fallback
     let res = app
         .oneshot(
             Request::builder()
@@ -82,3 +101,30 @@ async fn test_spa_static_files_and_fallback_serving() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 }
+
+#[tokio::test]
+async fn test_spa_nonexistent_web_dir_falls_back_gracefully() {
+    let _lock = ENV_LOCK.lock().unwrap();
+    unsafe {
+        std::env::set_var(
+            "LAUDA_WEB_DIR",
+            "/tmp/caminho_inexistente_para_web_spa_lauda_12345",
+        );
+    }
+
+    let backend = Arc::new(InMemoryMailBackend::new());
+    let app = app_router(backend, "test-jwt-secret-123".to_string());
+
+    // Sem pasta estática existente, rotas desconhecidas retornam 404 sem panic
+    let res = app
+        .oneshot(
+            Request::builder()
+                .uri("/rota_inexistente")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
