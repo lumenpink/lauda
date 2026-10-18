@@ -16,9 +16,17 @@ pub struct HttpApiClient {
 
 impl HttpApiClient {
     pub fn new(base_url: impl Into<String>) -> Self {
+        #[cfg(not(target_arch = "wasm32"))]
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(15))
+            .build()
+            .unwrap_or_default();
+        #[cfg(target_arch = "wasm32")]
+        let client = Client::builder().build().unwrap_or_default();
+
         Self {
             base_url: base_url.into().trim_end_matches('/').to_string(),
-            client: Client::builder().build().unwrap_or_default(),
+            client,
         }
     }
 

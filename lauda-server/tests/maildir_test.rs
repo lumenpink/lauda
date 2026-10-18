@@ -543,3 +543,40 @@ async fn test_maildir_dovecot_uidlist_with_size_suffixes_and_perf() {
     );
 }
 
+#[tokio::test]
+async fn test_maildir_large_volume_perf() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+
+    std::fs::create_dir_all(root.join("cur")).unwrap();
+    std::fs::create_dir_all(root.join("new")).unwrap();
+
+    let count = 2000;
+    let mut uidlist_builder = String::from("3 V1790640297 N57063 Ga836741ba900bb6a090600002f3acf59\n");
+    for i in 1..=count {
+        let filename = format!("1790640000.M{i:06}P1545.mail.lumen.pink,S=1000,W=1050:2,S");
+        std::fs::write(root.join("cur").join(&filename), "From: a@b.c\nSubject: s\n\nbody").unwrap();
+        uidlist_builder.push_str(&format!("{i} :1790640000.M{i:06}P1545.mail.lumen.pink,S=1000,W=1050\n"));
+    }
+    std::fs::write(root.join("dovecot-uidlist"), uidlist_builder).unwrap();
+
+    let backend = MaildirBackend::new(root);
+    backend.add_user("lumen", "senha123");
+
+    let start = std::time::Instant::now();
+    let messages = backend
+        .list_messages("lumen", "INBOX", Some(50), Some(0))
+        .await
+        .expect("Listar mensagens");
+    let elapsed = start.elapsed();
+
+    assert_eq!(messages.len(), 50);
+    // 2000 arquivos devem ser processados e paginados em menos de 500ms
+    assert!(
+        elapsed < std::time::Duration::from_millis(500),
+        "Processamento demorou {:?}, esperado < 500ms",
+        elapsed
+    );
+}
+
+

@@ -93,7 +93,8 @@ impl MaildirBackend {
                 if parts.len() >= 2
                     && let Ok(uid) = parts[0].parse::<u32>()
                 {
-                    let prefix = parts[1].trim_start_matches(':');
+                    let raw_prefix = parts[1].trim_start_matches(':');
+                    let prefix = raw_prefix.split(',').next().unwrap_or(raw_prefix);
                     if !prefix.is_empty() {
                         prefix_to_uid.insert(prefix.to_string(), uid);
                         uid_to_prefix.insert(uid, prefix.to_string());
@@ -105,7 +106,8 @@ impl MaildirBackend {
             }
         }
 
-        // Para arquivos sem entrada no dovecot-uidlist, garanta mapeamento consistente
+        // Para arquivos sem entrada no dovecot-uidlist, garanta mapeamento consistente em O(1) com HashSet
+        let mut unmapped_set = HashSet::new();
         let mut unmapped = Vec::new();
         for sub in &["cur", "new"] {
             if let Ok(entries) = std::fs::read_dir(dir.join(sub)) {
@@ -114,13 +116,13 @@ impl MaildirBackend {
                     if filename.starts_with('.') {
                         continue;
                     }
-                    let prefix = filename
+                    let raw_prefix = filename
                         .split(":2,")
                         .next()
-                        .unwrap_or(&filename)
-                        .to_string();
-                    if !prefix_to_uid.contains_key(&prefix) && !unmapped.contains(&prefix) {
-                        unmapped.push(prefix);
+                        .unwrap_or(&filename);
+                    let prefix = raw_prefix.split(',').next().unwrap_or(raw_prefix);
+                    if !prefix_to_uid.contains_key(prefix) && unmapped_set.insert(prefix.to_string()) {
+                        unmapped.push(prefix.to_string());
                     }
                 }
             }
@@ -168,6 +170,11 @@ impl MaildirBackend {
         }
     }
 
+    fn extract_prefix(filename: &str) -> &str {
+        let raw = filename.split(":2,").next().unwrap_or(filename);
+        raw.split(',').next().unwrap_or(raw)
+    }
+
     fn find_message_file(&self, dir: &Path, uid: u32) -> Option<(PathBuf, String, bool, bool)> {
         let (prefix_to_uid, uid_to_prefix) = self.load_uid_maps(dir);
         let target_prefix = uid_to_prefix.get(&uid);
@@ -178,7 +185,7 @@ impl MaildirBackend {
                 for entry in entries.flatten() {
                     let path = entry.path();
                     let filename = entry.file_name().to_string_lossy().to_string();
-                    let prefix = filename.split(":2,").next().unwrap_or(&filename);
+                    let prefix = Self::extract_prefix(&filename);
 
                     let matched = if let Some(target) = target_prefix {
                         prefix == target
@@ -519,7 +526,7 @@ impl MailBackend for MaildirBackend {
         let mut fallback_uid = 1000u32;
 
         for item in selected_entries {
-            let prefix = item.filename.split(":2,").next().unwrap_or(&item.filename);
+            let prefix = Self::extract_prefix(&item.filename);
             let uid = prefix_to_uid.get(prefix).copied().unwrap_or_else(|| {
                 fallback_uid += 1;
                 fallback_uid
