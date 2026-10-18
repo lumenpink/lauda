@@ -500,7 +500,7 @@ async fn test_client_async_contact_search_non_blocking() {
 
 #[test]
 fn test_session_default_server_url_mutation_resilience() {
-    use lauda_client::domain::session::{detect_default_server_url, SessionConfig};
+    use lauda_client::domain::session::{SessionConfig, detect_default_server_url};
 
     // 1. Salvar estado original de LAUDA_SERVER_URL
     let original = std::env::var("LAUDA_SERVER_URL").ok();
@@ -519,7 +519,10 @@ fn test_session_default_server_url_mutation_resilience() {
 
     let cfg = SessionConfig::default();
     assert_eq!(cfg.server_url, "http://localhost:8432");
-    assert!(!cfg.server_url.contains("lohn.in"), "Nao deve conter dominio fixo de producao");
+    assert!(
+        !cfg.server_url.contains("lohn.in"),
+        "Nao deve conter dominio fixo de producao"
+    );
     assert_eq!(cfg.server_url, detect_default_server_url());
 
     // 4. Restaurar estado original
@@ -529,4 +532,3 @@ fn test_session_default_server_url_mutation_resilience() {
         }
     }
 }
-
