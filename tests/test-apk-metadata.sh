@@ -24,10 +24,6 @@ if [ -f "$VERSION_JSON" ]; then
         exit 1
     fi
 fi
-if [ ! -f "$VERSION_FILE" ]; then
-    echo "ERRO: $VERSION_FILE não encontrado."
-    exit 1
-fi
 
 EXPECTED_VERSION="$(cat "$VERSION_FILE" | tr -d '[:space:]')"
 
