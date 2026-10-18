@@ -502,3 +502,44 @@ async fn test_maildir_pagination_and_mtime_sorting() {
     assert_eq!(p2[0].subject, "Mensagem 2");
     assert_eq!(p2[1].subject, "Mensagem 1");
 }
+
+#[tokio::test]
+async fn test_maildir_dovecot_uidlist_with_size_suffixes_and_perf() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+
+    std::fs::create_dir_all(root.join("cur")).unwrap();
+    std::fs::create_dir_all(root.join("new")).unwrap();
+
+    // 1. Mensagens com sufixo real do Dovecot no dovecot-uidlist (:prefix,S=1099,W=1125)
+    let msg1 = "1790640297.M460601P1545.mail.lumen.pink:2,S";
+    let msg2 = "1790704998.M934046P116293.mail.lumen.pink:2,";
+    let content = "From: remetente@2lp.in\nTo: dest@2lp.in\nSubject: Teste Dovecot UID\nDate: Mon, 05 Oct 2026 12:00:00 +0000\n\nOla!";
+    std::fs::write(root.join("cur").join(msg1), content).unwrap();
+    std::fs::write(root.join("cur").join(msg2), content).unwrap();
+
+    let uidlist = "3 V1790640297 N57063 Ga836741ba900bb6a090600002f3acf59\n10 :1790640297.M460601P1545.mail.lumen.pink,S=1099,W=1125\n20 :1790704998.M934046P116293.mail.lumen.pink,S=2508,W=2585\n";
+    std::fs::write(root.join("dovecot-uidlist"), uidlist).unwrap();
+
+    let backend = MaildirBackend::new(root);
+    backend.add_user("lumen", "senha123");
+
+    let messages = backend
+        .list_messages("lumen", "INBOX", None, None)
+        .await
+        .expect("Listar mensagens");
+
+    assert_eq!(messages.len(), 2);
+    let uids: Vec<u32> = messages.iter().map(|m| m.uid).collect();
+    assert!(
+        uids.contains(&10),
+        "UID 10 do dovecot-uidlist com sufixo ,S= deve ser mapeado, mas obtido: {:?}",
+        uids
+    );
+    assert!(
+        uids.contains(&20),
+        "UID 20 do dovecot-uidlist com sufixo ,S= deve ser mapeado, mas obtido: {:?}",
+        uids
+    );
+}
+
