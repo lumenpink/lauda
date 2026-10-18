@@ -28,7 +28,7 @@ pub fn detect_default_server_url() -> String {
             }
             return loc;
         }
-        "https://lauda.lohn.in".to_string()
+        "http://localhost:8432".to_string()
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
@@ -37,14 +37,7 @@ pub fn detect_default_server_url() -> String {
         {
             return env_url;
         }
-        #[cfg(target_os = "android")]
-        {
-            "https://lauda.lohn.in".to_string()
-        }
-        #[cfg(not(target_os = "android"))]
-        {
-            "http://127.0.0.1:8432".to_string()
-        }
+        "http://localhost:8432".to_string()
     }
 }
 

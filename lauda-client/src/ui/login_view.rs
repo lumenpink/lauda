@@ -147,7 +147,7 @@ pub fn LoginView(
                             value: "{server_input}",
                             oninput: move |evt| server_input.set(evt.value()),
                             onchange: move |evt| server_input.set(evt.value()),
-                            placeholder: "https://lauda.lohn.in",
+                            placeholder: "http://localhost:8432",
                         }
                     }
                 }
