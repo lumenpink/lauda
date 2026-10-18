@@ -497,3 +497,36 @@ async fn test_client_async_contact_search_non_blocking() {
     assert_eq!(fuzzy_results.len(), 1);
     assert_eq!(fuzzy_results[0].id, c1.id);
 }
+
+#[test]
+fn test_session_default_server_url_mutation_resilience() {
+    use lauda_client::domain::session::{detect_default_server_url, SessionConfig};
+
+    // 1. Salvar estado original de LAUDA_SERVER_URL
+    let original = std::env::var("LAUDA_SERVER_URL").ok();
+
+    // 2. Com LAUDA_SERVER_URL definida, deve respeitar estritamente a variável
+    unsafe {
+        std::env::set_var("LAUDA_SERVER_URL", "https://mail.example.org:9000");
+    }
+    assert_eq!(detect_default_server_url(), "https://mail.example.org:9000");
+
+    // 3. Com LAUDA_SERVER_URL removida, deve retornar deterministicamente http://localhost:8432
+    unsafe {
+        std::env::remove_var("LAUDA_SERVER_URL");
+    }
+    assert_eq!(detect_default_server_url(), "http://localhost:8432");
+
+    let cfg = SessionConfig::default();
+    assert_eq!(cfg.server_url, "http://localhost:8432");
+    assert!(!cfg.server_url.contains("lohn.in"), "Nao deve conter dominio fixo de producao");
+    assert_eq!(cfg.server_url, detect_default_server_url());
+
+    // 4. Restaurar estado original
+    if let Some(val) = original {
+        unsafe {
+            std::env::set_var("LAUDA_SERVER_URL", val);
+        }
+    }
+}
+
