@@ -541,6 +541,12 @@ async fn test_maildir_dovecot_uidlist_with_size_suffixes_and_perf() {
         "UID 20 do dovecot-uidlist com sufixo ,S= deve ser mapeado, mas obtido: {:?}",
         uids
     );
+
+    // Mutação: garantir que arquivo com múltiplos sufixos com vírgula ou sem vírgula seja mapeado
+    let msg3 = "1790704999.M934047P116293.mail.lumen.pink:2,F";
+    std::fs::write(root.join("cur").join(msg3), "From: x@y.z\nSubject: sub3\n\nbody").unwrap();
+    let file = backend.get_message("lumen", "INBOX", 10).await;
+    assert!(file.is_ok(), "Mensagem com UID 10 deve ser recuperada sem erro");
 }
 
 #[tokio::test]
