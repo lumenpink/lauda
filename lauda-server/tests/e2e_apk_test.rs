@@ -527,3 +527,30 @@ fn test_ci_workflow_has_deploy_apk_job_with_strict_contract() {
         "deploy-apk deve ser restrito à branch main"
     );
 }
+
+#[test]
+fn test_ci_workflow_avoids_unreachable_container_and_has_stable_hermetic_test_pipeline() {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let repo_root = manifest_dir.parent().unwrap();
+    let ci_yml = repo_root.join(".forgejo/workflows/ci.yml");
+    let content = std::fs::read_to_string(&ci_yml).expect("Leitura de ci.yml");
+
+    // 1. Não deve referenciar a imagem fantasma que falha no Codeberg
+    assert!(
+        !content.contains("codeberg.org/lumenpink/gost-ci-lauda"),
+        "ci.yml não deve referenciar imagem inexistente codeberg.org/lumenpink/gost-ci-lauda"
+    );
+
+    // 2. Job test deve utilizar imagem funcional no Docker Hub ou runner hermético
+    assert!(
+        content.contains("docker.io/lumenpink/gost-ci-wasm") || content.contains("runs-on: ubuntu-latest"),
+        "Job test deve usar imagem funcional suportada"
+    );
+
+    // 3. Deve conter gatilho de dispatch para a Pratilera
+    assert!(
+        content.contains("trigger-pratilera:"),
+        "ci.yml deve conter job trigger-pratilera para atualizar o catálogo da banca"
+    );
+}
+
