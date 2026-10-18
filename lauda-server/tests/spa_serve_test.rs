@@ -5,14 +5,14 @@ use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use lauda_server::adapters::in_memory::InMemoryMailBackend;
 use lauda_server::app_router;
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 use tower::ServiceExt;
 
-static ENV_LOCK: Mutex<()> = Mutex::new(());
+static ENV_LOCK: Mutex<()> = Mutex::const_new(());
 
 #[tokio::test]
 async fn test_spa_static_files_and_fallback_serving() {
-    let _lock = ENV_LOCK.lock().unwrap();
+    let _lock = ENV_LOCK.lock().await;
     let tmp = tempfile::tempdir().unwrap();
     let web_dir = tmp.path();
 
@@ -104,7 +104,7 @@ async fn test_spa_static_files_and_fallback_serving() {
 
 #[tokio::test]
 async fn test_spa_nonexistent_web_dir_falls_back_gracefully() {
-    let _lock = ENV_LOCK.lock().unwrap();
+    let _lock = ENV_LOCK.lock().await;
     unsafe {
         std::env::set_var(
             "LAUDA_WEB_DIR",
@@ -127,4 +127,3 @@ async fn test_spa_nonexistent_web_dir_falls_back_gracefully() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }
-
