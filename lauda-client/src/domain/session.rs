@@ -203,4 +203,30 @@ mod tests {
         clear_session(Some(&session_file)).expect("clear session");
         assert_eq!(load_session(Some(&session_file)), None);
     }
+
+    #[test]
+    fn test_default_session_config_points_to_localhost_8432() {
+        // Garantir que a variável de ambiente não interfira no teste
+        let original_env = std::env::var("LAUDA_SERVER_URL").ok();
+        unsafe {
+            std::env::remove_var("LAUDA_SERVER_URL");
+        }
+
+        let default_config = SessionConfig::default();
+        assert_eq!(
+            default_config.server_url, "http://localhost:8432",
+            "A URL padrão da sessão zerada deve ser http://localhost:8432"
+        );
+        assert_eq!(
+            detect_default_server_url(),
+            "http://localhost:8432",
+            "detect_default_server_url deve retornar http://localhost:8432"
+        );
+
+        if let Some(val) = original_env {
+            unsafe {
+                std::env::set_var("LAUDA_SERVER_URL", val);
+            }
+        }
+    }
 }
