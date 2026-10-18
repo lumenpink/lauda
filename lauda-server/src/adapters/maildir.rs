@@ -117,7 +117,9 @@ impl MaildirBackend {
                         continue;
                     }
                     let prefix = Self::extract_prefix(&filename);
-                    if !prefix_to_uid.contains_key(prefix) && unmapped_set.insert(prefix.to_string()) {
+                    if !prefix_to_uid.contains_key(prefix)
+                        && unmapped_set.insert(prefix.to_string())
+                    {
                         unmapped.push(prefix.to_string());
                     }
                 }

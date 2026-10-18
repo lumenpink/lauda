@@ -544,9 +544,16 @@ async fn test_maildir_dovecot_uidlist_with_size_suffixes_and_perf() {
 
     // Mutação: garantir que arquivo com múltiplos sufixos com vírgula ou sem vírgula seja mapeado
     let msg3 = "1790704999.M934047P116293.mail.lumen.pink:2,F";
-    std::fs::write(root.join("cur").join(msg3), "From: x@y.z\nSubject: sub3\n\nbody").unwrap();
+    std::fs::write(
+        root.join("cur").join(msg3),
+        "From: x@y.z\nSubject: sub3\n\nbody",
+    )
+    .unwrap();
     let file = backend.get_message("lumen", "INBOX", 10).await;
-    assert!(file.is_ok(), "Mensagem com UID 10 deve ser recuperada sem erro");
+    assert!(
+        file.is_ok(),
+        "Mensagem com UID 10 deve ser recuperada sem erro"
+    );
 }
 
 #[tokio::test]
@@ -558,11 +565,18 @@ async fn test_maildir_large_volume_perf() {
     std::fs::create_dir_all(root.join("new")).unwrap();
 
     let count = 2000;
-    let mut uidlist_builder = String::from("3 V1790640297 N57063 Ga836741ba900bb6a090600002f3acf59\n");
+    let mut uidlist_builder =
+        String::from("3 V1790640297 N57063 Ga836741ba900bb6a090600002f3acf59\n");
     for i in 1..=count {
         let filename = format!("1790640000.M{i:06}P1545.mail.lumen.pink,S=1000,W=1050:2,S");
-        std::fs::write(root.join("cur").join(&filename), "From: a@b.c\nSubject: s\n\nbody").unwrap();
-        uidlist_builder.push_str(&format!("{i} :1790640000.M{i:06}P1545.mail.lumen.pink,S=1000,W=1050\n"));
+        std::fs::write(
+            root.join("cur").join(&filename),
+            "From: a@b.c\nSubject: s\n\nbody",
+        )
+        .unwrap();
+        uidlist_builder.push_str(&format!(
+            "{i} :1790640000.M{i:06}P1545.mail.lumen.pink,S=1000,W=1050\n"
+        ));
     }
     std::fs::write(root.join("dovecot-uidlist"), uidlist_builder).unwrap();
 
@@ -584,5 +598,3 @@ async fn test_maildir_large_volume_perf() {
         elapsed
     );
 }
-
-
