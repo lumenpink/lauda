@@ -85,12 +85,12 @@ A busca semântica utiliza Max-Pooling entre os segmentos gerados pelo `urupema`
 
 ## 3. Critérios de Aceitação
 
-- [ ] Modelo `multilingual-e5-small` produz vetores normalizados de 384 floats.
-- [ ] O prefixo `passage: ` é aplicado durante a indexação de segmentos de mensagens.
-- [ ] O prefixo `query: ` é aplicado durante a vetorização de perguntas.
-- [ ] Frases com sinônimos semânticos em português (ex: "professora" vs "docente", "segunda chamada" vs "avaliação substitutiva") produzem alta similaridade de cosseno ($> 0.65$), enquanto textos não correlatos produzem similaridade significativamente inferior ($< 0.30$).
-- [ ] O sistema inicializa com sucesso mesmo quando o diretório do modelo ONNX não existe (fallback automático).
-- [ ] Cobertura de testes unitários e de integração validando o pipeline completo.
+- [x] Modelo `multilingual-e5-small` produz vetores normalizados de 384 floats.
+- [x] O prefixo `passage: ` é aplicado durante a indexação de segmentos de mensagens.
+- [x] O prefixo `query: ` é aplicado durante a vetorização de perguntas.
+- [x] Frases com sinônimos semânticos em português (ex: "professora" vs "docente", "segunda chamada" vs "avaliação substitutiva") produzem alta similaridade de cosseno ($> 0.65$), enquanto textos não correlatos produzem similaridade significativamente inferior ($< 0.30$).
+- [x] O sistema inicializa com sucesso mesmo quando o diretório do modelo ONNX não existe (fallback automático).
+- [x] Cobertura de testes unitários e de integração validando o pipeline completo.
 
 ---
 
@@ -99,9 +99,9 @@ A busca semântica utiliza Max-Pooling entre os segmentos gerados pelo `urupema`
 - [x] **Fase 1 - Ticket:** Issue #87 formalizada no Codeberg e sincronizada via `cccp ticket`.
 - [x] **Fase 2 - Branch:** Branch `feat/87-multilingual-e5-semantic-search` criada a partir de `main`.
 - [x] **Fase 3 - Doc/Spec:** Especificação técnica e contratos estruturados (Zero código de produção).
-- [ ] **Fase 4 - Red:** Teste automatizado falho comprovando o requisito e semântica.
-- [ ] **Fase 5 - Green:** Implementação funcional com teste passando.
-- [ ] **Fase 6 - Refactor:** Código limpo, idiomático e com Zero Warnings.
-- [ ] **Fase 7 - Mutation:** Testes de mutação e casos de borda eliminados.
-- [ ] **Fase 8 - Quality Gate:** Validação rigorosa com `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `cargo test`.
+- [x] **Fase 4 - Red:** Teste automatizado falho comprovando o requisito e semântica.
+- [x] **Fase 5 - Green:** Implementação funcional com teste passando.
+- [x] **Fase 6 - Refactor:** Código limpo, idiomático e com Zero Warnings.
+- [x] **Fase 7 - Mutation:** Testes de mutação e casos de borda eliminados.
+- [x] **Fase 8 - Quality Gate:** Validação rigorosa com `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `cargo test`.
 - [ ] **Fase 9 - Close:** Atualização de documentação, changelog e merge com fechamento de issue.
