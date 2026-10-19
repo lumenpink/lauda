@@ -23,7 +23,21 @@ fn main() {
         target_arch = "wasm32"
     )))]
     {
-        println!("Lauda Smolclient — compile com --features desktop, mobile ou web.");
-        let _ = App;
+        let args: Vec<String> = std::env::args().collect();
+        let is_tui = args.iter().any(|a| a == "tui") || args.len() <= 1;
+
+        if is_tui {
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .expect("Falha ao inicializar runtime tokio para TUI");
+            if let Err(e) = rt.block_on(lauda_client::tui::runner::run_tui()) {
+                eprintln!("Erro na execução da TUI do Lauda: {e}");
+            }
+        } else {
+            println!("Lauda Smolclient — compile com --features desktop, mobile ou web.");
+            println!("Ou execute com 'tui' para modo terminal interativo.");
+            let _ = App;
+        }
     }
 }

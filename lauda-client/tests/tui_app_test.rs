@@ -111,8 +111,8 @@ fn test_tui_app_open_message_and_return() {
     // Define mensagem ativa carregada
     let sample_msg = Message {
         envelope: create_sample_envelopes()[1].clone(),
-        txt_auto: "Olá equipe, atualizamos os servidores.".to_string(),
-        txt_original: "Olá equipe, atualizamos os servidores.".to_string(),
+        txt_auto: Some("Olá equipe, atualizamos os servidores.".to_string()),
+        txt_original: Some("Olá equipe, atualizamos os servidores.".to_string()),
         html_sanitized: None,
         attachments: vec![],
     };

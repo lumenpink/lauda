@@ -2,7 +2,7 @@
 
 **ID do Ticket:** #83  
 **Norma:** GOST 1.4.0 (DD-TDD)  
-**Status:** Em Andamento (Fase 3: Spec)  
+**Status:** Concluído (Fase 8: Quality Gate)  
 **Responsável:** Lumen Pink / Antigravity  
 
 ---
@@ -61,9 +61,9 @@ O estado da aplicação TUI deve ser desacoplado do loop de renderização para 
 - [x] **Fase 1 (Ticket):** Ticket #83 formalizado e delimitado.
 - [x] **Fase 2 (Branch):** Branch `feat/83-cli-tui-interface` criada a partir da `main`.
 - [x] **Fase 3 (Spec):** Especificação técnica formalizada neste documento.
-- [ ] **Fase 4 (Red Test):** Testes unitários falhos para máquina de estados e processamento de eventos da TUI.
-- [ ] **Fase 5 (Green Implement):** Implementação da máquina de estados, renderizador Ratatui e subcomando CLI.
-- [ ] **Fase 6 (Refactor):** Código modularizado, idiomático e com zero warnings.
-- [ ] **Fase 7 (Mutation Test):** Eliminação de mutantes de navegação e limites de seleção.
-- [ ] **Fase 8 (Quality Gate):** Validação com `cargo fmt --check`, `cargo clippy` e suíte de testes.
+- [x] **Fase 4 (Red Test):** Testes unitários falhos para máquina de estados e processamento de eventos da TUI.
+- [x] **Fase 5 (Green Implement):** Implementação da máquina de estados, renderizador Ratatui e subcomando CLI.
+- [x] **Fase 6 (Refactor):** Código modularizado, idiomático e com zero warnings.
+- [x] **Fase 7 (Mutation Test):** Eliminação de mutantes de navegação e limites de seleção.
+- [x] **Fase 8 (Quality Gate):** Validação com `cargo fmt --check`, `cargo clippy` e suíte de testes.
 - [ ] **Fase 9 (Finish & Close):** Merge via CCCP e fechamento do ticket #83.
