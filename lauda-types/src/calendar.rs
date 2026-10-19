@@ -1400,7 +1400,12 @@ impl CalendarIntentParser {
                     consumed_indices.push(i);
                     if i > 0 && !consumed_indices.contains(&(i - 1)) {
                         let prev = tokens[i - 1].to_lowercase();
-                        if prev == "em" || prev == "no" || prev == "na" || prev == "para" || prev == "pra" {
+                        if prev == "em"
+                            || prev == "no"
+                            || prev == "na"
+                            || prev == "para"
+                            || prev == "pra"
+                        {
                             consumed_indices.push(i - 1);
                         }
                     }
@@ -1804,7 +1809,8 @@ impl CalendarIntentParser {
                 let t_lower = tokens[i].to_lowercase();
                 if (t_lower == "para" || t_lower == "pra")
                     && i + 2 < tokens.len()
-                    && (tokens[i + 1].to_lowercase() == "às" || tokens[i + 1].to_lowercase() == "as")
+                    && (tokens[i + 1].to_lowercase() == "às"
+                        || tokens[i + 1].to_lowercase() == "as")
                 {
                     if let Some((h, m)) = parse_time_token(tokens[i + 2]) {
                         start_hour = Some(h);
@@ -2158,13 +2164,10 @@ fn is_boundary_connector_token(token: &str) -> bool {
     let clean = token.trim().to_lowercase();
     let clean = clean.trim_matches(|c: char| !c.is_alphanumeric());
     let normalized = clean
-        .replace('à', "a")
-        .replace('á', "a")
-        .replace('é', "e")
-        .replace('ê', "e")
+        .replace(['à', 'á'], "a")
+        .replace(['é', 'ê'], "e")
         .replace('í', "i")
-        .replace('ó', "o")
-        .replace('õ', "o")
+        .replace(['ó', 'õ'], "o")
         .replace('ú', "u")
         .replace('ç', "c");
 
