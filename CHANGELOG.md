@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Features
+- **index:** implementar instrucao e5 e busca semantica neural local (#87)
 - **search:** busca bm25 direta no sqlite e aviso de indexacao incompleta (#86)
 - **calendar:** exibir ate tres proximos eventos no destaque da agenda (#58)
 - **calendar:** padronizar placeholder da quick-add bar para formato generico (#57)
