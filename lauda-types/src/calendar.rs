@@ -1000,6 +1000,53 @@ impl CalendarIntentParser {
             }
         }
 
+        // Pass 0b: Expressões Ordinais de Dia da Semana e Mês (ex: "primeiro domingo de novembro", "terceira terça de outubro")
+        for i in 0..tokens.len() {
+            if consumed_indices.contains(&i) {
+                continue;
+            }
+            if let Some(ord) = parse_ordinal_token(tokens[i]) {
+                if i + 1 < tokens.len()
+                    && let Some(target_wd) = parse_weekday_token(tokens[i + 1])
+                {
+                    let mut m_idx = i + 2;
+                    if m_idx < tokens.len() && tokens[m_idx].to_lowercase() == "de" {
+                        m_idx += 1;
+                    }
+                    if m_idx < tokens.len()
+                        && let Some(m) = parse_month_token(tokens[m_idx])
+                    {
+                        let mut y = ref_time.year;
+                        if let Some(d) = resolve_ordinal_weekday_in_month(y, m, target_wd, ord) {
+                            if (m, d) < (ref_time.month, ref_time.day) {
+                                y += 1;
+                                if let Some(d_next) = resolve_ordinal_weekday_in_month(y, m, target_wd, ord) {
+                                    specific_date = Some((y, m, d_next));
+                                } else {
+                                    specific_date = Some((y, m, d));
+                                }
+                            } else {
+                                specific_date = Some((y, m, d));
+                            }
+
+                            for k in i..=m_idx {
+                                consumed_indices.push(k);
+                            }
+                            if i > 0
+                                && (tokens[i - 1].to_lowercase() == "no"
+                                    || tokens[i - 1].to_lowercase() == "na"
+                                    || tokens[i - 1].to_lowercase() == "em")
+                                && !consumed_indices.contains(&(i - 1))
+                            {
+                                consumed_indices.push(i - 1);
+                            }
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+
         // Pass 1: Recorrências e padrões temporais
         for i in 0..tokens.len() {
             if consumed_indices.contains(&i) {
@@ -2078,6 +2125,82 @@ fn parse_word_number(word: &str) -> Option<u32> {
         "quarenta" | "40" => Some(40),
         "cinquenta" | "50" => Some(50),
         _ => None,
+    }
+}
+
+fn parse_ordinal_token(token: &str) -> Option<i32> {
+    let clean = token.trim().to_lowercase();
+    let clean = clean.trim_matches(|c: char| !c.is_alphanumeric());
+    match clean {
+        "primeiro" | "primeira" | "1o" | "1a" | "1º" | "1ª" | "1" => Some(1),
+        "segundo" | "segunda" | "2o" | "2a" | "2º" | "2ª" | "2" => Some(2),
+        "terceiro" | "terceira" | "3o" | "3a" | "3º" | "3ª" | "3" => Some(3),
+        "quarto" | "quarta" | "4o" | "4a" | "4º" | "4ª" | "4" => Some(4),
+        "quinto" | "quinta" | "5o" | "5a" | "5º" | "5ª" | "5" => Some(5),
+        "ultimo" | "ultima" | "último" | "última" => Some(-1),
+        _ => None,
+    }
+}
+
+fn parse_weekday_token(token: &str) -> Option<Weekday> {
+    let clean = token.trim().to_lowercase();
+    let clean = clean.trim_matches(|c: char| !c.is_alphanumeric() && c != '-');
+    if clean.starts_with("segunda") {
+        Some(Weekday::Monday)
+    } else if clean.starts_with("terca") || clean.starts_with("terça") {
+        Some(Weekday::Tuesday)
+    } else if clean.starts_with("quarta") {
+        Some(Weekday::Wednesday)
+    } else if clean.starts_with("quinta") {
+        Some(Weekday::Thursday)
+    } else if clean.starts_with("sexta") {
+        Some(Weekday::Friday)
+    } else if clean.starts_with("sabado") || clean.starts_with("sábado") {
+        Some(Weekday::Saturday)
+    } else if clean.starts_with("domingo") {
+        Some(Weekday::Sunday)
+    } else {
+        None
+    }
+}
+
+fn days_in_month(year: i32, month: u32) -> u32 {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 => {
+            if (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0) {
+                29
+            } else {
+                28
+            }
+        }
+        _ => 30,
+    }
+}
+
+fn resolve_ordinal_weekday_in_month(
+    year: i32,
+    month: u32,
+    target_weekday: Weekday,
+    ordinal: i32,
+) -> Option<u32> {
+    let mut matching_days = Vec::new();
+    let total_days = days_in_month(year, month);
+    for d in 1..=total_days {
+        let civil_days = civil_to_days(year, month, d);
+        let wd_num = (civil_days + 3).rem_euclid(7) as u32;
+        if wd_num == target_weekday.day_number() {
+            matching_days.push(d);
+        }
+    }
+
+    if ordinal == -1 {
+        matching_days.last().copied()
+    } else if ordinal >= 1 && (ordinal as usize) <= matching_days.len() {
+        matching_days.get((ordinal - 1) as usize).copied()
+    } else {
+        None
     }
 }
 
