@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **client:** resolver comparacao de versao com LAUDA_APP_VERSION (#61)
 
 ### Bug Fixes
+- **calendar:** higienizar conectores temporais do titulo de eventos (#85)
 - **calendar:** interpretar expressoes de data ordinal por dia da semana e mes (#84)
 - **ci:** estabilizar esteira com imagem funcional e publicacao de apk (closes #77)
 - **client:** definir servidor padrao localhost:8432 em instalacao limpa (closes #75)

@@ -47,11 +47,11 @@ Ao final da construção de `summary_tokens`:
 
 ## 3. Critérios de Aceitação
 
-- [ ] `"Reunião primeiro domingo de novembro às 15 pra quatro"` resulta no título estritamente `"Reunião"`.
-- [ ] `"Reunião primeiro domingo de novembro as 15 pra quatro"` (sem acento) resulta no título estritamente `"Reunião"`.
-- [ ] `"Almoço de negócios amanhã para as 13h"` resulta no título estritamente `"Almoço de negócios"`.
-- [ ] `"Consulta médica em 15/11 às 10h"` resulta no título estritamente `"Consulta médica"`.
-- [ ] Pontuações suspensas ao final do título (como traços ou dois-pontos) são removidas.
+- [x] `"Reunião primeiro domingo de novembro às 15 pra quatro"` resulta no título estritamente `"Reunião"`.
+- [x] `"Reunião primeiro domingo de novembro as 15 pra quatro"` (sem acento) resulta no título estritamente `"Reunião"`.
+- [x] `"Almoço de negócios amanhã para as 13h"` resulta no título estritamente `"Almoço de negócios"`.
+- [x] `"Consulta médica em 15/11 às 10h"` resulta no título estritamente `"Consulta médica"`.
+- [x] Pontuações suspensas ao final do título (como traços ou dois-pontos) são removidas.
 
 ---
 
@@ -60,9 +60,9 @@ Ao final da construção de `summary_tokens`:
 - [x] **Fase 1 - Ticket:** Issue #85 delimitada no Codeberg e sincronizada.
 - [x] **Fase 2 - Branch:** Branch `fix/85-sanitize-event-title-temporal-connectors` criada a partir de `main`.
 - [x] **Fase 3 - Doc/Spec:** Especificação preliminar e contratos definidos (Zero código de produção).
-- [ ] **Fase 4 - Red:** Testes automatizados falhos comprovando a permanência de conectores com e sem acento no título.
-- [ ] **Fase 5 - Green:** Implementação funcional da higienização com testes passando.
-- [ ] **Fase 6 - Refactor:** Código idiomático e zero warnings.
-- [ ] **Fase 7 - Mutation:** Testes de borda cobrindo múltiplos conectores encadeados e pontuações suspensas.
-- [ ] **Fase 8 - Quality Gate:** Validação incremental rigorosa (`cargo fmt --check`, `cargo clippy`, `cargo test`).
-- [ ] **Fase 9 - Close:** Atualização de documentação, changelog e merge.
+- [x] **Fase 4 - Red:** Testes automatizados falhos comprovando a permanência de conectores com e sem acento no título.
+- [x] **Fase 5 - Green:** Implementação funcional da higienização com testes passando.
+- [x] **Fase 6 - Refactor:** Código idiomático e zero warnings.
+- [x] **Fase 7 - Mutation:** Testes de borda cobrindo múltiplos conectores encadeados e pontuações suspensas.
+- [x] **Fase 8 - Quality Gate:** Validação incremental rigorosa (`cargo fmt --check`, `cargo clippy`, `cargo test`).
+- [x] **Fase 9 - Close:** Atualização de documentação, changelog e merge.
