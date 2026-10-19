@@ -2,7 +2,7 @@
 
 **ID do Ticket:** #82  
 **Norma:** GOST 1.4.0 (DD-TDD)  
-**Status:** Em Andamento (Fase 3: Spec)  
+**Status:** Concluído (Fase 8: Quality Gate)  
 **Responsável:** Lumen Pink / Antigravity  
 
 ---
@@ -52,9 +52,9 @@ No chip de prévia gerado a partir do `parsed_intent`:
 - [x] **Fase 1 (Ticket):** Ticket #82 formalizado e delimitado.
 - [x] **Fase 2 (Branch):** Branch `fix/82-calendar-event-chips-full-date` criada a partir da `main`.
 - [x] **Fase 3 (Spec):** Especificação técnica formalizada neste documento.
-- [ ] **Fase 4 (Red Test):** Testes unitários falhos para formatação de chips de data e horário do parser.
-- [ ] **Fase 5 (Green Implement):** Implementação dos formatadores em `lauda-types` e renderização em `CalendarView`.
-- [ ] **Fase 6 (Refactor):** Simplificação idiomática com zero warnings.
-- [ ] **Fase 7 (Mutation Test):** Verificação de mutantes (omissão de ano, troca de ordem de início/fim, fallback incorreto de dia inteiro).
-- [ ] **Fase 8 (Quality Gate):** Validação estrita Gosplan (`cargo fmt --check`, `cargo clippy`, testes de integração).
+- [x] **Fase 4 (Red Test):** Testes unitários falhos para formatação de chips de data e horário do parser.
+- [x] **Fase 5 (Green Implement):** Implementação dos formatadores em `lauda-types` e renderização em `CalendarView`.
+- [x] **Fase 6 (Refactor):** Simplificação idiomática com zero warnings.
+- [x] **Fase 7 (Mutation Test):** Verificação de mutantes (omissão de ano, troca de ordem de início/fim, fallback incorreto de dia inteiro).
+- [x] **Fase 8 (Quality Gate):** Validação estrita Gosplan (`cargo fmt --check`, `cargo clippy`, testes de integração).
 - [ ] **Fase 9 (Finish & Close):** Merge via CCCP e fechamento do ticket #82.

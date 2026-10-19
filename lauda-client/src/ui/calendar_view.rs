@@ -1,7 +1,8 @@
 use dioxus::prelude::*;
 use lauda_types::calendar::{
     CalendarEvent, CalendarIntentParser, CalendarReferenceTime, EventStatus, EventTime,
-    ParsedCalendarIntent, Weekday, format_event_datetime_chip, timestamp_to_utc_parts,
+    ParsedCalendarIntent, Weekday, format_event_datetime_chip, format_intent_date_chip,
+    format_intent_time_chip, timestamp_to_utc_parts,
 };
 
 use crate::domain::calendar_cache::LocalCalendarCache;
@@ -524,8 +525,12 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
                             "{intent.summary}"
                         }
                         span {
-                            style: "color: #dc143c; font-weight: bold;",
-                            if intent.is_all_day { "📅 Dia Inteiro" } else { "📅 Com horário definido" }
+                            style: "background: #fff; border: 1px solid #0a0a0a; color: #0a0a0a; font-weight: bold; padding: 0.1rem 0.5rem; font-size: 0.8rem; box-shadow: 2px 2px 0 #0a0a0a;",
+                            "📅 {format_intent_date_chip(intent)}"
+                        }
+                        span {
+                            style: "background: #fff; border: 1px solid #dc143c; color: #dc143c; font-weight: bold; padding: 0.1rem 0.5rem; font-size: 0.8rem; box-shadow: 2px 2px 0 #dc143c;",
+                            "⏰ {format_intent_time_chip(intent)}"
                         }
                         if let Some(ref loc) = intent.location {
                             span {

@@ -40,8 +40,8 @@ fn test_calendar_intent_date_and_time_chips_full_data() {
     );
 
     // 2. Evento de dia inteiro ("Aniversário amanhã")
-    let parsed_all_day = CalendarIntentParser::parse("Aniversário amanhã", &ref_time)
-        .expect("parse dia inteiro");
+    let parsed_all_day =
+        CalendarIntentParser::parse("Aniversário amanhã", &ref_time).expect("parse dia inteiro");
 
     assert_eq!(format_intent_date_chip(&parsed_all_day), "20/10/2026");
     assert_eq!(format_intent_time_chip(&parsed_all_day), "Dia inteiro");
