@@ -100,4 +100,4 @@ O objetivo deste ticket é viabilizar a busca BM25 ultrarrápida direta via SQL 
 - [x] **Fase 6 (Refactor):** Código limpo, modular, com zero warnings e documentação integrada.
 - [x] **Fase 7 (Mutation Test):** Verificação de robustez contra mutantes de pontuação, cálculo residual e ordenação.
 - [x] **Fase 8 (Quality Gate):** Validação com `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e testes direcionados.
-- [ ] **Fase 9 (Finish & Close):** Commit de encerramento (`closes #86`), merge e deploy.
+- [x] **Fase 9 (Finish & Close):** Commit de encerramento (`closes #86`), merge e deploy.
