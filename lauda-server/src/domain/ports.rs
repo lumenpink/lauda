@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use lauda_types::{ComposeForm, MailboxInfo, Message, MessageEnvelope};
+use lauda_types::{ComposeForm, MailboxInfo, Message, MessageEnvelope, SearchResult};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -74,7 +74,7 @@ pub trait MailBackend: Send + Sync {
         username: &str,
         mailbox: &str,
         query: &str,
-    ) -> Result<Vec<MessageEnvelope>, BackendError>;
+    ) -> Result<SearchResult, BackendError>;
     async fn get_sieve_script(&self, username: &str) -> Result<String, BackendError> {
         let _ = username;
         Ok(String::new())

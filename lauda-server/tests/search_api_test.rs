@@ -5,7 +5,7 @@ use axum::http::{Request, StatusCode, header};
 use http_body_util::BodyExt;
 use lauda_server::adapters::in_memory::InMemoryMailBackend;
 use lauda_server::app_router;
-use lauda_types::{LoginRequest, MailboxInfo, Message, MessageEnvelope, TokenResponse};
+use lauda_types::{LoginRequest, MailboxInfo, Message, MessageEnvelope, SearchResult, TokenResponse};
 use tower::ServiceExt;
 
 const TEST_SECRET: &str = "segredo-super-secreto-de-teste-123456";
@@ -115,9 +115,9 @@ async fn test_server_search_endpoint() {
     assert_eq!(resp_tiro.status(), StatusCode::OK);
 
     let bytes = resp_tiro.into_body().collect().await.unwrap().to_bytes();
-    let results: Vec<MessageEnvelope> = serde_json::from_slice(&bytes).unwrap();
-    assert!(!results.is_empty());
-    assert_eq!(results[0].uid, 101);
+    let results: SearchResult = serde_json::from_slice(&bytes).unwrap();
+    assert!(!results.messages.is_empty());
+    assert_eq!(results.messages[0].uid, 101);
 
     // 3. Busca por "hospital" via /mailboxes/INBOX/search?q=hospital
     let req_hosp = Request::builder()
@@ -131,9 +131,9 @@ async fn test_server_search_endpoint() {
     assert_eq!(resp_hosp.status(), StatusCode::OK);
 
     let bytes = resp_hosp.into_body().collect().await.unwrap().to_bytes();
-    let results_hosp: Vec<MessageEnvelope> = serde_json::from_slice(&bytes).unwrap();
-    assert!(!results_hosp.is_empty());
-    assert_eq!(results_hosp[0].uid, 102);
+    let results_hosp: SearchResult = serde_json::from_slice(&bytes).unwrap();
+    assert!(!results_hosp.messages.is_empty());
+    assert_eq!(results_hosp.messages[0].uid, 102);
 }
 
 #[tokio::test]
@@ -181,8 +181,8 @@ async fn test_search_edge_cases_and_unauthorized() {
     let resp_nomatch = app.clone().oneshot(req_nomatch).await.unwrap();
     assert_eq!(resp_nomatch.status(), StatusCode::OK);
     let bytes = resp_nomatch.into_body().collect().await.unwrap().to_bytes();
-    let results: Vec<MessageEnvelope> = serde_json::from_slice(&bytes).unwrap();
-    assert!(results.is_empty());
+    let results: SearchResult = serde_json::from_slice(&bytes).unwrap();
+    assert!(results.messages.is_empty());
 
     // 4. Query vazia deve retornar todas as mensagens da caixa
     let req_empty = Request::builder()
@@ -195,8 +195,8 @@ async fn test_search_edge_cases_and_unauthorized() {
     let resp_empty = app.clone().oneshot(req_empty).await.unwrap();
     assert_eq!(resp_empty.status(), StatusCode::OK);
     let bytes = resp_empty.into_body().collect().await.unwrap().to_bytes();
-    let results_empty: Vec<MessageEnvelope> = serde_json::from_slice(&bytes).unwrap();
-    assert_eq!(results_empty.len(), 2);
+    let results_empty: SearchResult = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(results_empty.messages.len(), 2);
 }
 
 #[tokio::test]

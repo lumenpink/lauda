@@ -4,7 +4,7 @@ use std::sync::RwLock;
 
 use async_trait::async_trait;
 use lauda_types::{
-    ComposeForm, MailboxInfo, Message, MessageEnvelope,
+    ComposeForm, MailboxInfo, MailboxSyncStatus, Message, MessageEnvelope, SearchResult,
     message::{
         CryptoMeta, SignatureStatus, clean_ishcondidim_preamble_html,
         clean_ishcondidim_preamble_text,
@@ -1048,11 +1048,12 @@ impl MailBackend for MaildirBackend {
         username: &str,
         mailbox: &str,
         query: &str,
-    ) -> Result<Vec<MessageEnvelope>, BackendError> {
+    ) -> Result<SearchResult, BackendError> {
         if let Some(ref store) = self.sqlite_index {
             let dir = self.resolve_mailbox_dir(mailbox)?;
             let (_, uid_to_prefix) = self.load_uid_maps(&dir);
             let active_uids: HashSet<u32> = uid_to_prefix.keys().copied().collect();
+            let total_count = active_uids.len() as u64;
 
             // 1. Reconciliação inteligente com dovecot-uidlist / active_uids
             let reconcile = store
@@ -1066,51 +1067,49 @@ impl MailBackend for MaildirBackend {
                 let _ = store.remove_document(mailbox, del_uid);
             }
 
-            // Indexar novos e-mails pendentes
+            // Indexar pequenos lotes para não bloquear a resposta da requisição HTTP
             let provider = lauda_index::SimpleCpuEmbeddingProvider;
-            for new_uid in reconcile.to_index {
-                if let Ok(msg) = self.get_message(username, mailbox, new_uid).await {
+            for new_uid in reconcile.to_index.iter().take(5) {
+                if let Ok(msg) = self.get_message(username, mailbox, *new_uid).await {
                     let mut temp_index = lauda_index::MessageIndex::new();
                     temp_index.index_message_semantic(mailbox, &msg, &provider);
-                    if let Some(doc) = temp_index.documents().get(&new_uid) {
+                    if let Some(doc) = temp_index.documents().get(new_uid) {
                         let _ = store.save_document(mailbox, doc, 0);
                     }
                 }
             }
 
+            let sync_status = store
+                .get_sync_status(mailbox, total_count)
+                .unwrap_or_else(|_| MailboxSyncStatus::new(0, total_count));
+
             if query.trim().is_empty() {
-                return self.list_messages(username, mailbox, None, None).await;
+                let envelopes = self.list_messages(username, mailbox, None, None).await?;
+                return Ok(SearchResult {
+                    messages: envelopes,
+                    sync_status,
+                });
             }
 
-            // 2. Busca ultrarrápida direta do índice SQLite
-            let index = store.load_mailbox_index(mailbox).map_err(|e| {
-                BackendError::Internal(format!("Erro ao carregar índice SQLite: {}", e))
-            })?;
+            // 2. Busca ultrarrápida direta do índice SQLite via BM25 SQL
+            let ranked = store
+                .search_bm25(mailbox, query, 50)
+                .map_err(|e| BackendError::Internal(format!("Erro na busca BM25 SQLite: {}", e)))?;
 
-            let results = index.search_hybrid(query, &provider, 0.5);
-
-            let mut ranked = Vec::new();
-            for res in results {
-                if let Some(doc) = index.documents().get(&res.uid) {
-                    ranked.push(MessageEnvelope {
-                        uid: doc.uid,
-                        subject: doc.subject.clone(),
-                        sender: doc.sender.clone(),
-                        date: doc.date.clone(),
-                        cc: None,
-                        has_attachments: doc.has_attachments,
-                        is_read: doc.is_read,
-                        is_flagged: doc.is_flagged,
-                        crypto_meta: None,
-                    });
-                }
-            }
-
-            Ok(ranked)
+            Ok(SearchResult {
+                messages: ranked,
+                sync_status,
+            })
         } else {
             let envelopes = self.list_messages(username, mailbox, None, None).await?;
+            let total_count = envelopes.len() as u64;
+            let sync_status = MailboxSyncStatus::new(total_count, total_count);
+
             if query.trim().is_empty() {
-                return Ok(envelopes);
+                return Ok(SearchResult {
+                    messages: envelopes,
+                    sync_status,
+                });
             }
 
             let mut index = lauda_index::MessageIndex::new();
@@ -1131,7 +1130,10 @@ impl MailBackend for MaildirBackend {
                 }
             }
 
-            Ok(ranked)
+            Ok(SearchResult {
+                messages: ranked,
+                sync_status,
+            })
         }
     }
 

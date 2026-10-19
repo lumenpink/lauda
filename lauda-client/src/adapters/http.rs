@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use lauda_types::{
-    ComposeForm, LoginRequest, MailboxInfo, Message, MessageEnvelope, TokenResponse,
+    ComposeForm, LoginRequest, MailboxInfo, MailboxSyncStatus, Message, MessageEnvelope,
+    SearchResult, TokenResponse,
 };
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 use reqwest::{Client, StatusCode};
@@ -316,7 +317,7 @@ impl MailApiClient for HttpApiClient {
         token: &str,
         mailbox: &str,
         query: &str,
-    ) -> Result<Vec<MessageEnvelope>, ClientError> {
+    ) -> Result<SearchResult, ClientError> {
         let url = format!("{}/messages/search", self.base_url);
         let headers = Self::auth_headers(token)?;
         let resp = self
@@ -329,9 +330,25 @@ impl MailApiClient for HttpApiClient {
             .map_err(|e| ClientError::Network(e.to_string()))?;
 
         match resp.status() {
-            StatusCode::OK => resp.json::<Vec<MessageEnvelope>>().await.map_err(|e| {
-                ClientError::Network(format!("Erro ao deserializar resultados de busca: {}", e))
-            }),
+            StatusCode::OK => {
+                let text = resp
+                    .text()
+                    .await
+                    .map_err(|e| ClientError::Network(e.to_string()))?;
+                if let Ok(structured) = serde_json::from_str::<SearchResult>(&text) {
+                    Ok(structured)
+                } else if let Ok(messages) = serde_json::from_str::<Vec<MessageEnvelope>>(&text) {
+                    let total = messages.len() as u64;
+                    Ok(SearchResult {
+                        messages,
+                        sync_status: MailboxSyncStatus::new(total, total),
+                    })
+                } else {
+                    Err(ClientError::Network(
+                        "Erro ao deserializar resultados de busca".to_string(),
+                    ))
+                }
+            }
             StatusCode::UNAUTHORIZED => Err(ClientError::AuthFailed),
             status => Err(ClientError::Network(format!(
                 "Status inesperado na busca: {}",

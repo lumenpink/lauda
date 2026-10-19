@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use lauda_types::{
-    ComposeForm, LoginRequest, MailboxInfo, Message, MessageEnvelope, TokenResponse,
+    ComposeForm, LoginRequest, MailboxInfo, Message, MessageEnvelope, SearchResult, TokenResponse,
 };
 use thiserror::Error;
 
@@ -62,7 +62,7 @@ pub trait MailApiClient: Send + Sync {
         token: &str,
         mailbox: &str,
         query: &str,
-    ) -> Result<Vec<MessageEnvelope>, ClientError>;
+    ) -> Result<SearchResult, ClientError>;
     fn attachment_url(&self, mailbox: &str, uid: u32, attachment_id: usize) -> String;
     async fn fetch_attachment(
         &self,

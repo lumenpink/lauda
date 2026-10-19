@@ -3,7 +3,8 @@ use std::sync::RwLock;
 
 use async_trait::async_trait;
 use lauda_types::{
-    ComposeForm, LoginRequest, MailboxInfo, Message, MessageEnvelope, TokenResponse,
+    ComposeForm, LoginRequest, MailboxInfo, MailboxSyncStatus, Message, MessageEnvelope,
+    SearchResult, TokenResponse,
 };
 
 use crate::domain::{ClientError, MailApiClient};
@@ -179,16 +180,21 @@ impl MailApiClient for InMemoryApiClient {
         _token: &str,
         mailbox: &str,
         query: &str,
-    ) -> Result<Vec<MessageEnvelope>, ClientError> {
+    ) -> Result<SearchResult, ClientError> {
         let msgs = self.messages.read().unwrap();
         let empty = Vec::new();
         let box_msgs = msgs.get(mailbox).unwrap_or(&empty);
+        let total_count = box_msgs.len() as u64;
+        let sync_status = MailboxSyncStatus::new(total_count, total_count);
 
         if query.trim().is_empty() {
             let mut list: Vec<MessageEnvelope> =
                 box_msgs.iter().map(|m| m.envelope.clone()).collect();
             list.sort_by_key(|e| std::cmp::Reverse(e.uid));
-            return Ok(list);
+            return Ok(SearchResult {
+                messages: list,
+                sync_status,
+            });
         }
 
         let mut index = lauda_index::MessageIndex::new();
@@ -207,7 +213,10 @@ impl MailApiClient for InMemoryApiClient {
             }
         }
 
-        Ok(envelopes)
+        Ok(SearchResult {
+            messages: envelopes,
+            sync_status,
+        })
     }
 
     fn attachment_url(&self, mailbox: &str, uid: u32, attachment_id: usize) -> String {

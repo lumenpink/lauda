@@ -1,4 +1,4 @@
-use lauda_types::{MailboxInfo, Message, MessageEnvelope};
+use lauda_types::{MailboxInfo, MailboxSyncStatus, Message, MessageEnvelope};
 
 /// Telas ativas da interface de terminal TUI.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,6 +39,7 @@ pub struct TuiApp {
     active_message: Option<Message>,
     should_quit: bool,
     pub status_message: Option<String>,
+    pub sync_status: Option<MailboxSyncStatus>,
 }
 
 impl TuiApp {
@@ -60,7 +61,16 @@ impl TuiApp {
             active_message: None,
             should_quit: false,
             status_message: None,
+            sync_status: None,
         }
+    }
+
+    pub fn sync_status(&self) -> Option<&MailboxSyncStatus> {
+        self.sync_status.as_ref()
+    }
+
+    pub fn set_sync_status(&mut self, status: Option<MailboxSyncStatus>) {
+        self.sync_status = status;
     }
 
     pub fn current_screen(&self) -> TuiScreen {

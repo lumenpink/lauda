@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 
 use async_trait::async_trait;
-use lauda_types::{ComposeForm, MailboxInfo, Message, MessageEnvelope};
+use lauda_types::{ComposeForm, MailboxInfo, MailboxSyncStatus, Message, MessageEnvelope, SearchResult};
 
 use crate::domain::{BackendError, MailBackend};
 
@@ -282,17 +282,30 @@ impl MailBackend for InMemoryMailBackend {
         username: &str,
         mailbox: &str,
         query: &str,
-    ) -> Result<Vec<MessageEnvelope>, BackendError> {
+    ) -> Result<SearchResult, BackendError> {
         let msgs_lock = self.messages.read().unwrap();
         let empty_map = HashMap::new();
         let user_boxes = msgs_lock.get(username).unwrap_or(&empty_map);
         let empty_vec = Vec::new();
         let msgs = user_boxes.get(mailbox).unwrap_or(&empty_vec);
+        let indexed_count = msgs.len() as u64;
+        let total_count = {
+            let boxes_lock = self.mailboxes.read().unwrap();
+            boxes_lock
+                .get(username)
+                .and_then(|boxes| boxes.iter().find(|b| b.name == mailbox))
+                .map(|b| b.total_messages as u64)
+                .unwrap_or(indexed_count)
+        };
+        let sync_status = MailboxSyncStatus::new(indexed_count, total_count);
 
         if query.trim().is_empty() {
             let mut list: Vec<MessageEnvelope> = msgs.iter().map(|m| m.envelope.clone()).collect();
             list.sort_by_key(|e| std::cmp::Reverse(e.uid));
-            return Ok(list);
+            return Ok(SearchResult {
+                messages: list,
+                sync_status,
+            });
         }
 
         let mut index = lauda_index::MessageIndex::new();
@@ -311,7 +324,10 @@ impl MailBackend for InMemoryMailBackend {
             }
         }
 
-        Ok(envelopes)
+        Ok(SearchResult {
+            messages: envelopes,
+            sync_status,
+        })
     }
 
     async fn get_sieve_script(&self, username: &str) -> Result<String, BackendError> {

@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use axum::extract::{FromRequestParts, Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderValue, StatusCode};
 use axum::http::request::Parts;
+use axum::response::{IntoResponse, Response};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::routing::{get, patch, post};
 use axum::{Json, Router};
@@ -83,14 +84,29 @@ async fn search_messages_handler(
     State(state): State<AppState>,
     AuthUser(username): AuthUser,
     Query(query): Query<SearchQuery>,
-) -> Result<Json<Vec<MessageEnvelope>>, (StatusCode, String)> {
+) -> Result<Response, (StatusCode, String)> {
     let mailbox = query.r#box.as_deref().unwrap_or("INBOX");
-    let results = state
+    let result = state
         .backend
         .search_messages(&username, mailbox, &query.q)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    Ok(Json(results))
+
+    let mut resp = Json(result.clone()).into_response();
+    let headers = resp.headers_mut();
+    if let Ok(v) = HeaderValue::from_str(&result.sync_status.is_synced.to_string()) {
+        headers.insert("x-lauda-index-synced", v);
+    }
+    if let Ok(v) = HeaderValue::from_str(&result.sync_status.indexed_count.to_string()) {
+        headers.insert("x-lauda-index-indexed", v);
+    }
+    if let Ok(v) = HeaderValue::from_str(&result.sync_status.total_count.to_string()) {
+        headers.insert("x-lauda-index-total", v);
+    }
+    if let Ok(v) = HeaderValue::from_str(&result.sync_status.remaining_count.to_string()) {
+        headers.insert("x-lauda-index-remaining", v);
+    }
+    Ok(resp)
 }
 
 async fn search_mailbox_handler(
@@ -98,13 +114,28 @@ async fn search_mailbox_handler(
     AuthUser(username): AuthUser,
     Path(mailbox): Path<String>,
     Query(query): Query<MailboxSearchQuery>,
-) -> Result<Json<Vec<MessageEnvelope>>, (StatusCode, String)> {
-    let results = state
+) -> Result<Response, (StatusCode, String)> {
+    let result = state
         .backend
         .search_messages(&username, &mailbox, &query.q)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    Ok(Json(results))
+
+    let mut resp = Json(result.clone()).into_response();
+    let headers = resp.headers_mut();
+    if let Ok(v) = HeaderValue::from_str(&result.sync_status.is_synced.to_string()) {
+        headers.insert("x-lauda-index-synced", v);
+    }
+    if let Ok(v) = HeaderValue::from_str(&result.sync_status.indexed_count.to_string()) {
+        headers.insert("x-lauda-index-indexed", v);
+    }
+    if let Ok(v) = HeaderValue::from_str(&result.sync_status.total_count.to_string()) {
+        headers.insert("x-lauda-index-total", v);
+    }
+    if let Ok(v) = HeaderValue::from_str(&result.sync_status.remaining_count.to_string()) {
+        headers.insert("x-lauda-index-remaining", v);
+    }
+    Ok(resp)
 }
 
 #[derive(Debug, Deserialize)]

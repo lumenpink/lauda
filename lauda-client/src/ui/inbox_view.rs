@@ -111,7 +111,7 @@ pub fn InboxView(
             } else if let Some(token) = sess.token {
                 let client = HttpApiClient::new(sess.server_url);
                 match client.search_messages(&token, &box_name, &q).await {
-                    Ok(list) => Some((list, false)),
+                    Ok(result) => Some((result, false)),
                     Err(_) => {
                         let cache = LocalMessageCache::new(get_default_cache_dir());
                         if let Ok(Some(local_index)) = cache.load_index_slice(&box_name) {
@@ -134,7 +134,12 @@ pub fn InboxView(
                                     })
                                 })
                                 .collect();
-                            Some((envelopes, true))
+                            let total = envelopes.len() as u64;
+                            let fallback = lauda_types::SearchResult {
+                                messages: envelopes,
+                                sync_status: lauda_types::MailboxSyncStatus::new(total, total),
+                            };
+                            Some((fallback, true))
                         } else {
                             None
                         }
@@ -150,11 +155,16 @@ pub fn InboxView(
     let query_str = search_query.read().trim().to_string();
     let is_searching = crate::domain::is_search_active(&query_str);
 
-    let (base_list, is_offline_search) = match &*search_resource.read() {
-        Some(Some((list, is_offline))) => (list.clone(), *is_offline),
+    let (base_list, is_offline_search, search_sync_status) = match &*search_resource.read() {
+        Some(Some((result, is_offline))) => (
+            result.messages.clone(),
+            *is_offline,
+            Some(result.sync_status.clone()),
+        ),
         _ => (
             crate::domain::fast_filter_envelopes(&messages.read(), &query_str),
             false,
+            None,
         ),
     };
 
@@ -346,6 +356,25 @@ pub fn InboxView(
                                 style: "border: 2px solid #dc143c; background: #0a0a0a; color: #fff; padding: 0.5rem 0.8rem; font-family: monospace; font-size: 0.8rem; font-weight: bold; display: flex; align-items: center; gap: 0.5rem; box-shadow: 2px 2px 0 #dc143c;",
                                 span { "⚡" }
                                 span { "MODO OFFLINE: PESQUISANDO NO HISTÓRICO LOCAL DOS ÚLTIMOS 90 DIAS" }
+                            }
+                        }
+
+                        if is_searching {
+                            if let Some(sync) = &search_sync_status {
+                                if !sync.is_synced && !is_offline_search {
+                                    div {
+                                        style: "border: 2px solid #dc143c; background: #fff5f5; color: #0a0a0a; padding: 0.6rem 0.8rem; font-family: monospace; font-size: 0.8rem; box-shadow: 3px 3px 0 #dc143c; display: flex; flex-direction: column; gap: 0.3rem;",
+                                        div {
+                                            style: "display: flex; align-items: center; gap: 0.4rem; font-weight: bold; color: #dc143c;",
+                                            span { "⚠️" }
+                                            span { "ÍNDICE EM SINCRONIZAÇÃO: {sync.indexed_count} de {sync.total_count} e-mails indexados (faltam {sync.remaining_count})" }
+                                        }
+                                        div {
+                                            style: "font-size: 0.75rem; color: #444;",
+                                            "A busca cobriu apenas o acervo já indexado. É possível que o e-mail procurado ainda não tenha entrado no índice."
+                                        }
+                                    }
+                                }
                             }
                         }
 

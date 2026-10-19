@@ -223,9 +223,27 @@ fn render_message_reader(app: &TuiApp, frame: &mut Frame, area: ratatui::layout:
 }
 
 fn render_search_screen(app: &TuiApp, frame: &mut Frame, area: ratatui::layout::Rect) {
+    let show_warning = app
+        .sync_status()
+        .map(|s| !s.is_synced)
+        .unwrap_or(false);
+
+    let constraints = if show_warning {
+        vec![
+            Constraint::Length(3), // Search bar
+            Constraint::Length(3), // Warning banner
+            Constraint::Min(5),    // Envelope list
+        ]
+    } else {
+        vec![
+            Constraint::Length(3), // Search bar
+            Constraint::Min(5),    // Envelope list
+        ]
+    };
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Min(5)])
+        .constraints(constraints)
         .split(area);
 
     let query_line = format!("🔍 {}", app.search_query());
@@ -237,5 +255,28 @@ fn render_search_screen(app: &TuiApp, frame: &mut Frame, area: ratatui::layout::
     );
     frame.render_widget(search_bar, chunks[0]);
 
-    render_envelope_list(app, frame, chunks[1]);
+    if show_warning {
+        if let Some(sync) = app.sync_status() {
+            let warn_text = format!(
+                " ⚠️  ÍNDICE EM SINCRONIZAÇÃO: {} de {} e-mails indexados (faltam {}). Mensagens pendentes podem não constar no resultado. ",
+                sync.indexed_count, sync.total_count, sync.remaining_count
+            );
+            let warn_banner = Paragraph::new(warn_text)
+                .style(
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .block(
+                    Block::default()
+                        .title(" Atenção ")
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Yellow)),
+                );
+            frame.render_widget(warn_banner, chunks[1]);
+        }
+        render_envelope_list(app, frame, chunks[2]);
+    } else {
+        render_envelope_list(app, frame, chunks[1]);
+    }
 }
