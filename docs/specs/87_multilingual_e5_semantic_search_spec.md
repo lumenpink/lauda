@@ -104,4 +104,4 @@ A busca semântica utiliza Max-Pooling entre os segmentos gerados pelo `urupema`
 - [x] **Fase 6 - Refactor:** Código limpo, idiomático e com Zero Warnings.
 - [x] **Fase 7 - Mutation:** Testes de mutação e casos de borda eliminados.
 - [x] **Fase 8 - Quality Gate:** Validação rigorosa com `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `cargo test`.
-- [ ] **Fase 9 - Close:** Atualização de documentação, changelog e merge com fechamento de issue.
+- [x] **Fase 9 - Close:** Atualização de documentação, changelog e merge com fechamento de issue.
