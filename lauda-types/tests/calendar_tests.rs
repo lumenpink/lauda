@@ -513,3 +513,36 @@ fn test_format_event_datetime_chip_scenarios() {
     let chip4 = format_event_datetime_chip(&ev4);
     assert_eq!(chip4, "14/10 23:00 → 15/10 02:00");
 }
+
+#[test]
+fn test_parse_ordinal_weekday_month_expressions() {
+    let ref_time = sample_ref_time(); // 14/10/2026
+
+    // "Reunião primeiro domingo de novembro" -> 01/11/2026
+    let p1 = CalendarIntentParser::parse("Reunião primeiro domingo de novembro", &ref_time)
+        .expect("deveria interpretar primeiro domingo de novembro");
+    if let EventTime::DateOnly { year, month, day } = p1.start {
+        assert_eq!((year, month, day), (2026, 11, 1));
+    } else {
+        panic!("esperava DateOnly para primeiro domingo de novembro, obteve {:?}", p1.start);
+    }
+
+    // "Almoço terceira terça de outubro" -> 20/10/2026
+    let p2 = CalendarIntentParser::parse("Almoço terceira terça de outubro", &ref_time)
+        .expect("deveria interpretar terceira terça de outubro");
+    if let EventTime::DateOnly { year, month, day } = p2.start {
+        assert_eq!((year, month, day), (2026, 10, 20));
+    } else {
+        panic!("esperava DateOnly para terceira terça de outubro, obteve {:?}", p2.start);
+    }
+
+    // "Festa ultima sexta de dezembro" -> 25/12/2026
+    let p3 = CalendarIntentParser::parse("Festa ultima sexta de dezembro", &ref_time)
+        .expect("deveria interpretar ultima sexta de dezembro");
+    if let EventTime::DateOnly { year, month, day } = p3.start {
+        assert_eq!((year, month, day), (2026, 12, 25));
+    } else {
+        panic!("esperava DateOnly para ultima sexta de dezembro, obteve {:?}", p3.start);
+    }
+}
+
