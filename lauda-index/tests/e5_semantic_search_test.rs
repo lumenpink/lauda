@@ -21,8 +21,8 @@ impl EmbeddingProvider for MockSemanticNeuralProvider {
             || lower.contains("docente")
             || lower.contains("magistério")
         {
-            for i in 0..50 {
-                vec[i] += 1.0;
+            for val in &mut vec[0..50] {
+                *val += 1.0;
             }
         }
 
@@ -32,8 +32,8 @@ impl EmbeddingProvider for MockSemanticNeuralProvider {
             || lower.contains("reposição")
             || lower.contains("prova para quem faltou")
         {
-            for i in 50..100 {
-                vec[i] += 1.0;
+            for val in &mut vec[50..100] {
+                *val += 1.0;
             }
         }
 
@@ -43,8 +43,8 @@ impl EmbeddingProvider for MockSemanticNeuralProvider {
             || lower.contains("aéreo")
             || lower.contains("hotel")
         {
-            for i in 100..150 {
-                vec[i] += 1.0;
+            for val in &mut vec[100..150] {
+                *val += 1.0;
             }
         }
 
@@ -151,7 +151,8 @@ fn test_semantic_search_retrieves_synonyms_without_exact_lexical_match() {
 #[test]
 fn test_dynamic_embedding_provider_fallback() {
     // Quando inicializado com caminho inexistente, DynamicEmbeddingProvider usa fallback gracioso sem pânico
-    let dynamic = DynamicEmbeddingProvider::from_path_or_fallback("/caminho/inexistente/modelo.onnx");
+    let dynamic =
+        DynamicEmbeddingProvider::from_path_or_fallback("/caminho/inexistente/modelo.onnx");
     assert!(
         dynamic.is_fallback(),
         "Deveria estar em modo fallback devido ao arquivo inexistente"
