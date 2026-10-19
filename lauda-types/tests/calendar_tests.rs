@@ -606,5 +606,23 @@ fn test_sanitize_temporal_connectors_from_summary() {
     let p4 = CalendarIntentParser::parse("Consulta médica em 15/11 às 10h", &ref_time)
         .expect("deveria interpretar consulta médica");
     assert_eq!(p4.summary, "Consulta médica");
-}
 
+    // 5. Conectores até/ate com e sem acento:
+    let p5 = CalendarIntentParser::parse("Sessão de coaching até 18h", &ref_time)
+        .expect("deveria interpretar com até");
+    assert_eq!(p5.summary, "Sessão de coaching");
+
+    let p6 = CalendarIntentParser::parse("Sessão de coaching ate 18h", &ref_time)
+        .expect("deveria interpretar com ate sem acento");
+    assert_eq!(p6.summary, "Sessão de coaching");
+
+    // 6. Conectores encadeados e pontuação residual suspensa:
+    let p7 = CalendarIntentParser::parse("Alinhamento semanal - para as 16h", &ref_time)
+        .expect("deveria interpretar alinhamento semanal");
+    assert_eq!(p7.summary, "Alinhamento semanal");
+
+    // 7. Input composto exclusivamente de termos temporais:
+    let p8 = CalendarIntentParser::parse("amanhã às 15h", &ref_time)
+        .expect("deveria interpretar evento sem título explícito");
+    assert_eq!(p8.summary, "Novo Evento");
+}
