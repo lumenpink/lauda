@@ -352,4 +352,3 @@ pub struct SearchResult {
     /// Metadados de sincronização do índice da caixa consultada.
     pub sync_status: MailboxSyncStatus,
 }
-

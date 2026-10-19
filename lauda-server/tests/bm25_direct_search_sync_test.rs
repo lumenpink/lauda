@@ -8,7 +8,9 @@ use lauda_index::{MessageIndex, SimpleCpuEmbeddingProvider};
 use lauda_server::adapters::in_memory::InMemoryMailBackend;
 use lauda_server::adapters::sqlite_index::SqliteIndexStore;
 use lauda_server::app_router;
-use lauda_types::{LoginRequest, MailboxInfo, Message, MessageEnvelope, SearchResult, TokenResponse};
+use lauda_types::{
+    LoginRequest, MailboxInfo, Message, MessageEnvelope, SearchResult, TokenResponse,
+};
 use tower::ServiceExt;
 
 #[test]
@@ -21,7 +23,10 @@ fn test_sqlite_index_store_sync_status_calculation() {
     let status_initial = store
         .get_sync_status("INBOX", 10)
         .expect("calcular sync status inicial");
-    assert!(!status_initial.is_synced, "Base vazia não deve constar como sincronizada");
+    assert!(
+        !status_initial.is_synced,
+        "Base vazia não deve constar como sincronizada"
+    );
     assert_eq!(status_initial.indexed_count, 0);
     assert_eq!(status_initial.total_count, 10);
     assert_eq!(status_initial.remaining_count, 10);
@@ -70,14 +75,19 @@ fn test_sqlite_index_store_sync_status_calculation() {
     index.index_message_semantic("INBOX", &msg2, &provider);
 
     for doc in index.documents().values() {
-        store.save_document("INBOX", doc, 1000).expect("salvar documento");
+        store
+            .save_document("INBOX", doc, 1000)
+            .expect("salvar documento");
     }
 
     // 3. Status com sincronização parcial (2 de 5)
     let status_partial = store
         .get_sync_status("INBOX", 5)
         .expect("calcular status parcial");
-    assert!(!status_partial.is_synced, "2 de 5 não deve constar como sincronizado");
+    assert!(
+        !status_partial.is_synced,
+        "2 de 5 não deve constar como sincronizado"
+    );
     assert_eq!(status_partial.indexed_count, 2);
     assert_eq!(status_partial.total_count, 5);
     assert_eq!(status_partial.remaining_count, 3);
@@ -86,7 +96,10 @@ fn test_sqlite_index_store_sync_status_calculation() {
     let status_complete = store
         .get_sync_status("INBOX", 2)
         .expect("calcular status completo");
-    assert!(status_complete.is_synced, "2 de 2 deve constar como sincronizado");
+    assert!(
+        status_complete.is_synced,
+        "2 de 2 deve constar como sincronizado"
+    );
     assert_eq!(status_complete.indexed_count, 2);
     assert_eq!(status_complete.total_count, 2);
     assert_eq!(status_complete.remaining_count, 0);
@@ -114,7 +127,9 @@ fn test_sqlite_index_store_direct_bm25_search() {
             crypto_meta: None,
         },
         attachments: vec![],
-        txt_auto: Some("A fatura do seu cartao de credito vence no dia 20. Pague o cartao em dia.".to_string()),
+        txt_auto: Some(
+            "A fatura do seu cartao de credito vence no dia 20. Pague o cartao em dia.".to_string(),
+        ),
         txt_original: None,
         html_sanitized: None,
     };
@@ -132,7 +147,10 @@ fn test_sqlite_index_store_direct_bm25_search() {
             crypto_meta: None,
         },
         attachments: vec![],
-        txt_auto: Some("Voce recebeu um pix no valor de R$ 150,00 atraves da chave cartao fidelidade.".to_string()),
+        txt_auto: Some(
+            "Voce recebeu um pix no valor de R$ 150,00 atraves da chave cartao fidelidade."
+                .to_string(),
+        ),
         txt_original: None,
         html_sanitized: None,
     };
@@ -160,14 +178,20 @@ fn test_sqlite_index_store_direct_bm25_search() {
     index.index_message_semantic("INBOX", &msg3, &provider);
 
     for doc in index.documents().values() {
-        store.save_document("INBOX", doc, 1000).expect("salvar documento");
+        store
+            .save_document("INBOX", doc, 1000)
+            .expect("salvar documento");
     }
 
     // Busca BM25 direta via SQL
     let results_cartao = store
         .search_bm25("INBOX", "cartao", 10)
         .expect("busca direta bm25 cartao");
-    assert_eq!(results_cartao.len(), 2, "Deve encontrar msg1 e msg2 que contêm cartao");
+    assert_eq!(
+        results_cartao.len(),
+        2,
+        "Deve encontrar msg1 e msg2 que contêm cartao"
+    );
     // msg1 tem termo 'cartao' repetido tanto no subject quanto no corpo, logo deve ter maior score
     assert_eq!(results_cartao[0].uid, 101);
     assert_eq!(results_cartao[1].uid, 102);
@@ -238,7 +262,8 @@ async fn test_search_api_returns_sync_status_headers_and_payload() {
 
     let resp_login = app.clone().oneshot(req_login).await.unwrap();
     let token_resp: TokenResponse =
-        serde_json::from_slice(&resp_login.into_body().collect().await.unwrap().to_bytes()).unwrap();
+        serde_json::from_slice(&resp_login.into_body().collect().await.unwrap().to_bytes())
+            .unwrap();
     let token = token_resp.token;
 
     // Busca com status de sincronização

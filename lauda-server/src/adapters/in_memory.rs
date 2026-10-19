@@ -2,7 +2,9 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 
 use async_trait::async_trait;
-use lauda_types::{ComposeForm, MailboxInfo, MailboxSyncStatus, Message, MessageEnvelope, SearchResult};
+use lauda_types::{
+    ComposeForm, MailboxInfo, MailboxSyncStatus, Message, MessageEnvelope, SearchResult,
+};
 
 use crate::domain::{BackendError, MailBackend};
 

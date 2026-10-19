@@ -5,7 +5,9 @@ use axum::http::{Request, StatusCode, header};
 use http_body_util::BodyExt;
 use lauda_server::adapters::in_memory::InMemoryMailBackend;
 use lauda_server::app_router;
-use lauda_types::{LoginRequest, MailboxInfo, Message, MessageEnvelope, SearchResult, TokenResponse};
+use lauda_types::{
+    LoginRequest, MailboxInfo, Message, MessageEnvelope, SearchResult, TokenResponse,
+};
 use tower::ServiceExt;
 
 const TEST_SECRET: &str = "segredo-super-secreto-de-teste-123456";

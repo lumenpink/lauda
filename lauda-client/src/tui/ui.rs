@@ -223,10 +223,7 @@ fn render_message_reader(app: &TuiApp, frame: &mut Frame, area: ratatui::layout:
 }
 
 fn render_search_screen(app: &TuiApp, frame: &mut Frame, area: ratatui::layout::Rect) {
-    let show_warning = app
-        .sync_status()
-        .map(|s| !s.is_synced)
-        .unwrap_or(false);
+    let show_warning = app.sync_status().map(|s| !s.is_synced).unwrap_or(false);
 
     let constraints = if show_warning {
         vec![
