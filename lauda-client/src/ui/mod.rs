@@ -365,6 +365,7 @@ pub fn App() -> Element {
 
             // Exibição da Tela Conforme o Estado de Navegação
             main {
+                style: "min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box;",
                 match screen.read().clone() {
                     Screen::Login => rsx! {
                         LoginView {

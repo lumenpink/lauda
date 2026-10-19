@@ -222,3 +222,78 @@ pub async fn search_contacts_fuzzy_async(
     .await
     .unwrap_or_default()
 }
+
+/// Estilo base do container raiz do MessageView com contenção estrita de flexbox e viewport.
+pub const MESSAGE_VIEW_ROOT_STYLE: &str = "display: flex; flex-direction: column; gap: 1rem; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box;";
+
+/// Estilo base do painel do corpo da mensagem com contenção de overflow e quebra de palavras.
+pub const MESSAGE_BODY_CONTAINER_STYLE: &str = "width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; overflow-x: auto; overflow-wrap: break-word; word-break: break-word;";
+
+/// Envelopa o HTML bruto de um e-mail com regras CSS de contenção para impedir transbordamento de layout.
+pub fn format_html_body_contained(html: &str) -> String {
+    format!(
+        r#"<style>
+.lauda-html-body {{
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    box-sizing: border-box !important;
+}}
+.lauda-html-body table {{
+    max-width: 100% !important;
+    word-break: break-word !important;
+}}
+.lauda-html-body img {{
+    max-width: 100% !important;
+    height: auto !important;
+}}
+.lauda-html-body pre {{
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+}}
+.lauda-html-body .paper-sheet > table {{
+    min-height: 848px !important;
+    height: 100% !important;
+}}
+.lauda-html-body .paper-sheet > table > tbody > tr > td {{
+    height: 100% !important;
+}}
+</style><div class="lauda-html-body">{html}</div>"#
+    )
+}
+
+/// Envelopa o HTML gerado a partir de Markdown (txtauto) com regras CSS de contenção para tabelas, código e imagens.
+pub fn format_txtauto_body_contained(markdown_html: &str) -> String {
+    format!(
+        r#"<style>
+.lauda-txtauto-body {{
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.6;
+    font-size: 1rem;
+    color: #0a0a0a;
+    box-sizing: border-box;
+}}
+.lauda-txtauto-body pre, .lauda-txtauto-body code {{
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-width: 100%;
+    overflow-x: auto;
+}}
+.lauda-txtauto-body table {{
+    max-width: 100%;
+    display: block;
+    overflow-x: auto;
+    border-collapse: collapse;
+    word-break: break-word;
+}}
+.lauda-txtauto-body img {{
+    max-width: 100%;
+    height: auto;
+}}
+</style><div class="lauda-txtauto-body">{markdown_html}</div>"#
+    )
+}

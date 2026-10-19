@@ -71,3 +71,23 @@ fn test_txtauto_body_containment_wrapper() {
     assert!(wrapped.contains("word-break: break-word"));
     assert!(wrapped.contains(markdown_html));
 }
+
+#[test]
+fn test_mutation_detection_on_missing_containment() {
+    // Mutante 1: Falta min-width: 0 no root
+    let mut1 = MESSAGE_VIEW_ROOT_STYLE.replace("min-width: 0", "");
+    assert!(!mut1.contains("min-width: 0"));
+
+    // Mutante 2: Falta overflow-x: auto no container de mensagem
+    let mut2 = MESSAGE_BODY_CONTAINER_STYLE.replace("overflow-x: auto", "");
+    assert!(!mut2.contains("overflow-x: auto"));
+
+    // Mutante 3: Falta word-break no wrapper de HTML
+    let mut3 = format_html_body_contained("<b>teste</b>").replace("word-break: break-word", "");
+    assert!(!mut3.contains("word-break: break-word !important"));
+
+    // Mutante 4: Falta white-space pre-wrap no wrapper de txtauto
+    let mut4 =
+        format_txtauto_body_contained("<code>teste</code>").replace("white-space: pre-wrap", "");
+    assert!(!mut4.contains("white-space: pre-wrap"));
+}

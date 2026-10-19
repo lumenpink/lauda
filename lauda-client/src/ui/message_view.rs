@@ -6,7 +6,10 @@ use crate::adapters::HttpApiClient;
 use crate::domain::calendar_cache::LocalCalendarCache;
 use crate::domain::ports::MailApiClient;
 use crate::domain::session::SessionConfig;
-use crate::domain::view::{clean_comment_tags, parse_markdown_to_html};
+use crate::domain::view::{
+    MESSAGE_BODY_CONTAINER_STYLE, MESSAGE_VIEW_ROOT_STYLE, clean_comment_tags,
+    format_html_body_contained, format_txtauto_body_contained, parse_markdown_to_html,
+};
 use crate::ui::state::Screen;
 
 #[component]
@@ -261,7 +264,7 @@ pub fn MessageView(
 
     rsx! {
         div {
-            style: "display: flex; flex-direction: column; gap: 1rem;",
+            style: "{MESSAGE_VIEW_ROOT_STYLE}",
 
             // Barra de Navegação e Ações Rápidas
             div {
@@ -566,42 +569,34 @@ pub fn MessageView(
             {
                 let is_html_mode = *current_view_mode.read() == ViewMode::Html;
                 let container_style = if is_html_mode {
-                    "border: 2px solid #0a0a0a; background: #fff; padding: 0; box-shadow: 6px 6px 0 #0a0a0a; overflow: hidden;"
+                    format!("border: 2px solid #0a0a0a; background: #fff; padding: 0; box-shadow: 6px 6px 0 #0a0a0a; {MESSAGE_BODY_CONTAINER_STYLE}")
                 } else {
-                    "border: 2px solid #0a0a0a; background: #fff; padding: 1.5rem; box-shadow: 6px 6px 0 #0a0a0a; min-height: 250px;"
+                    format!("border: 2px solid #0a0a0a; background: #fff; padding: 1.5rem; box-shadow: 6px 6px 0 #0a0a0a; min-height: 250px; {MESSAGE_BODY_CONTAINER_STYLE}")
                 };
 
                 rsx! {
                     div {
                         style: "{container_style}",
                         match *current_view_mode.read() {
-                            ViewMode::TxtAuto => rsx! {
-                                div {
-                                    style: "line-height: 1.6; font-size: 1rem; color: #0a0a0a;",
-                                    dangerous_inner_html: "{rendered_markdown_html}",
+                            ViewMode::TxtAuto => {
+                                let styled_txtauto = format_txtauto_body_contained(&rendered_markdown_html.read());
+                                rsx! {
+                                    div {
+                                        dangerous_inner_html: "{styled_txtauto}",
+                                    }
                                 }
                             },
                             ViewMode::TxtOriginal => rsx! {
                                 pre {
-                                    style: "white-space: pre-wrap; font-family: monospace; font-size: 0.95rem; line-height: 1.5; color: #0a0a0a; margin: 0; background: #faf9f6; padding: 1rem; border: 1px dashed #0a0a0a;",
+                                    style: "white-space: pre-wrap; font-family: monospace; font-size: 0.95rem; line-height: 1.5; color: #0a0a0a; margin: 0; background: #faf9f6; padding: 1rem; border: 1px dashed #0a0a0a; max-width: 100%; overflow-x: auto; overflow-wrap: break-word; word-break: break-word;",
                                     "{txt_original_body}"
                                 }
                             },
                             ViewMode::Html => {
-                                let styled_html_body = format!(
-                                    r#"<style>
-.lauda-html-body .paper-sheet > table {{
-    min-height: 848px !important;
-    height: 100% !important;
-}}
-.lauda-html-body .paper-sheet > table > tbody > tr > td {{
-    height: 100% !important;
-}}
-</style><div class="lauda-html-body">{html_body}</div>"#
-                                );
+                                let styled_html_body = format_html_body_contained(&html_body);
                                 rsx! {
                                     div {
-                                        style: "line-height: 1.5; font-size: 0.95rem; color: #0a0a0a; background: transparent; padding: 0; overflow-x: auto; width: 100%;",
+                                        style: "background: transparent; padding: 0; width: 100%; max-width: 100%;",
                                         dangerous_inner_html: "{styled_html_body}",
                                     }
                                 }
