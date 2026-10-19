@@ -52,29 +52,18 @@ pub fn LoginView(
 
             match client.login(&req).await {
                 Ok(token_resp) => {
-                    let new_session = SessionConfig {
-                        server_url: server.clone(),
-                        username: user,
-                        token: Some(token_resp.token.clone()),
-                    };
+                    let post_login = crate::domain::session::prepare_post_login_state(
+                        server,
+                        user,
+                        token_resp.token,
+                    );
 
-                    let _ = save_session(&new_session, None);
-                    session.set(new_session);
-
-                    // Carregar caixas e mensagens iniciais
-                    if let Ok(boxes) = client.list_mailboxes(&token_resp.token).await {
-                        mailboxes.set(boxes);
-                    }
-                    current_mailbox.set("INBOX".to_string());
-                    if let Ok(msgs) = client
-                        .list_messages(&token_resp.token, "INBOX", Some(50), Some(0))
-                        .await
-                    {
-                        messages.set(msgs);
-                    }
+                    let _ = save_session(&post_login.session, None);
+                    current_mailbox.set(post_login.initial_mailbox);
+                    session.set(post_login.session);
 
                     is_loading.set(false);
-                    screen.set(Screen::Inbox);
+                    screen.set(post_login.target_screen);
                 }
                 Err(err) => {
                     is_loading.set(false);

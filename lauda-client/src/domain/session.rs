@@ -2,6 +2,37 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::ui::state::Screen;
+
+/// Estado preparado para transição instantânea e desacoplada pós-login.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PostLoginState {
+    pub session: SessionConfig,
+    pub initial_mailbox: String,
+    pub target_screen: Screen,
+    pub blocking_mailbox_fetch: bool,
+    pub blocking_messages_fetch: bool,
+}
+
+/// Prepara o estado da sessão e navegação imediata pós-login sem bloqueio de rede.
+pub fn prepare_post_login_state(
+    server_url: String,
+    username: String,
+    token: String,
+) -> PostLoginState {
+    PostLoginState {
+        session: SessionConfig {
+            server_url,
+            username,
+            token: Some(token),
+        },
+        initial_mailbox: "INBOX".to_string(),
+        target_screen: Screen::Inbox,
+        blocking_mailbox_fetch: false,
+        blocking_messages_fetch: false,
+    }
+}
+
 /// Configuração persistida de sessão local do Lauda.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct SessionConfig {

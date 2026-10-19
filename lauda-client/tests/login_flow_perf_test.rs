@@ -1,4 +1,4 @@
-use lauda_client::domain::session::{SessionConfig, prepare_post_login_state};
+use lauda_client::domain::session::prepare_post_login_state;
 use lauda_client::ui::state::Screen;
 
 #[test]

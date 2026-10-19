@@ -400,6 +400,8 @@ pub fn InboxView(
                                 "{hint_msg}"
                             } else if is_searching {
                                 "Nenhuma mensagem encontrada para \"{query_str}\" nos filtros ativos."
+                            } else if messages.read().is_empty() {
+                                "⌛ SINCRONIZANDO OU NENHUMA MENSAGEM NA CAIXA..."
                             } else {
                                 "Nenhuma mensagem corresponde aos filtros ativos."
                             }

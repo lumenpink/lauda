@@ -2,7 +2,7 @@
 
 **ID do Ticket:** #81  
 **Norma:** GOST 1.4.0 (DD-TDD)  
-**Status:** Em Andamento (Fase 3: Spec)  
+**Status:** Concluído (Fase 8: Quality Gate)  
 **Responsável:** Lumen Pink / Antigravity  
 
 ---
@@ -29,7 +29,7 @@ Essa abordagem causava retenção perceptível da tela de login, atrasando a nav
 - O ciclo reativo de SWR em segundo plano (em `ui/mod.rs`) e/ou rotinas assíncronas em background assumem a sincronização de envelopes e caixas, preenchendo a interface à medida que os dados chegam.
 
 ### 2.3. Indicador de Carregamento na Caixa de Entrada
-- Caso a `InboxView` seja exibida com a lista de mensagens vazia enquanto a primeira sincronização ocorre, a interface deve exibir um indicador claro e leve de carregamento (`"CARREGANDO CAIXA DE ENTRADA..."`), mantendo menus e botões operacionais.
+- Caso a `InboxView` seja exibida com a lista de mensagens vazia enquanto a primeira sincronização ocorre, a interface exibe um indicador claro e leve de carregamento (`"⌛ SINCRONIZANDO OU NENHUMA MENSAGEM NA CAIXA..."`), mantendo menus e botões operacionais.
 
 ---
 
@@ -47,9 +47,9 @@ Essa abordagem causava retenção perceptível da tela de login, atrasando a nav
 - [x] **Fase 1 (Ticket):** Ticket #81 formalizado e delimitado.
 - [x] **Fase 2 (Branch):** Branch `perf/81-login-initial-load-optimization` criada a partir da `main`.
 - [x] **Fase 3 (Spec):** Especificação técnica formalizada neste documento.
-- [ ] **Fase 4 (Red Test):** Teste comprovando a latência ou o bloqueio sequencial indevido no fluxo de login.
-- [ ] **Fase 5 (Green Implement):** Desacoplamento do login e transição imediata para Inbox.
-- [ ] **Fase 6 (Refactor):** Código idiomático, tipado e com zero warnings.
-- [ ] **Fase 7 (Mutation Test):** Asserções verificando sensibilidade à reintrodução de chamadas bloqueantes.
-- [ ] **Fase 8 (Quality Gate):** Validação com `cargo fmt --check`, `cargo clippy` e suíte de testes.
+- [x] **Fase 4 (Red Test):** Teste comprovando a latência ou o bloqueio sequencial indevido no fluxo de login.
+- [x] **Fase 5 (Green Implement):** Desacoplamento do login e transição imediata para Inbox.
+- [x] **Fase 6 (Refactor):** Código idiomático, tipado e com zero warnings.
+- [x] **Fase 7 (Mutation Test):** Asserções verificando sensibilidade à reintrodução de chamadas bloqueantes.
+- [x] **Fase 8 (Quality Gate):** Validação com `cargo fmt --check`, `cargo clippy` e suíte de testes.
 - [ ] **Fase 9 (Finish & Close):** Reconciliação, merge via CCCP e fechamento do ticket.
