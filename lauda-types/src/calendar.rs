@@ -1398,6 +1398,12 @@ impl CalendarIntentParser {
                     };
                     specific_date = Some((year_val, month_val, day_val));
                     consumed_indices.push(i);
+                    if i > 0 && !consumed_indices.contains(&(i - 1)) {
+                        let prev = tokens[i - 1].to_lowercase();
+                        if prev == "em" || prev == "no" || prev == "na" || prev == "para" || prev == "pra" {
+                            consumed_indices.push(i - 1);
+                        }
+                    }
                     continue;
                 }
             }
@@ -1582,6 +1588,12 @@ impl CalendarIntentParser {
 
                             for k in i..(next_pos + extra_consumed) {
                                 consumed_indices.push(k);
+                            }
+                            if i > 0 && !consumed_indices.contains(&(i - 1)) {
+                                let prev = tokens[i - 1].to_lowercase();
+                                if prev == "às" || prev == "as" || prev == "a" || prev == "à" {
+                                    consumed_indices.push(i - 1);
+                                }
                             }
                             break;
                         }
@@ -1790,12 +1802,29 @@ impl CalendarIntentParser {
                     continue;
                 }
                 let t_lower = tokens[i].to_lowercase();
-                if (t_lower == "às" || t_lower == "as") && i + 1 < tokens.len() {
+                if (t_lower == "para" || t_lower == "pra")
+                    && i + 2 < tokens.len()
+                    && (tokens[i + 1].to_lowercase() == "às" || tokens[i + 1].to_lowercase() == "as")
+                {
+                    if let Some((h, m)) = parse_time_token(tokens[i + 2]) {
+                        start_hour = Some(h);
+                        start_min = m;
+                        is_all_day = false;
+                        consumed_indices.extend_from_slice(&[i, i + 1, i + 2]);
+                        break;
+                    }
+                } else if (t_lower == "às" || t_lower == "as") && i + 1 < tokens.len() {
                     if let Some((h, m)) = parse_time_token(tokens[i + 1]) {
                         start_hour = Some(h);
                         start_min = m;
                         is_all_day = false;
                         consumed_indices.extend_from_slice(&[i, i + 1]);
+                        if i > 0 && !consumed_indices.contains(&(i - 1)) {
+                            let prev = tokens[i - 1].to_lowercase();
+                            if prev == "para" || prev == "pra" {
+                                consumed_indices.push(i - 1);
+                            }
+                        }
                         break;
                     }
                 } else if let Some((h, m)) = parse_time_token(tokens[i]) {
@@ -1935,12 +1964,39 @@ impl CalendarIntentParser {
             summary_tokens.push(*token);
         }
 
+        // Poda de conectores e preposições temporais órfãs nas extremidades (cauda e cabeça)
+        while let Some(last) = summary_tokens.last() {
+            let trimmed_punct = last.trim_matches(|c: char| !c.is_alphanumeric());
+            if trimmed_punct.is_empty() || is_boundary_connector_token(last) {
+                summary_tokens.pop();
+            } else {
+                break;
+            }
+        }
+
+        while let Some(first) = summary_tokens.first() {
+            let trimmed_punct = first.trim_matches(|c: char| !c.is_alphanumeric());
+            if trimmed_punct.is_empty() || is_boundary_connector_token(first) {
+                summary_tokens.remove(0);
+            } else {
+                break;
+            }
+        }
+
         let summary_raw = if summary_tokens.is_empty() {
             "Novo Evento".to_string()
         } else {
             summary_tokens.join(" ")
         };
-        let summary = restore_literals(&summary_raw, &literals);
+        let mut summary = restore_literals(&summary_raw, &literals);
+        summary = summary
+            .trim()
+            .trim_matches(|c: char| c == '-' || c == ':' || c == ',' || c == ';')
+            .trim()
+            .to_string();
+        if summary.is_empty() {
+            summary = "Novo Evento".to_string();
+        }
         if let Some(loc) = location.as_mut() {
             *loc = restore_literals(loc, &literals);
         }
@@ -2096,6 +2152,49 @@ fn restore_literals(text: &str, literals: &[String]) -> String {
         res = res.replace(&placeholder, lit);
     }
     res
+}
+
+fn is_boundary_connector_token(token: &str) -> bool {
+    let clean = token.trim().to_lowercase();
+    let clean = clean.trim_matches(|c: char| !c.is_alphanumeric());
+    let normalized = clean
+        .replace('à', "a")
+        .replace('á', "a")
+        .replace('é', "e")
+        .replace('ê', "e")
+        .replace('í', "i")
+        .replace('ó', "o")
+        .replace('õ', "o")
+        .replace('ú', "u")
+        .replace('ç', "c");
+
+    matches!(
+        normalized.as_str(),
+        "as" | "a"
+            | "ao"
+            | "aos"
+            | "em"
+            | "no"
+            | "na"
+            | "nos"
+            | "nas"
+            | "para"
+            | "pra"
+            | "pro"
+            | "pras"
+            | "pros"
+            | "de"
+            | "do"
+            | "da"
+            | "dos"
+            | "das"
+            | "pelo"
+            | "pela"
+            | "pelos"
+            | "pelas"
+            | "ate"
+            | "com"
+    )
 }
 
 fn parse_word_number(word: &str) -> Option<u32> {
