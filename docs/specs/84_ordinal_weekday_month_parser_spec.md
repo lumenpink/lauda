@@ -51,11 +51,11 @@ No laço de reconhecimento de datas de `ParsedCalendarIntent::parse_colloquial`:
 
 ## 3. Critérios de Aceitação
 
-- [ ] "primeiro domingo de novembro" em 2026 resolve para 01/11/2026.
-- [ ] "segunda terça de outubro" em 2026 resolve para 13/10/2026.
-- [ ] "última sexta de dezembro" em 2026 resolve para 25/12/2026.
-- [ ] Formas com acento ("último", "terça", "sábado") e sem acento ("ultimo", "terca", "sabado") funcionam igualmente.
-- [ ] Todos os tokens da expressão de data são consumidos, não vazando para o título do evento.
+- [x] "primeiro domingo de novembro" em 2026 resolve para 01/11/2026.
+- [x] "segunda terça de outubro" em 2026 resolve para 13/10/2026.
+- [x] "última sexta de dezembro" em 2026 resolve para 25/12/2026.
+- [x] Formas com acento ("último", "terça", "sábado") e sem acento ("ultimo", "terca", "sabado") funcionam igualmente.
+- [x] Todos os tokens da expressão de data são consumidos, não vazando para o título do evento.
 
 ---
 
@@ -64,9 +64,9 @@ No laço de reconhecimento de datas de `ParsedCalendarIntent::parse_colloquial`:
 - [x] **Fase 1 - Ticket:** Issue #84 delimitada no Codeberg e sincronizada.
 - [x] **Fase 2 - Branch:** Branch `fix/84-ordinal-weekday-month-parser` criada a partir de `main`.
 - [x] **Fase 3 - Doc/Spec:** Especificação técnica preliminar registrada (Zero código de produção).
-- [ ] **Fase 4 - Red:** Testes automatizados falhos comprovando a falta de suporte a ordinais de dias da semana no mês.
-- [ ] **Fase 5 - Green:** Implementação funcional com testes passando.
-- [ ] **Fase 6 - Refactor:** Código idiomático e zero warnings.
-- [ ] **Fase 7 - Mutation:** Validação de ordinais de borda (ex: 5º dia inexistente, anos bissextos).
-- [ ] **Fase 8 - Quality Gate:** Validação incremental com `cargo fmt --check`, `cargo clippy` e `cargo test`.
-- [ ] **Fase 9 - Close:** Atualização de documentação, changelog e merge.
+- [x] **Fase 4 - Red:** Testes automatizados falhos comprovando a falta de suporte a ordinais de dias da semana no mês.
+- [x] **Fase 5 - Green:** Implementação funcional com testes passando.
+- [x] **Fase 6 - Refactor:** Código idiomático e zero warnings.
+- [x] **Fase 7 - Mutation:** Validação de ordinais de borda (ex: 5º dia inexistente, anos bissextos).
+- [x] **Fase 8 - Quality Gate:** Validação incremental com `cargo fmt --check`, `cargo clippy` e `cargo test`.
+- [x] **Fase 9 - Close:** Atualização de documentação, changelog e merge.
