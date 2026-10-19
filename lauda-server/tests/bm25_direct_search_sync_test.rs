@@ -291,3 +291,94 @@ async fn test_search_api_returns_sync_status_headers_and_payload() {
     assert_eq!(result.messages[0].uid, 101);
     assert_eq!(result.sync_status.total_count, 5);
 }
+
+#[test]
+fn test_mutation_resilience_sync_and_bm25_bounds() {
+    // 1. Mutantes de MailboxSyncStatus
+    let st_overflow = lauda_types::MailboxSyncStatus::new(10, 5);
+    assert!(st_overflow.is_synced);
+    assert_eq!(st_overflow.remaining_count, 0);
+
+    let st_zero = lauda_types::MailboxSyncStatus::new(0, 0);
+    assert!(st_zero.is_synced);
+    assert_eq!(st_zero.remaining_count, 0);
+
+    let st_off_by_one = lauda_types::MailboxSyncStatus::new(4, 5);
+    assert!(!st_off_by_one.is_synced);
+    assert_eq!(st_off_by_one.remaining_count, 1);
+
+    // 2. Mutantes de busca BM25 no SQLite
+    let temp = tempdir().expect("tempdir");
+    let db_path = temp.path().join("mutation_search.db");
+    let store = SqliteIndexStore::open(&db_path).expect("abrir sqlite index");
+
+    let mut index = MessageIndex::new();
+    let provider = SimpleCpuEmbeddingProvider;
+
+    let msg_a = Message {
+        envelope: MessageEnvelope {
+            uid: 1,
+            subject: "Contrato Renovado".to_string(),
+            sender: "juridico@firma.com".to_string(),
+            date: "2026-10-15T12:00:00Z".to_string(),
+            cc: None,
+            has_attachments: false,
+            is_read: true,
+            is_flagged: false,
+            crypto_meta: None,
+        },
+        attachments: vec![],
+        txt_auto: Some("O contrato de prestacao de servicos foi devidamente renovado.".to_string()),
+        txt_original: None,
+        html_sanitized: None,
+    };
+
+    let msg_b = Message {
+        envelope: MessageEnvelope {
+            uid: 2,
+            subject: "Contrato e mais contrato".to_string(),
+            sender: "contabilidade@firma.com".to_string(),
+            date: "2026-10-16T12:00:00Z".to_string(),
+            cc: None,
+            has_attachments: false,
+            is_read: true,
+            is_flagged: false,
+            crypto_meta: None,
+        },
+        attachments: vec![],
+        txt_auto: Some("Novo contrato assinado. Detalhes do contrato anexados.".to_string()),
+        txt_original: None,
+        html_sanitized: None,
+    };
+
+    index.index_message_semantic("INBOX", &msg_a, &provider);
+    index.index_message_semantic("INBOX", &msg_b, &provider);
+
+    for doc in index.documents().values() {
+        store
+            .save_document("INBOX", doc, 1000)
+            .expect("salvar documento");
+    }
+
+    // Normalização com acentuação e maiúsculas: "CONTRATO!"
+    let results_upper = store
+        .search_bm25("INBOX", "CONTRATO!", 10)
+        .expect("busca com acento e caixa alta");
+    assert_eq!(results_upper.len(), 2);
+    // msg_b possui maior frequência do termo 'contrato'
+    assert_eq!(results_upper[0].uid, 2);
+    assert_eq!(results_upper[1].uid, 1);
+
+    // Respeito ao limitador
+    let results_limit = store
+        .search_bm25("INBOX", "contrato", 1)
+        .expect("busca com limit=1");
+    assert_eq!(results_limit.len(), 1);
+    assert_eq!(results_limit[0].uid, 2);
+
+    // Query puramente pontuação e espaços não deve quebrar SQL nem retornar erro
+    let results_punct = store
+        .search_bm25("INBOX", "   ... ,,, !?  ", 10)
+        .expect("busca pontuação pura");
+    assert!(results_punct.is_empty());
+}
