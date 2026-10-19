@@ -161,3 +161,84 @@ fn test_dynamic_embedding_provider_fallback() {
     let vec = dynamic.embed_query("teste de query de fallback");
     assert_eq!(vec.len(), 384);
 }
+
+#[derive(Debug, Default, Clone)]
+struct RecordingProvider {
+    last_text: std::sync::Arc<std::sync::Mutex<String>>,
+}
+
+impl EmbeddingProvider for RecordingProvider {
+    fn embed(&self, text: &str) -> Vec<f32> {
+        let mut last = self.last_text.lock().unwrap();
+        *last = text.to_string();
+        vec![0.0f32; 384]
+    }
+}
+
+#[test]
+fn test_mutation_e5_prefix_strict_verification() {
+    let recorder = RecordingProvider::default();
+    let recorder_ref = recorder.last_text.clone();
+    let provider = E5InstructionProvider::new(recorder);
+
+    assert!(provider.inner().last_text.lock().is_ok());
+
+    let _ = provider.embed_query("  termo de busca  ");
+    assert_eq!(*recorder_ref.lock().unwrap(), "query: termo de busca");
+
+    let _ = provider.embed_passage("  parágrafo do corpo  ");
+    assert_eq!(*recorder_ref.lock().unwrap(), "passage: parágrafo do corpo");
+
+    let _ = provider.embed("texto neutro");
+    assert_eq!(*recorder_ref.lock().unwrap(), "texto neutro");
+}
+
+#[test]
+fn test_mutation_hybrid_search_bm25_fails_while_semantic_succeeds() {
+    let base = MockSemanticNeuralProvider;
+    let provider = E5InstructionProvider::new(base);
+    let mut index = MessageIndex::new();
+
+    let msg = Message {
+        envelope: MessageEnvelope {
+            uid: 301,
+            subject: "Avaliação substitutiva".to_string(),
+            sender: "Dra. Docente <prof@faculdade.br>".to_string(),
+            date: "2026-10-18".to_string(),
+            is_read: true,
+            is_flagged: false,
+            has_attachments: false,
+            ..Default::default()
+        },
+        txt_auto: Some("Reposição da prova para alunos ausentes.".to_string()),
+        txt_original: None,
+        html_sanitized: None,
+        attachments: vec![],
+    };
+
+    index.index_message_semantic("INBOX", &msg, &provider);
+
+    let query = "segunda chamada";
+
+    // 1. Quando alpha = 1.0 (BM25 puro): Não encontra, pois "segunda chamada" não existe no texto
+    let bm25_results = index.search_hybrid(query, &provider, 1.0);
+    assert!(
+        bm25_results.is_empty(),
+        "BM25 puro não deve encontrar e-mail sem correspondência de termos"
+    );
+
+    // 2. Quando alpha = 0.0 (Semântico puro): Encontra com pontuação expressiva
+    let sem_results = index.search_hybrid(query, &provider, 0.0);
+    assert!(
+        !sem_results.is_empty(),
+        "Busca semântica deve encontrar o conceito de substitutiva/reposição"
+    );
+    assert_eq!(sem_results[0].uid, 301);
+    assert!(sem_results[0].semantic_score > 0.60);
+
+    // 3. Quando alpha = 0.5 (Híbrido ponderado): O ranking semântico sustenta o resultado
+    let hybrid_results = index.search_hybrid(query, &provider, 0.5);
+    assert!(!hybrid_results.is_empty());
+    assert_eq!(hybrid_results[0].uid, 301);
+    assert!(hybrid_results[0].score > 0.30);
+}
