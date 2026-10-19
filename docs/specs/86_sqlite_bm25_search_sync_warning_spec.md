@@ -2,7 +2,7 @@
 
 **ID do Ticket:** #86  
 **Norma:** GOST 1.4.0 (DD-TDD)  
-**Status:** Especificação (Fase 3: Doc/Spec)  
+**Status:** Concluído (Fase 8: Quality Gate)  
 **Responsável:** Lumen Pink / Antigravity  
 
 ---
@@ -95,9 +95,9 @@ O objetivo deste ticket é viabilizar a busca BM25 ultrarrápida direta via SQL 
 - [x] **Fase 1 (Ticket):** Ticket #86 formalizado e sincronizado.
 - [x] **Fase 2 (Branch):** Branch `feat/86-sqlite-bm25-search-sync-warning` criada a partir da `main`.
 - [x] **Fase 3 (Spec):** Especificação técnica formalizada neste documento.
-- [ ] **Fase 4 (Red Test):** Testes unitários falhos para busca BM25 direta no SQLite e cálculo de `sync_status`.
-- [ ] **Fase 5 (Green Implement):** Implementação da busca SQL BM25, cálculo de sincronização, desacoplamento e exibição na UI.
-- [ ] **Fase 6 (Refactor):** Código limpo, modular, com zero warnings e documentação integrada.
-- [ ] **Fase 7 (Mutation Test):** Verificação de robustez contra mutantes de pontuação, cálculo residual e ordenação.
-- [ ] **Fase 8 (Quality Gate):** Validação com `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e testes direcionados.
+- [x] **Fase 4 (Red Test):** Testes unitários falhos para busca BM25 direta no SQLite e cálculo de `sync_status`.
+- [x] **Fase 5 (Green Implement):** Implementação da busca SQL BM25, cálculo de sincronização, desacoplamento e exibição na UI.
+- [x] **Fase 6 (Refactor):** Código limpo, modular, com zero warnings e documentação integrada.
+- [x] **Fase 7 (Mutation Test):** Verificação de robustez contra mutantes de pontuação, cálculo residual e ordenação.
+- [x] **Fase 8 (Quality Gate):** Validação com `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e testes direcionados.
 - [ ] **Fase 9 (Finish & Close):** Commit de encerramento (`closes #86`), merge e deploy.
