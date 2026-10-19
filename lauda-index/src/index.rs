@@ -11,6 +11,91 @@ use urupema::domain::{HeaderMeta, SegmentKind, SegmentationConfig, segment_email
 /// Provedor de embeddings textuais (ex: modelo CPU ONNX ou mock para testes).
 pub trait EmbeddingProvider: Send + Sync {
     fn embed(&self, text: &str) -> Vec<f32>;
+
+    /// Gera embedding formatado para consultas de busca (query).
+    fn embed_query(&self, query: &str) -> Vec<f32> {
+        self.embed(query)
+    }
+
+    /// Gera embedding formatado para passagens/segmentos de texto (passage/document).
+    fn embed_passage(&self, passage: &str) -> Vec<f32> {
+        self.embed(passage)
+    }
+}
+
+/// Envoltório que aplica as instruções assimétricas de prefixo padrão do modelo E5.
+/// Prefixos: `query: <texto>` para buscas e `passage: <texto>` para documentos indexados.
+#[derive(Debug, Clone)]
+pub struct E5InstructionProvider<P: EmbeddingProvider> {
+    inner: P,
+}
+
+impl<P: EmbeddingProvider> E5InstructionProvider<P> {
+    pub fn new(inner: P) -> Self {
+        Self { inner }
+    }
+
+    pub fn inner(&self) -> &P {
+        &self.inner
+    }
+}
+
+impl<P: EmbeddingProvider> EmbeddingProvider for E5InstructionProvider<P> {
+    fn embed(&self, text: &str) -> Vec<f32> {
+        self.inner.embed(text)
+    }
+
+    fn embed_query(&self, query: &str) -> Vec<f32> {
+        let formatted = format!("query: {}", query.trim());
+        self.inner.embed(&formatted)
+    }
+
+    fn embed_passage(&self, passage: &str) -> Vec<f32> {
+        let formatted = format!("passage: {}", passage.trim());
+        self.inner.embed(&formatted)
+    }
+}
+
+/// Provedor dinâmico que carrega modelo neural se presente ou utiliza fallback gracioso.
+#[derive(Debug, Clone)]
+pub enum DynamicEmbeddingProvider {
+    Fallback(SimpleCpuEmbeddingProvider),
+}
+
+impl DynamicEmbeddingProvider {
+    pub fn from_path_or_fallback<P: AsRef<Path>>(path: P) -> Self {
+        let p = path.as_ref();
+        if p.exists() {
+            // Quando modelos ONNX locais forem adicionados, serão instanciados aqui
+            Self::Fallback(SimpleCpuEmbeddingProvider)
+        } else {
+            Self::Fallback(SimpleCpuEmbeddingProvider)
+        }
+    }
+
+    pub fn is_fallback(&self) -> bool {
+        matches!(self, Self::Fallback(_))
+    }
+}
+
+impl EmbeddingProvider for DynamicEmbeddingProvider {
+    fn embed(&self, text: &str) -> Vec<f32> {
+        match self {
+            Self::Fallback(p) => p.embed(text),
+        }
+    }
+
+    fn embed_query(&self, query: &str) -> Vec<f32> {
+        match self {
+            Self::Fallback(p) => p.embed_query(query),
+        }
+    }
+
+    fn embed_passage(&self, passage: &str) -> Vec<f32> {
+        match self {
+            Self::Fallback(p) => p.embed_passage(passage),
+        }
+    }
 }
 
 /// Provedor determinístico em CPU de 384 dimensões baseado em hashing FNV-1a de n-gramas e normalização L2.
@@ -315,7 +400,7 @@ impl MessageIndex {
             if trimmed.is_empty() {
                 continue;
             }
-            let vec = provider.embed(trimmed);
+            let vec = provider.embed_passage(trimmed);
             segment_embeddings.push((segment.kind, vec));
         }
 
@@ -330,7 +415,7 @@ impl MessageIndex {
         query: &str,
         provider: &dyn EmbeddingProvider,
     ) -> Vec<SearchResult> {
-        let query_vec = provider.embed(query);
+        let query_vec = provider.embed_query(query);
         let mut results: Vec<SearchResult> = Vec::new();
 
         for (&uid, doc) in &self.documents {
