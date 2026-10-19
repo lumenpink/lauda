@@ -21,7 +21,8 @@ pub use auth::{LoginRequest, TokenResponse};
 pub use calendar::{
     CalendarError, CalendarEvent, CalendarIntentParser, CalendarReferenceTime, EventAttendee,
     EventStatus, EventTime, ItipMethod, ParsedCalendarIntent, RecurrenceFreq, RecurrenceRule,
-    RsvpStatus, Weekday, generate_itip_payload,
+    RsvpStatus, Weekday, format_event_datetime_chip, format_intent_date_chip,
+    format_intent_datetime_chip, format_intent_time_chip, generate_itip_payload,
 };
 pub use compose::{AttachmentUpload, ComposeForm};
 pub use contact::{ContactEntry, ContactInfo, ContactSyncRequest, ContactSyncResponse};

@@ -796,6 +796,95 @@ pub fn format_event_datetime_chip(event: &CalendarEvent) -> String {
     }
 }
 
+/// Formata a data de calendário processada do intent para exibição em chip (DD/MM/YYYY).
+pub fn format_intent_date_chip(intent: &ParsedCalendarIntent) -> String {
+    match (&intent.start, &intent.end) {
+        (
+            EventTime::DateOnly {
+                year: y1,
+                month: m1,
+                day: d1,
+            },
+            EventTime::DateOnly {
+                year: y2,
+                month: m2,
+                day: d2,
+            },
+        ) => {
+            if y1 == y2 && m1 == m2 && d1 == d2 {
+                format!("{d1:02}/{m1:02}/{y1}")
+            } else {
+                format!("{d1:02}/{m1:02}/{y1} → {d2:02}/{m2:02}/{y2}")
+            }
+        }
+        (EventTime::DateOnly { year, month, day }, _) => {
+            format!("{day:02}/{month:02}/{year}")
+        }
+        (EventTime::DateTimeUtc(start_ts), EventTime::DateTimeUtc(end_ts)) => {
+            let (y1, m1, d1, _, _, _) = timestamp_to_utc_parts(*start_ts);
+            let (y2, m2, d2, _, _, _) = timestamp_to_utc_parts(*end_ts);
+            if y1 == y2 && m1 == m2 && d1 == d2 {
+                format!("{d1:02}/{m1:02}/{y1}")
+            } else {
+                format!("{d1:02}/{m1:02}/{y1} → {d2:02}/{m2:02}/{y2}")
+            }
+        }
+        (EventTime::DateTimeUtc(start_ts), _) => {
+            let (y1, m1, d1, _, _, _) = timestamp_to_utc_parts(*start_ts);
+            format!("{d1:02}/{m1:02}/{y1}")
+        }
+    }
+}
+
+/// Formata o horário processado do intent para exibição em chip (HH:MM - HH:MM ou Dia inteiro).
+pub fn format_intent_time_chip(intent: &ParsedCalendarIntent) -> String {
+    if intent.is_all_day {
+        return "Dia inteiro".to_string();
+    }
+    match (&intent.start, &intent.end) {
+        (EventTime::DateTimeUtc(start_ts), EventTime::DateTimeUtc(end_ts)) => {
+            let (y1, m1, d1, h1, min1, _) = timestamp_to_utc_parts(*start_ts);
+            let (y2, m2, d2, h2, min2, _) = timestamp_to_utc_parts(*end_ts);
+            if y1 == y2 && m1 == m2 && d1 == d2 {
+                format!("{h1:02}:{min1:02} - {h2:02}:{min2:02}")
+            } else {
+                format!("{h1:02}:{min1:02} → {h2:02}:{min2:02}")
+            }
+        }
+        (EventTime::DateTimeUtc(start_ts), _) => {
+            let (_, _, _, h1, min1, _) = timestamp_to_utc_parts(*start_ts);
+            format!("{h1:02}:{min1:02}")
+        }
+        _ => "Dia inteiro".to_string(),
+    }
+}
+
+/// Formata a data e horário completos do intent para exibição unificada em chips.
+pub fn format_intent_datetime_chip(intent: &ParsedCalendarIntent) -> String {
+    let date_str = format_intent_date_chip(intent);
+    if intent.is_all_day {
+        return format!("{date_str} (Dia inteiro)");
+    }
+    match (&intent.start, &intent.end) {
+        (EventTime::DateTimeUtc(start_ts), EventTime::DateTimeUtc(end_ts)) => {
+            let (y1, m1, d1, h1, min1, _) = timestamp_to_utc_parts(*start_ts);
+            let (y2, m2, d2, h2, min2, _) = timestamp_to_utc_parts(*end_ts);
+            if y1 == y2 && m1 == m2 && d1 == d2 {
+                format!("{d1:02}/{m1:02}/{y1} · {h1:02}:{min1:02} - {h2:02}:{min2:02}")
+            } else {
+                format!(
+                    "{d1:02}/{m1:02}/{y1} {h1:02}:{min1:02} → {d2:02}/{m2:02}/{y2} {h2:02}:{min2:02}"
+                )
+            }
+        }
+        (EventTime::DateTimeUtc(start_ts), _) => {
+            let (y1, m1, d1, h1, min1, _) = timestamp_to_utc_parts(*start_ts);
+            format!("{d1:02}/{m1:02}/{y1} às {h1:02}:{min1:02}")
+        }
+        _ => format!("{date_str} (Dia inteiro)"),
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CalendarReferenceTime {
     pub year: i32,
