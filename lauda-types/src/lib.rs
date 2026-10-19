@@ -27,7 +27,7 @@ pub use calendar::{
 pub use compose::{AttachmentUpload, ComposeForm};
 pub use contact::{ContactEntry, ContactInfo, ContactSyncRequest, ContactSyncResponse};
 pub use mailbox::MailboxInfo;
-pub use message::{AttachmentMeta, Message, MessageEnvelope, ViewMode};
+pub use message::{AttachmentMeta, MailboxSyncStatus, Message, MessageEnvelope, SearchResult, ViewMode};
 pub use phone::{NormalizedPhone, PhoneError, PhoneKind, PhoneNormalizer};
 pub use sieve::{
     ConditionField, MatchType, SieveAction, SieveCondition, SieveRule, SieveScriptBundle,

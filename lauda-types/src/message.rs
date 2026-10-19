@@ -316,3 +316,40 @@ pub fn clean_ishcondidim_preamble_html(html: &str) -> (String, Option<CryptoMeta
 
     (html.to_string(), None)
 }
+
+/// Status de sincronização da caixa postal com o índice de busca.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct MailboxSyncStatus {
+    /// Indica se 100% dos e-mails da caixa postal já foram indexados.
+    pub is_synced: bool,
+    /// Quantidade de mensagens indexadas no banco local/remoto.
+    pub indexed_count: u64,
+    /// Quantidade total de mensagens na caixa postal física/remota.
+    pub total_count: u64,
+    /// Quantidade de mensagens pendentes de indexação.
+    pub remaining_count: u64,
+}
+
+impl MailboxSyncStatus {
+    /// Construtor calculando o estado de sincronização e itens pendentes.
+    pub fn new(indexed_count: u64, total_count: u64) -> Self {
+        let is_synced = indexed_count >= total_count;
+        let remaining_count = total_count.saturating_sub(indexed_count);
+        Self {
+            is_synced,
+            indexed_count,
+            total_count,
+            remaining_count,
+        }
+    }
+}
+
+/// Resultado estruturado de busca de mensagens com transparência de sincronização.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct SearchResult {
+    /// Lista de mensagens encontradas ranqueadas por relevância.
+    pub messages: Vec<MessageEnvelope>,
+    /// Metadados de sincronização do índice da caixa consultada.
+    pub sync_status: MailboxSyncStatus,
+}
+
