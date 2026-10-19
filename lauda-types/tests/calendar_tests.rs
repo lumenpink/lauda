@@ -576,3 +576,35 @@ fn test_parse_ordinal_weekday_month_expressions() {
         panic!("esperava DateOnly para último sábado de janeiro");
     }
 }
+
+#[test]
+fn test_sanitize_temporal_connectors_from_summary() {
+    let ref_time = sample_ref_time();
+
+    // 1. "Reunião primeiro domingo de novembro às 15 pra quatro"
+    let p1 = CalendarIntentParser::parse(
+        "Reunião primeiro domingo de novembro às 15 pra quatro",
+        &ref_time,
+    )
+    .expect("deveria interpretar evento com às");
+    assert_eq!(p1.summary, "Reunião");
+
+    // 2. Sem acento no conector: "Reunião primeiro domingo de novembro as 15 pra quatro"
+    let p2 = CalendarIntentParser::parse(
+        "Reunião primeiro domingo de novembro as 15 pra quatro",
+        &ref_time,
+    )
+    .expect("deveria interpretar evento com 'as' sem acento");
+    assert_eq!(p2.summary, "Reunião");
+
+    // 3. Conectores no final: "Almoço de negócios amanhã para as 13h"
+    let p3 = CalendarIntentParser::parse("Almoço de negócios amanhã para as 13h", &ref_time)
+        .expect("deveria interpretar almoço de negócios");
+    assert_eq!(p3.summary, "Almoço de negócios");
+
+    // 4. Preposição 'em' e 'às': "Consulta médica em 15/11 às 10h"
+    let p4 = CalendarIntentParser::parse("Consulta médica em 15/11 às 10h", &ref_time)
+        .expect("deveria interpretar consulta médica");
+    assert_eq!(p4.summary, "Consulta médica");
+}
+
