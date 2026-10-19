@@ -2,7 +2,7 @@
 
 **ID do Ticket:** #80  
 **Norma:** GOST 1.4.0 (DD-TDD)  
-**Status:** Em Andamento (Fase 3: Spec)  
+**Status:** Concluído (Fase 9)  
 **Responsável:** Lumen Pink / Antigravity  
 
 ---
@@ -62,9 +62,9 @@ Sem contenção estrita (`min-width: 0`, `max-width: 100%`, `overflow-x: auto`, 
 - [x] **Fase 1 (Ticket):** Ticket #80 aberto no Codeberg.
 - [x] **Fase 2 (Branch):** Branch `fix/80-message-view-layout-overflow` criada a partir da `main`.
 - [x] **Fase 3 (Spec):** Especificação técnica formalizada neste documento.
-- [ ] **Fase 4 (Red Test):** Teste de layout falhando contra a implementação atual (ausência de regras de contenção).
-- [ ] **Fase 5 (Green Implement):** Aplicação das regras de contenção e testes passando verde.
-- [ ] **Fase 6 (Refactor):** Otimização e limpeza visual sem warnings.
-- [ ] **Fase 7 (Mutation Test):** Testes de mutação verificando sensibilidade à remoção de regras de contenção.
-- [ ] **Fase 8 (Quality Gate):** Validação com `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `cargo test`.
-- [ ] **Fase 9 (Finish & Close):** Reconciliação, merge via CCCP e fechamento do ticket.
+- [x] **Fase 4 (Red Test):** Teste de layout falhando contra a implementação anterior (`message_layout_containment_test.rs`).
+- [x] **Fase 5 (Green Implement):** Aplicação das regras de contenção e testes passando verde.
+- [x] **Fase 6 (Refactor):** Otimização e limpeza visual sem warnings via `cargo fmt`.
+- [x] **Fase 7 (Mutation Test):** Testes de mutação verificando sensibilidade à remoção de regras de contenção.
+- [x] **Fase 8 (Quality Gate):** Validação com `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `cargo test`.
+- [x] **Fase 9 (Finish & Close):** Reconciliação, merge via CCCP e fechamento do ticket.
