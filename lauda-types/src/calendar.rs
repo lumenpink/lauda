@@ -1005,43 +1005,44 @@ impl CalendarIntentParser {
             if consumed_indices.contains(&i) {
                 continue;
             }
-            if let Some(ord) = parse_ordinal_token(tokens[i]) {
-                if i + 1 < tokens.len()
-                    && let Some(target_wd) = parse_weekday_token(tokens[i + 1])
+            if let Some(ord) = parse_ordinal_token(tokens[i])
+                && i + 1 < tokens.len()
+                && let Some(target_wd) = parse_weekday_token(tokens[i + 1])
+            {
+                let mut m_idx = i + 2;
+                if m_idx < tokens.len() && tokens[m_idx].to_lowercase() == "de" {
+                    m_idx += 1;
+                }
+                if m_idx < tokens.len()
+                    && let Some(m) = parse_month_token(tokens[m_idx])
                 {
-                    let mut m_idx = i + 2;
-                    if m_idx < tokens.len() && tokens[m_idx].to_lowercase() == "de" {
-                        m_idx += 1;
-                    }
-                    if m_idx < tokens.len()
-                        && let Some(m) = parse_month_token(tokens[m_idx])
-                    {
-                        let mut y = ref_time.year;
-                        if let Some(d) = resolve_ordinal_weekday_in_month(y, m, target_wd, ord) {
-                            if (m, d) < (ref_time.month, ref_time.day) {
-                                y += 1;
-                                if let Some(d_next) = resolve_ordinal_weekday_in_month(y, m, target_wd, ord) {
-                                    specific_date = Some((y, m, d_next));
-                                } else {
-                                    specific_date = Some((y, m, d));
-                                }
+                    let mut y = ref_time.year;
+                    if let Some(d) = resolve_ordinal_weekday_in_month(y, m, target_wd, ord) {
+                        if (m, d) < (ref_time.month, ref_time.day) {
+                            y += 1;
+                            if let Some(d_next) =
+                                resolve_ordinal_weekday_in_month(y, m, target_wd, ord)
+                            {
+                                specific_date = Some((y, m, d_next));
                             } else {
                                 specific_date = Some((y, m, d));
                             }
-
-                            for k in i..=m_idx {
-                                consumed_indices.push(k);
-                            }
-                            if i > 0
-                                && (tokens[i - 1].to_lowercase() == "no"
-                                    || tokens[i - 1].to_lowercase() == "na"
-                                    || tokens[i - 1].to_lowercase() == "em")
-                                && !consumed_indices.contains(&(i - 1))
-                            {
-                                consumed_indices.push(i - 1);
-                            }
-                            continue;
+                        } else {
+                            specific_date = Some((y, m, d));
                         }
+
+                        for k in i..=m_idx {
+                            consumed_indices.push(k);
+                        }
+                        if i > 0
+                            && (tokens[i - 1].to_lowercase() == "no"
+                                || tokens[i - 1].to_lowercase() == "na"
+                                || tokens[i - 1].to_lowercase() == "em")
+                            && !consumed_indices.contains(&(i - 1))
+                        {
+                            consumed_indices.push(i - 1);
+                        }
+                        continue;
                     }
                 }
             }
