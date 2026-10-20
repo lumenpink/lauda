@@ -46,6 +46,8 @@ jobs:
         run: cargo clippy --workspace -- -D warnings
       - name: "Run All Tests & E2E Suites"
         run: cargo test --workspace
+      - name: "Audit Sovereign CD Workflow"
+        run: bash tests/audit_cd_workflow.sh
 
   deploy-web:
     name: "Build Dioxus WebAssembly & Deploy to Cloudflare"
