@@ -173,6 +173,24 @@ jobs:
           mkdir -p dist/desktop
           cp target/release/lauda-client dist/desktop/lauda-desktop
 
+      - name: "Publish Native Desktop & CLI to Banca Storage"
+        run: |
+          echo "★ Publicando binário nativo do Lauda na Banca (banca.2lp.in/downloads/lauda)..."
+          if [ -d /srv/banca/downloads/lauda ]; then
+            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+              TAG="${GITHUB_REF#refs/tags/v}"
+              mkdir -p /srv/banca/downloads/lauda/stable-latest /srv/banca/downloads/lauda/releases/v$TAG
+              cp dist/desktop/lauda-desktop /srv/banca/downloads/lauda/releases/v$TAG/lauda
+              cp dist/desktop/lauda-desktop /srv/banca/downloads/lauda/stable-latest/lauda
+              echo "$TAG" > /srv/banca/downloads/lauda/version
+            else
+              mkdir -p /srv/banca/downloads/lauda/nightly-latest
+              cp dist/desktop/lauda-desktop /srv/banca/downloads/lauda/nightly-latest/lauda
+              git rev-parse --short HEAD > /srv/banca/downloads/lauda/nightly-version
+            fi
+          fi
+          echo "✔ Binário do Lauda entregue na Banca."
+
   deploy-apk:
     name: "Build Android APK & Sync Pratilera"
     runs-on: ubuntu-latest
