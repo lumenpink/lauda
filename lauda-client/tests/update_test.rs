@@ -83,3 +83,21 @@ fn test_get_download_url_and_pinning() {
         "https://banca.2lp.in/downloads/lauda/releases/v0.6.0/lauda"
     );
 }
+
+#[test]
+fn test_semver_edge_cases_with_prefixes() {
+    assert!(semver_is_newer("v0.5.0", "0.4.1"));
+    assert!(semver_is_newer("0.5.0", "v0.4.1"));
+    assert!(!semver_is_newer("v0.4.1", "0.4.1"));
+    assert!(!semver_is_newer("0.4.1", "v0.4.1"));
+    assert!(semver_is_newer("0.5.0", "0.4.99"));
+}
+
+#[test]
+fn test_resolve_channel_env_empty() {
+    let tmp = tempdir().unwrap();
+    let config_file = tmp.path().join("config.toml");
+
+    let ch = resolve_channel(None, Some("   "), Some(&config_file));
+    assert_eq!(ch, "stable");
+}
