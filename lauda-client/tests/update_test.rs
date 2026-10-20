@@ -1,189 +1,85 @@
-use lauda_client::domain::update::{UpdateManifest, UpdateStatus, check_update};
+use lauda_client::update::{
+    get_distribution_endpoints, get_download_url, resolve_channel, save_default_channel,
+    semver_is_newer,
+};
+use tempfile::tempdir;
 
 #[test]
-fn test_parse_version_manifest() {
-    let json_data = r#"{
-        "version": "0.1.2",
-        "min_compatible_version": "0.1.0",
-        "apk_url": "https://lauda.2lp.in/lauda-latest.apk",
-        "release_notes": "Correções e melhorias de performance",
-        "published_at": "2026-10-02T08:00:00Z"
-    }"#;
+fn test_distribution_endpoints_banca() {
+    let (stable, nightly, ver) = get_distribution_endpoints("stable");
+    assert_eq!(
+        stable,
+        "https://banca.2lp.in/downloads/lauda/stable-latest/lauda"
+    );
+    assert_eq!(
+        nightly,
+        "https://banca.2lp.in/downloads/lauda/nightly-latest/lauda"
+    );
+    assert_eq!(ver, "https://banca.2lp.in/downloads/lauda/version");
 
-    let manifest: UpdateManifest =
-        serde_json::from_str(json_data).expect("Deve desserializar manifesto");
-    assert_eq!(manifest.version, "0.1.2");
-    assert_eq!(manifest.min_compatible_version, "0.1.0");
-    assert_eq!(manifest.apk_url, "https://lauda.2lp.in/lauda-latest.apk");
+    assert!(!stable.contains("codeberg.org"));
+    assert!(!nightly.contains("codeberg.org"));
+    assert!(!ver.contains("codeberg.org"));
+
+    let (_, _, nightly_ver) = get_distribution_endpoints("nightly");
+    assert_eq!(
+        nightly_ver,
+        "https://banca.2lp.in/downloads/lauda/nightly-version"
+    );
 }
 
 #[test]
-fn test_check_update_available() {
-    let manifest = UpdateManifest {
-        version: "0.2.0".to_string(),
-        min_compatible_version: "0.1.0".to_string(),
-        apk_url: "https://lauda.2lp.in/lauda-latest.apk".to_string(),
-        release_notes: "Nova versão disponível".to_string(),
-        published_at: "2026-10-02T08:00:00Z".to_string(),
-    };
-
-    let status = check_update("0.1.5", &manifest);
-    assert!(matches!(status, UpdateStatus::Available(_)));
-}
-
-#[test]
-fn test_check_update_required() {
-    let manifest = UpdateManifest {
-        version: "0.2.0".to_string(),
-        min_compatible_version: "0.2.0".to_string(),
-        apk_url: "https://lauda.2lp.in/lauda-latest.apk".to_string(),
-        release_notes: "Atualização obrigatória por quebra de protocolo".to_string(),
-        published_at: "2026-10-02T08:00:00Z".to_string(),
-    };
-
-    let status = check_update("0.1.9", &manifest);
-    assert!(matches!(status, UpdateStatus::Required(_)));
-}
-
-#[test]
-fn test_check_update_up_to_date() {
-    let manifest = UpdateManifest {
-        version: "0.1.0".to_string(),
-        min_compatible_version: "0.1.0".to_string(),
-        apk_url: "https://lauda.2lp.in/lauda-latest.apk".to_string(),
-        release_notes: "Mesma versão".to_string(),
-        published_at: "2026-10-02T08:00:00Z".to_string(),
-    };
-
-    let status_equal = check_update("0.1.0", &manifest);
-    assert_eq!(status_equal, UpdateStatus::UpToDate);
-
-    let status_ahead = check_update("0.2.0", &manifest);
-    assert_eq!(status_ahead, UpdateStatus::UpToDate);
-}
-
-#[test]
-fn test_check_update_nightly_channel() {
-    let manifest = UpdateManifest {
-        version: "0.2.1-nightly.20261005".to_string(),
-        min_compatible_version: "0.1.0".to_string(),
-        apk_url: "https://lauda.2lp.in/lauda-nightly.apk".to_string(),
-        release_notes: "Build experimental nightly".to_string(),
-        published_at: "2026-10-05T19:35:00Z".to_string(),
-    };
-
-    let status = check_update("0.2.0", &manifest);
-    assert!(matches!(status, UpdateStatus::Available(_)));
-
-    let status_up_to_date = check_update("0.2.1", &manifest);
-    assert_eq!(status_up_to_date, UpdateStatus::UpToDate);
-}
-
-#[test]
-fn test_check_update_dev_versions_treated_as_stable_and_not_inferior() {
-    let manifest = UpdateManifest {
-        version: "0.4.0-dev.46+20261014.7c0b89e".to_string(),
-        min_compatible_version: "0.1.0".to_string(),
-        apk_url: "https://lauda.2lp.in/lauda-latest.apk".to_string(),
-        release_notes: "Versão remota no manifesto".to_string(),
-        published_at: "2026-10-14T18:35:20Z".to_string(),
-    };
-
-    // Versão dev 0.4.1 em execução é superior a 0.4.0 -> UpToDate
-    let status_dev_newer = check_update("0.4.1-dev.4+20261015.f0478e0", &manifest);
-    assert_eq!(status_dev_newer, UpdateStatus::UpToDate);
-
-    // Versão dev igual à do manifesto remoto -> UpToDate
-    let manifest_same = UpdateManifest {
-        version: "0.4.1-dev.4+20261015.f0478e0".to_string(),
-        min_compatible_version: "0.1.0".to_string(),
-        apk_url: "https://lauda.2lp.in/lauda-latest.apk".to_string(),
-        release_notes: "Mesma versão dev".to_string(),
-        published_at: "2026-10-15T09:00:00Z".to_string(),
-    };
-    let status_same_dev = check_update("0.4.1-dev.4+20261015.f0478e0", &manifest_same);
-    assert_eq!(status_same_dev, UpdateStatus::UpToDate);
-}
-
-#[test]
-fn test_check_update_edge_cases_and_whitespace_resilience() {
-    let manifest = UpdateManifest {
-        version: "  0.4.1-dev.4+20261015.f0478e0 \n".to_string(),
-        min_compatible_version: " 0.1.0 ".to_string(),
-        apk_url: "https://lauda.2lp.in/lauda-latest.apk".to_string(),
-        release_notes: "Notas".to_string(),
-        published_at: "2026-10-15T09:00:00Z".to_string(),
-    };
-
-    let status = check_update("0.4.1-dev.4+20261015.f0478e0", &manifest);
-    assert_eq!(status, UpdateStatus::UpToDate);
-
-    // SemVer com tag v
-    let status_v = check_update("v0.4.1", &manifest);
-    assert_eq!(status_v, UpdateStatus::UpToDate);
-}
-
-#[test]
-fn test_should_show_update_banner_dismissal_behavior() {
-    let manifest = UpdateManifest {
-        version: "0.5.0".to_string(),
-        min_compatible_version: "0.1.0".to_string(),
-        apk_url: "https://lauda.2lp.in/lauda-latest.apk".to_string(),
-        release_notes: "Nova versão".to_string(),
-        published_at: "2026-10-15T10:00:00Z".to_string(),
-    };
-
-    // Sem dispensa prévia: deve exibir
-    assert!(lauda_client::domain::update::should_show_update_banner(
-        Some(&manifest),
-        None
-    ));
-
-    // Dispensado para a mesma versão: NÃO deve exibir
-    assert!(!lauda_client::domain::update::should_show_update_banner(
-        Some(&manifest),
-        Some("0.5.0")
-    ));
-
-    // Dispensado para versão anterior diferente: DEVE exibir para a nova versão
-    assert!(lauda_client::domain::update::should_show_update_banner(
-        Some(&manifest),
-        Some("0.4.9")
-    ));
-
-    // Sem manifesto: NÃO deve exibir
-    assert!(!lauda_client::domain::update::should_show_update_banner(
-        None, None
+fn test_semver_precedence() {
+    assert!(semver_is_newer("0.5.0", "0.4.1"));
+    assert!(!semver_is_newer("0.4.1", "0.4.1"));
+    assert!(!semver_is_newer("0.4.1", "0.5.0"));
+    assert!(semver_is_newer("0.4.2", "0.4.1"));
+    assert!(semver_is_newer("1.0.0", "0.9.9"));
+    assert!(semver_is_newer(
+        "0.5.0-dev.2+20261019",
+        "0.5.0-dev.1+20261019"
     ));
 }
 
 #[test]
-fn test_should_show_update_banner_mutation_and_edge_cases() {
-    let manifest = UpdateManifest {
-        version: "0.5.0".to_string(),
-        min_compatible_version: "0.1.0".to_string(),
-        apk_url: "https://lauda.2lp.in/lauda-latest.apk".to_string(),
-        release_notes: "Nova versão".to_string(),
-        published_at: "2026-10-15T10:00:00Z".to_string(),
-    };
+fn test_resolve_channel_precedence() {
+    let tmp = tempdir().unwrap();
+    let config_file = tmp.path().join("config.toml");
 
-    // Espaços em branco não devem burlar a dispensa
-    assert!(!lauda_client::domain::update::should_show_update_banner(
-        Some(&manifest),
-        Some("  0.5.0  ")
-    ));
+    // 1. Default without flag, env or config -> "stable"
+    let ch = resolve_channel(None, None, Some(&config_file));
+    assert_eq!(ch, "stable");
 
-    // Manifest com versão contendo espaços
-    let mut manifest_ws = manifest.clone();
-    manifest_ws.version = " 0.5.0 \n".to_string();
-    assert!(!lauda_client::domain::update::should_show_update_banner(
-        Some(&manifest_ws),
-        Some("0.5.0")
-    ));
+    // 2. Persisted config -> "nightly"
+    save_default_channel("nightly", Some(&config_file)).unwrap();
+    let ch = resolve_channel(None, None, Some(&config_file));
+    assert_eq!(ch, "nightly");
 
-    // None manifest com Some dismissed
-    assert!(!lauda_client::domain::update::should_show_update_banner(
-        None,
-        Some("0.5.0")
-    ));
+    // 3. Env var overrides config
+    let ch = resolve_channel(None, Some("stable"), Some(&config_file));
+    assert_eq!(ch, "stable");
+
+    // 4. CLI flag overrides everything
+    let ch = resolve_channel(Some("nightly"), Some("stable"), Some(&config_file));
+    assert_eq!(ch, "nightly");
+}
+
+#[test]
+fn test_get_download_url_and_pinning() {
+    assert_eq!(
+        get_download_url("stable", None),
+        "https://banca.2lp.in/downloads/lauda/stable-latest/lauda"
+    );
+    assert_eq!(
+        get_download_url("nightly", None),
+        "https://banca.2lp.in/downloads/lauda/nightly-latest/lauda"
+    );
+    assert_eq!(
+        get_download_url("stable", Some("0.5.0")),
+        "https://banca.2lp.in/downloads/lauda/releases/v0.5.0/lauda"
+    );
+    assert_eq!(
+        get_download_url("stable", Some("v0.6.0")),
+        "https://banca.2lp.in/downloads/lauda/releases/v0.6.0/lauda"
+    );
 }
