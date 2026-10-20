@@ -184,11 +184,17 @@ pub fn cmd_check_update(channel_override: Option<&str>) -> Result<(), Box<dyn st
     println!("Versão Remota         : v{}", remote_ver);
 
     if semver_is_newer(&remote_ver, current_ver) {
-        println!("\n★ Nova versão disponível: v{} -> v{}", current_ver, remote_ver);
+        println!(
+            "\n★ Nova versão disponível: v{} -> v{}",
+            current_ver, remote_ver
+        );
         println!("Para atualizar agora, execute:");
         println!("  lauda update --channel {}", channel);
     } else {
-        println!("\n✔ O Lauda já está atualizado na versão mais recente do canal {}.", channel);
+        println!(
+            "\n✔ O Lauda já está atualizado na versão mais recente do canal {}.",
+            channel
+        );
     }
 
     Ok(())
