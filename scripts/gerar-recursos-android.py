@@ -246,6 +246,15 @@ def main():
     fg.save(drawable_dir / "ic_launcher_foreground.png", "PNG", optimize=True)
     print("✓ Adaptive foreground gerado: drawable/ic_launcher_foreground.png (432x432)")
     
+    # 5. Strings de Recursos (Nome do App no Android)
+    values_dir = RES_DIR / "values"
+    values_dir.mkdir(parents=True, exist_ok=True)
+    strings_xml = values_dir / "strings.xml"
+    strings_content = '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="app_name">Lauda</string>\n</resources>\n'
+    with open(strings_xml, "w", encoding="utf-8") as f:
+        f.write(strings_content)
+    print("✓ Recursos de texto gerados: values/strings.xml (app_name = Lauda)")
+    
     print("🎉 Todos os recursos visuais do Lauda foram gerados com sucesso!")
 
 if __name__ == "__main__":
