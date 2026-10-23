@@ -2,7 +2,7 @@
 
 > Cliente de correio eletrônico acolhedor, focado na experiência aconchegante de ler cartas com calma e escrever com tranquilidade e sem ruído, construído em Rust com **Dioxus 0.7**, backend em **Axum** e motor inteligente de indexação **lauda-index**.
 
-[![GOST Compliance](https://img.shields.io/badge/GOST-1.4.0-crimson)](https://codeberg.org/lumenpink/gost)
+[![GOST Compliance](https://img.shields.io/badge/GOST-1.5.0-crimson)](https://codeberg.org/lumenpink/gost)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](./LICENSE)
 [![Website](https://img.shields.io/badge/portal-lauda.2lp.in-red)](https://lauda.2lp.in)
 
@@ -89,6 +89,10 @@ A documentação pública segue o tema estético **Trash Polka** (halftones, rec
 * **Portal online & Download:** [lauda.2lp.in](https://lauda.2lp.in)
 * **Arquivos do Portal:** [`site/index.html`](./site/index.html) e [`site/_headers`](./site/_headers)
 * **Especificação Técnica:** [`SPEC.md`](./SPEC.md)
+
+### Compilação Estática e Otimização Soberana (GOST 1.5.0)
+- **Perfil de Release:** `opt-level = 3`, `lto = "fat"`, `codegen-units = 1`, `panic = "abort"` e `strip = true`.
+- **Linking Estático musl:** Suporte a `target-feature=+crt-static` para distribuição `static-pie` universal sem dependências de sistema.
 
 ---
 
