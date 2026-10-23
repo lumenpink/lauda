@@ -21,7 +21,7 @@ jobs:
     name: "Rust Test, Lint & E2E (GOST-CI)"
     runs-on: ubuntu-latest
     container:
-      image: git.2lp.in/lumen/gost-ci-wasm:latest
+      image: gambi.2lp.in/lumen/gost-ci-wasm:latest
     steps:
       - name: "Checkout repository"
         uses: actions/checkout@v4
@@ -33,13 +33,13 @@ jobs:
             ln -sf /opt/gost/deps/* ../ 2>/dev/null || true
           fi
           if [ ! -f ../ishcondidim/Cargo.toml ]; then
-            git clone --depth 1 https://git.2lp.in/lumen/ishcondidim.git ../ishcondidim
+            git clone --depth 1 https://gambi.2lp.in/lumen/ishcondidim.git ../ishcondidim
           fi
           if [ ! -f ../papeli/Cargo.toml ]; then
-            git clone --depth 1 https://git.2lp.in/lumen/papeli.git ../papeli
+            git clone --depth 1 https://gambi.2lp.in/lumen/papeli.git ../papeli
           fi
           if [ ! -f ../urupema/Cargo.toml ]; then
-            git clone --depth 1 https://git.2lp.in/lumen/urupema.git ../urupema
+            git clone --depth 1 https://gambi.2lp.in/lumen/urupema.git ../urupema
           fi
 
       - name: "Sync Version Manifests"
@@ -71,7 +71,7 @@ jobs:
     needs: [test]
     if: github.ref == 'refs/heads/main'
     container:
-      image: git.2lp.in/lumen/gost-ci-wasm:latest
+      image: gambi.2lp.in/lumen/gost-ci-wasm:latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -86,13 +86,13 @@ jobs:
             ln -sf /opt/gost/deps/* ../ 2>/dev/null || true
           fi
           if [ ! -f ../ishcondidim/Cargo.toml ]; then
-            git clone --depth 1 https://git.2lp.in/lumen/ishcondidim.git ../ishcondidim
+            git clone --depth 1 https://gambi.2lp.in/lumen/ishcondidim.git ../ishcondidim
           fi
           if [ ! -f ../papeli/Cargo.toml ]; then
-            git clone --depth 1 https://git.2lp.in/lumen/papeli.git ../papeli
+            git clone --depth 1 https://gambi.2lp.in/lumen/papeli.git ../papeli
           fi
           if [ ! -f ../urupema/Cargo.toml ]; then
-            git clone --depth 1 https://git.2lp.in/lumen/urupema.git ../urupema
+            git clone --depth 1 https://gambi.2lp.in/lumen/urupema.git ../urupema
           fi
 
       - name: "Sync Version Manifests"
@@ -140,7 +140,7 @@ jobs:
     needs: [test]
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     container:
-      image: git.2lp.in/lumen/gost-ci-cross:latest
+      image: gambi.2lp.in/lumen/gost-ci-cross:latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -158,19 +158,19 @@ jobs:
             ln -sf /opt/gost/deps/* ../ 2>/dev/null || true
           fi
           if [ ! -f ../ishcondidim/Cargo.toml ]; then
-            git clone --depth 1 https://git.2lp.in/lumen/ishcondidim.git ../ishcondidim
+            git clone --depth 1 https://gambi.2lp.in/lumen/ishcondidim.git ../ishcondidim
           fi
           if [ ! -f ../papeli/Cargo.toml ]; then
-            git clone --depth 1 https://git.2lp.in/lumen/papeli.git ../papeli
+            git clone --depth 1 https://gambi.2lp.in/lumen/papeli.git ../papeli
           fi
           if [ ! -f ../urupema/Cargo.toml ]; then
-            git clone --depth 1 https://git.2lp.in/lumen/urupema.git ../urupema
+            git clone --depth 1 https://gambi.2lp.in/lumen/urupema.git ../urupema
           fi
 
       - name: "Configure Sovereign Lumen Cargo Registry"
         run: |
           mkdir -p "$HOME/.cargo"
-          printf '[registries.lumen]\nindex = "sparse+https://git.2lp.in/api/packages/lumen/cargo/"\n' > "$HOME/.cargo/config.toml"
+          printf '[registries.lumen]\nindex = "sparse+https://gambi.2lp.in/api/packages/lumen/cargo/"\n' > "$HOME/.cargo/config.toml"
           if [ -n "${{ secrets.LUMEN_REGISTRY_TOKEN }}" ]; then
             printf '[registries.lumen]\ntoken = "${{ secrets.LUMEN_REGISTRY_TOKEN }}"\n' > "$HOME/.cargo/credentials.toml"
           fi
@@ -254,22 +254,45 @@ jobs:
             exit 0
           fi
 
+          upload_r2_with_retry() {
+            local target="$1"
+            local file="$2"
+            local max_attempts=4
+            local attempt=1
+            local delay=5
+
+            while [ "$attempt" -le "$max_attempts" ]; do
+              echo "  -> Enviando $file para $target (tentativa $attempt/$max_attempts)..."
+              if npx wrangler r2 object put "$target" --file="$file" --remote; then
+                echo "  ✓ Upload concluído com sucesso: $target"
+                return 0
+              fi
+              echo "  ⚠️ Falha transitória ao enviar para o R2 (tentativa $attempt/$max_attempts). Aguardando ${delay}s..."
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+            done
+
+            echo "❌ ERRO CRÍTICO: Falha permanente após $max_attempts tentativas ao publicar no Cloudflare R2: $target"
+            exit 1
+          }
+
           echo "★ Publicando artefatos versionados no R2 (twolp-bucket)..."
           for pkg in dist/packages/*; do
             filename=$(basename "$pkg")
-            npx wrangler r2 object put "twolp-bucket/downloads/lauda/${CHANNEL}/${filename}" --file="$pkg" --remote
+            upload_r2_with_retry "twolp-bucket/downloads/lauda/${CHANNEL}/${filename}" "$pkg"
           done
 
           echo "★ Publicando binários unificados em latest..."
           if [ -f target/x86_64-unknown-linux-musl/release/lauda-client ]; then
-            npx wrangler r2 object put "twolp-bucket/downloads/lauda/${CHANNEL}-latest/lauda" --file=target/x86_64-unknown-linux-musl/release/lauda-client --remote
-            npx wrangler r2 object put "twolp-bucket/downloads/lauda/${CHANNEL}-latest/lauda-linux-amd64" --file=target/x86_64-unknown-linux-musl/release/lauda-client --remote
+            upload_r2_with_retry "twolp-bucket/downloads/lauda/${CHANNEL}-latest/lauda" target/x86_64-unknown-linux-musl/release/lauda-client
+            upload_r2_with_retry "twolp-bucket/downloads/lauda/${CHANNEL}-latest/lauda-linux-amd64" target/x86_64-unknown-linux-musl/release/lauda-client
           fi
           if [ -f target/aarch64-unknown-linux-musl/release/lauda-client ]; then
-            npx wrangler r2 object put "twolp-bucket/downloads/lauda/${CHANNEL}-latest/lauda-linux-arm64" --file=target/aarch64-unknown-linux-musl/release/lauda-client --remote
+            upload_r2_with_retry "twolp-bucket/downloads/lauda/${CHANNEL}-latest/lauda-linux-arm64" target/aarch64-unknown-linux-musl/release/lauda-client
           fi
           if [ -f target/x86_64-pc-windows-gnu/release/lauda-client.exe ]; then
-            npx wrangler r2 object put "twolp-bucket/downloads/lauda/${CHANNEL}-latest/lauda.exe" --file=target/x86_64-pc-windows-gnu/release/lauda-client.exe --remote
+            upload_r2_with_retry "twolp-bucket/downloads/lauda/${CHANNEL}-latest/lauda.exe" target/x86_64-pc-windows-gnu/release/lauda-client.exe
           fi
 
       - name: "Update & Rotate Release Manifest in Banca Repo"
@@ -282,7 +305,7 @@ jobs:
             exit 0
           fi
 
-          git clone --depth 1 "https://lumen:${GIT_2LP_TOKEN}@git.2lp.in/lumen/banca.git" /tmp/banca
+          git clone --depth 1 "https://lumen:${GIT_2LP_TOKEN}@gambi.2lp.in/lumen/banca.git" /tmp/banca
 
           if [ -d "/tmp/banca/site/downloads/lauda" ] && [ -f "/tmp/banca/scripts/rotate-downloads.py" ]; then
             cd /tmp/banca
@@ -346,13 +369,36 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          upload_r2_with_retry() {
+            local target="$1"
+            local file="$2"
+            local max_attempts=4
+            local attempt=1
+            local delay=5
+
+            while [ "$attempt" -le "$max_attempts" ]; do
+              echo "  -> Enviando $file para $target (tentativa $attempt/$max_attempts)..."
+              if npx wrangler r2 object put "$target" --file="$file" --remote; then
+                echo "  ✓ Upload concluído com sucesso: $target"
+                return 0
+              fi
+              echo "  ⚠️ Falha transitória ao enviar para o R2 (tentativa $attempt/$max_attempts). Aguardando ${delay}s..."
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+            done
+
+            echo "❌ ERRO CRÍTICO: Falha permanente após $max_attempts tentativas ao publicar no Cloudflare R2: $target"
+            exit 1
+          }
+
           if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
             if [ -f site/lauda.apk ]; then
-              npx wrangler r2 object put "twolp-bucket/lauda.apk" --file="site/lauda.apk" --remote || true
-              npx wrangler r2 object put "twolp-bucket/lauda-latest.apk" --file="site/lauda.apk" --remote || true
+              upload_r2_with_retry "twolp-bucket/lauda.apk" "site/lauda.apk"
+              upload_r2_with_retry "twolp-bucket/lauda-latest.apk" "site/lauda.apk"
             elif [ -f site/lauda-latest.apk ]; then
-              npx wrangler r2 object put "twolp-bucket/lauda.apk" --file="site/lauda-latest.apk" --remote || true
-              npx wrangler r2 object put "twolp-bucket/lauda-latest.apk" --file="site/lauda-latest.apk" --remote || true
+              upload_r2_with_retry "twolp-bucket/lauda.apk" "site/lauda-latest.apk"
+              upload_r2_with_retry "twolp-bucket/lauda-latest.apk" "site/lauda-latest.apk"
             fi
           else
             echo "Cloudflare token ausente ou APK ausente, mantendo distribuição estática."
@@ -373,7 +419,7 @@ jobs:
             curl -s -X POST \
               -H "Authorization: token $GIT_2LP_TOKEN" \
               -H "Content-Type: application/json" \
-              "https://git.2lp.in/api/v1/repos/lumen/banca/actions/workflows/ci.yml/dispatches" \
+              "https://gambi.2lp.in/api/v1/repos/lumen/banca/actions/workflows/ci.yml/dispatches" \
               -d '{"ref": "main"}' || true
           else
             echo "GIT_2LP_TOKEN ausente, pulando disparo remoto da Pratilera."
@@ -390,28 +436,13 @@ jobs:
 
       - name: "Build local Docker Image"
         run: |
-          OLD_IMAGE_ID=$(docker inspect --format='{{.Id}}' git.2lp.in/lumen/lauda-server:latest 2>/dev/null || docker inspect --format='{{.Id}}' lumenpink/lauda-server:latest 2>/dev/null || true)
+          OLD_IMAGE_ID=$(docker inspect --format='{{.Id}}' gambi.2lp.in/lumen/lauda-server:latest 2>/dev/null || true)
           echo "OLD_IMAGE_ID=$OLD_IMAGE_ID" >> $GITHUB_ENV
-          docker build -t git.2lp.in/lumen/lauda-server:latest -t lumenpink/lauda-server:latest -f ./Dockerfile .
+          docker build -t gambi.2lp.in/lumen/lauda-server:latest -f ./Dockerfile .
 
       - name: "Push Image to Sovereign Registry"
         run: |
-          docker push git.2lp.in/lumen/lauda-server:latest
-
-      - name: "Login to Docker Hub (Registry Backup)"
-        if: env.DOCKER_PASSWORD != ''
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-        run: |
-          echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-
-      - name: "Push Image to Docker Hub (Registry Backup)"
-        if: env.DOCKER_PASSWORD != ''
-        env:
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-        run: |
-          docker push lumenpink/lauda-server:latest
+          docker push gambi.2lp.in/lumen/lauda-server:latest
 
       - name: "Deploy Locally on obizero (Direct Socket)"
         run: |
@@ -435,8 +466,7 @@ jobs:
           if [ $SUCCESS -ne 1 ]; then
             echo "✘ [FALHA] Container lauda-server não estabilizou! Acionando Rollback..."
             if [ -n "$OLD_IMAGE_ID" ]; then
-              docker tag "$OLD_IMAGE_ID" git.2lp.in/lumen/lauda-server:latest
-              docker tag "$OLD_IMAGE_ID" lumenpink/lauda-server:latest
+              docker tag "$OLD_IMAGE_ID" gambi.2lp.in/lumen/lauda-server:latest
               docker compose -f /home/lumen/stacks/mail/compose.yml up -d --no-build lauda-server
               echo "✔ Rollback concluído no obizero."
             fi
