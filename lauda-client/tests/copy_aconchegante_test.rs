@@ -1,7 +1,10 @@
 #[test]
 fn test_landing_page_e_readme_copy_aconchegante() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-    let site_html = std::fs::read_to_string(root.join("site/index.html")).expect("ler site/index.html");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap();
+    let site_html =
+        std::fs::read_to_string(root.join("site/index.html")).expect("ler site/index.html");
     let readme = std::fs::read_to_string(root.join("README.md")).expect("ler README.md");
 
     let site_lower = site_html.to_lowercase();

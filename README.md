@@ -1,6 +1,6 @@
-# lauda (O Smolclient Minimalista & Micro-Daemon de Correio)
+# lauda (Leitura e Escrita Aconchegante de Correio)
 
-> Cliente de e-mail ultraleve focado em leitura pura e redação rápida sem a sobrecarga de clientes IMAP/SMTP tradicionais, construído em Rust com **Dioxus 0.7**, backend em **Axum** e motor nativo de indexação **lauda-index**.
+> Cliente de correio eletrônico acolhedor, focado na experiência aconchegante de ler cartas com calma e escrever com tranquilidade e sem ruído, construído em Rust com **Dioxus 0.7**, backend em **Axum** e motor inteligente de indexação **lauda-index**.
 
 [![GOST Compliance](https://img.shields.io/badge/GOST-1.4.0-crimson)](https://codeberg.org/lumenpink/gost)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](./LICENSE)
@@ -18,7 +18,7 @@ O **`lauda`** substitui a complexidade pesada dos clientes tradicionais por uma 
   - `txt original`: Texto cru RFC 5322 em fonte monoespaçada com quebras de linha preservadas.
   - `html`: Container isolado (sandbox) para e-mails transacionais e papéis de carta sem faixas espúrias.
 * **Superbusca com BM25 & Sintaxe Gmail (`lauda-index`):**
-  - Motor de busca em Rust 100% puro (sem dependência de C/Xapian/notmuch).
+  - Motor de busca nativo sem dependências externas.
   - Normalização completa com remoção de acentos e diacríticos.
   - Operadores de consulta: `from:`, `to:`, `subject:`, `has:attachment`, `is:unread`, `is:flagged`.
   - Expressões booleanas com `OR` explícito e negação com `-` ou `NOT`.
