@@ -48,6 +48,21 @@ if command -v aapt >/dev/null 2>&1; then
         echo "ERRO: Versão base SemVer divergente: $VER_BASE != $EXPECTED_BASE ($VER_NAME vs $EXPECTED_VERSION)"
         exit 1
     fi
+
+    # Validação do nome do aplicativo e ícone na launchable-activity (Ticket #51)
+    APP_LABEL="$(echo "$BADGE" | grep "application: " | grep -o "label='[^']*'" | cut -d"'" -f2 || true)"
+    ACT_LABEL="$(echo "$BADGE" | grep "launchable-activity: " | grep -o "label='[^']*'" | cut -d"'" -f2 || true)"
+    ACT_ICON="$(echo "$BADGE" | grep "launchable-activity: " | grep -o "icon='[^']*'" | cut -d"'" -f2 || true)"
+
+    if [ "$APP_LABEL" = "LaudaClient" ] || [ "$ACT_LABEL" = "LaudaClient" ]; then
+        echo "ERRO: O aplicativo está se apresentando como LaudaClient no Android em vez de Lauda."
+        exit 1
+    fi
+    if [ -z "$ACT_ICON" ]; then
+        echo "ERRO: A launchable-activity não possui ícone configurado no Android."
+        exit 1
+    fi
+    echo "✅ Nome do app (Lauda) e ícone na launchable-activity validados!"
     echo "✅ Metadados aapt validados com sucesso!"
 fi
 
