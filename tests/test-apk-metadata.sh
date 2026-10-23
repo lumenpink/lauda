@@ -79,7 +79,7 @@ if [ ! -f "$CI_WORKFLOW" ]; then
     exit 1
 fi
 if ! grep -q "Trigger Pratilera Store Update" "$CI_WORKFLOW" || \
-   ! grep -q "https://codeberg.org/api/v1/repos/lumenpink/banca/actions/workflows/ci.yml/dispatches" "$CI_WORKFLOW"; then
+   ! grep -q "https://git.2lp.in/api/v1/repos/lumen/banca/actions/workflows/ci.yml/dispatches" "$CI_WORKFLOW"; then
     echo "ERRO: .forgejo/workflows/ci.yml deve conter o step Trigger Pratilera Store Update apontando para a API de dispatches da banca."
     exit 1
 fi

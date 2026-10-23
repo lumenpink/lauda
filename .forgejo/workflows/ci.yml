@@ -9,6 +9,13 @@ on:
       - "v*"
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
 jobs:
   test:
     name: "Rust Test, Lint & E2E (GOST-CI)"
@@ -16,13 +23,9 @@ jobs:
     container:
       image: docker.io/lumenpink/gost-ci-wasm:latest
     steps:
-      - name: "Install Node.js Runtime for Runner Actions"
-        run: |
-          if ! command -v node >/dev/null 2>&1; then
-            apt-get update -qq && apt-get install -y -qq --no-install-recommends nodejs >/dev/null
-          fi
       - name: "Checkout repository"
         uses: https://github.com/actions/checkout@v4
+
       - name: "Checkout sibling dependencies"
         run: |
           mkdir -p ../ishcondidim ../papeli ../urupema
@@ -30,24 +33,32 @@ jobs:
             ln -sf /opt/gost/deps/* ../ 2>/dev/null || true
           fi
           if [ ! -f ../ishcondidim/Cargo.toml ]; then
-            git clone --depth 1 https://codeberg.org/lumenpink/ishcondidim.git ../ishcondidim
+            git clone --depth 1 https://git.2lp.in/lumen/ishcondidim.git ../ishcondidim
           fi
           if [ ! -f ../papeli/Cargo.toml ]; then
-            git clone --depth 1 https://codeberg.org/lumenpink/papeli.git ../papeli
+            git clone --depth 1 https://git.2lp.in/lumen/papeli.git ../papeli
           fi
           if [ ! -f ../urupema/Cargo.toml ]; then
-            git clone --depth 1 https://codeberg.org/lumenpink/urupema.git ../urupema
+            git clone --depth 1 https://git.2lp.in/lumen/urupema.git ../urupema
           fi
+
       - name: "Sync Version Manifests"
         run: ./scripts/sync-version-manifests.sh
+
       - name: "Format Check"
         run: cargo fmt -- --check
+
       - name: "Clippy (Zero Warnings)"
         run: cargo clippy --workspace -- -D warnings
+
       - name: "Run All Tests & E2E Suites"
         run: cargo test --workspace
+
       - name: "Audit Sovereign CD Workflow"
         run: bash tests/audit_cd_workflow.sh
+
+      - name: "Test APK Metadata"
+        run: bash tests/test-apk-metadata.sh
 
   deploy-web:
     name: "Build Dioxus WebAssembly & Deploy to Cloudflare"
@@ -62,6 +73,7 @@ jobs:
     steps:
       - name: "Checkout repository"
         uses: https://github.com/actions/checkout@v4
+
       - name: "Checkout sibling dependencies"
         run: |
           mkdir -p ../ishcondidim ../papeli ../urupema
@@ -69,16 +81,18 @@ jobs:
             ln -sf /opt/gost/deps/* ../ 2>/dev/null || true
           fi
           if [ ! -f ../ishcondidim/Cargo.toml ]; then
-            git clone --depth 1 https://codeberg.org/lumenpink/ishcondidim.git ../ishcondidim
+            git clone --depth 1 https://git.2lp.in/lumen/ishcondidim.git ../ishcondidim
           fi
           if [ ! -f ../papeli/Cargo.toml ]; then
-            git clone --depth 1 https://codeberg.org/lumenpink/papeli.git ../papeli
+            git clone --depth 1 https://git.2lp.in/lumen/papeli.git ../papeli
           fi
           if [ ! -f ../urupema/Cargo.toml ]; then
-            git clone --depth 1 https://codeberg.org/lumenpink/urupema.git ../urupema
+            git clone --depth 1 https://git.2lp.in/lumen/urupema.git ../urupema
           fi
+
       - name: "Sync Version Manifests"
         run: ./scripts/sync-version-manifests.sh
+
       - name: "Build Dioxus Web Client (Release)"
         run: |
           dx build -p lauda-client --platform web --release
@@ -88,6 +102,7 @@ jobs:
           WASM_NAME=$(ls site/app/assets | grep '^lauda-client_bg-.*\.wasm$' | head -n 1)
           sed -i -E "s|/app/assets/lauda-client-[^\"']+\.js|/app/assets/${JS_NAME}|g" site/app/index.html
           sed -i -E "s|/app/assets/lauda-client_bg-[^\"']+\.wasm|/app/assets/${WASM_NAME}|g" site/app/index.html
+
       - name: "Ensure Sovereign Keystore Signature on APKs"
         run: |
           if [ -f "$HOME/.android/in_twolp_release.keystore" ] && [ -f "$HOME/.android/in_twolp_release.properties" ]; then
@@ -105,6 +120,7 @@ jobs:
             echo "Verificando assinaturas dos APKs em site/:"
             apksigner verify --print-certs site/lauda-latest.apk || true
           fi
+
       - name: "Deploy to Cloudflare Workers"
         run: |
           if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
@@ -112,48 +128,24 @@ jobs:
           else
             echo "CLOUDFLARE_API_TOKEN not set, skipping Cloudflare deploy."
           fi
-      - name: "Deploy to Codeberg Pages (Fallback)"
-        env:
-          CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN || secrets.GITHUB_TOKEN }}
-        run: |
-          if [ -d site ]; then
-            git config user.name "actions-user"
-            git config user.email "actions@codeberg.org"
 
-            WORKTREE_DIR=$(mktemp -d)
-            if git ls-remote --exit-code --heads origin pages >/dev/null 2>&1; then
-              git fetch origin pages:pages
-              git worktree add "$WORKTREE_DIR" pages
-            else
-              git worktree add --orphan -b pages "$WORKTREE_DIR"
-            fi
-
-            rm -rf "${WORKTREE_DIR:?}"/*
-            cp -r site/* "$WORKTREE_DIR/"
-
-            cd "$WORKTREE_DIR"
-            git add -A
-            if git diff --staged --quiet; then
-              echo "No changes to deploy to Codeberg Pages."
-            else
-              git commit -m "docs(site): deploy to Codeberg Pages [skip ci]"
-              git push origin pages
-              echo "Successfully deployed to Codeberg Pages."
-            fi
-            cd - >/dev/null
-            git worktree remove "$WORKTREE_DIR" --force || true
-          fi
-
-  deploy-desktop:
-    name: "Build Desktop Client (Linux Release)"
+  deploy-banca:
+    name: "Build & Publish Lauda Multiarch to Banca"
     runs-on: ubuntu-latest
     needs: [test]
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     container:
-      image: docker.io/lumenpink/gost-ci-wasm:latest
+      image: docker.io/lumenpink/gost-ci-cross:latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GIT_2LP_TOKEN: ${{ secrets.GIT_2LP_TOKEN }}
     steps:
       - name: "Checkout repository"
         uses: https://github.com/actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: "Checkout sibling dependencies"
         run: |
           mkdir -p ../ishcondidim ../papeli ../urupema
@@ -161,37 +153,199 @@ jobs:
             ln -sf /opt/gost/deps/* ../ 2>/dev/null || true
           fi
           if [ ! -f ../ishcondidim/Cargo.toml ]; then
-            git clone --depth 1 https://codeberg.org/lumenpink/ishcondidim.git ../ishcondidim
+            git clone --depth 1 https://git.2lp.in/lumen/ishcondidim.git ../ishcondidim
           fi
           if [ ! -f ../papeli/Cargo.toml ]; then
-            git clone --depth 1 https://codeberg.org/lumenpink/papeli.git ../papeli
+            git clone --depth 1 https://git.2lp.in/lumen/papeli.git ../papeli
           fi
           if [ ! -f ../urupema/Cargo.toml ]; then
-            git clone --depth 1 https://codeberg.org/lumenpink/urupema.git ../urupema
+            git clone --depth 1 https://git.2lp.in/lumen/urupema.git ../urupema
           fi
-      - name: "Build Desktop Binary"
-        run: |
-          cargo build -p lauda-client --features desktop --release
-          mkdir -p dist/desktop
-          cp target/release/lauda-client dist/desktop/lauda-desktop
 
-      - name: "Publish Native Desktop & CLI to Banca Storage"
+      - name: "Configure Sovereign Lumen Cargo Registry"
         run: |
-          echo "★ Publicando binário nativo do Lauda na Banca (banca.2lp.in/downloads/lauda)..."
-          if [ -d /srv/banca/downloads/lauda ]; then
-            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-              TAG="${GITHUB_REF#refs/tags/v}"
-              mkdir -p /srv/banca/downloads/lauda/stable-latest /srv/banca/downloads/lauda/releases/v$TAG
-              cp dist/desktop/lauda-desktop /srv/banca/downloads/lauda/releases/v$TAG/lauda
-              cp dist/desktop/lauda-desktop /srv/banca/downloads/lauda/stable-latest/lauda
-              echo "$TAG" > /srv/banca/downloads/lauda/version
-            else
-              mkdir -p /srv/banca/downloads/lauda/nightly-latest
-              cp dist/desktop/lauda-desktop /srv/banca/downloads/lauda/nightly-latest/lauda
-              git rev-parse --short HEAD > /srv/banca/downloads/lauda/nightly-version
-            fi
+          mkdir -p "$HOME/.cargo"
+          printf '[registries.lumen]\nindex = "sparse+https://git.2lp.in/api/packages/lumen/cargo/"\n' > "$HOME/.cargo/config.toml"
+          if [ -n "${{ secrets.LUMEN_REGISTRY_TOKEN }}" ]; then
+            printf '[registries.lumen]\ntoken = "${{ secrets.LUMEN_REGISTRY_TOKEN }}"\n' > "$HOME/.cargo/credentials.toml"
           fi
-          echo "✔ Binário do Lauda entregue na Banca."
+
+      - name: "Determine Version & Release Metadata"
+        id: meta
+        run: |
+          ./scripts/sync-version-manifests.sh || true
+          RAW_VER=$(cat VERSION 2>/dev/null || grep -m1 '^version =' lauda-client/Cargo.toml | cut -d '"' -f2)
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          DATE_TAG=$(date -u +%Y%m%d)
+
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG_VER="${GITHUB_REF#refs/tags/v}"
+            echo "is_stable=true" >> $GITHUB_OUTPUT
+            echo "version=${TAG_VER}" >> $GITHUB_OUTPUT
+            echo "channel=stable" >> $GITHUB_OUTPUT
+          else
+            NIGHTLY_VER="${RAW_VER}-dev.${DATE_TAG}.${COMMIT_HASH}"
+            echo "is_stable=false" >> $GITHUB_OUTPUT
+            echo "version=${NIGHTLY_VER}" >> $GITHUB_OUTPUT
+            echo "channel=nightly" >> $GITHUB_OUTPUT
+          fi
+          echo "date=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
+
+      - name: "Compile Lauda Multiarch CLI Binaries"
+        run: |
+          export RUSTFLAGS="-C target-feature=+crt-static"
+          echo "★ [1/3] Compilando x86_64-unknown-linux-musl (Linux AMD64)..."
+          cargo zigbuild --release --target x86_64-unknown-linux-musl -p lauda-client || \
+            cargo build --release --target x86_64-unknown-linux-musl -p lauda-client
+
+          echo "★ [2/3] Compilando aarch64-unknown-linux-musl (Linux ARM64)..."
+          cargo zigbuild --release --target aarch64-unknown-linux-musl -p lauda-client || \
+            cargo build --release --target aarch64-unknown-linux-musl -p lauda-client
+
+          echo "★ [3/3] Compilando x86_64-pc-windows-gnu (Windows AMD64)..."
+          cargo zigbuild --release --target x86_64-pc-windows-gnu -p lauda-client || \
+            cargo build --release --target x86_64-pc-windows-gnu -p lauda-client
+
+      - name: "Package Artifacts & Generate Checksums"
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          mkdir -p dist/packages
+
+          if [ -d target/x86_64-unknown-linux-musl/release ]; then
+            tar -czf "dist/packages/lauda-${VERSION}-linux-amd64.tar.gz" \
+              -C target/x86_64-unknown-linux-musl/release lauda-client \
+              -C "$PWD" README.md LICENSE 2>/dev/null || \
+            tar -czf "dist/packages/lauda-${VERSION}-linux-amd64.tar.gz" \
+              -C target/x86_64-unknown-linux-musl/release lauda-client
+          fi
+
+          if [ -d target/aarch64-unknown-linux-musl/release ]; then
+            tar -czf "dist/packages/lauda-${VERSION}-linux-arm64.tar.gz" \
+              -C target/aarch64-unknown-linux-musl/release lauda-client \
+              -C "$PWD" README.md LICENSE 2>/dev/null || \
+            tar -czf "dist/packages/lauda-${VERSION}-linux-arm64.tar.gz" \
+              -C target/aarch64-unknown-linux-musl/release lauda-client
+          fi
+
+          if [ -d target/x86_64-pc-windows-gnu/release ]; then
+            cd target/x86_64-pc-windows-gnu/release
+            zip -j "$GITHUB_WORKSPACE/dist/packages/lauda-${VERSION}-windows-amd64.zip" \
+              lauda-client.exe "$GITHUB_WORKSPACE/README.md" "$GITHUB_WORKSPACE/LICENSE" 2>/dev/null || \
+            zip -j "$GITHUB_WORKSPACE/dist/packages/lauda-${VERSION}-windows-amd64.zip" lauda-client.exe
+            cd "$GITHUB_WORKSPACE"
+          fi
+
+          cd dist/packages
+          sha256sum * > SHA256SUMS
+          cd "$GITHUB_WORKSPACE"
+
+      - name: "Upload Artifacts to Cloudflare R2"
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          CHANNEL="${{ steps.meta.outputs.channel }}"
+
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "Aviso: CLOUDFLARE_API_TOKEN ausente. Pulando upload R2."
+            exit 0
+          fi
+
+          echo "★ Publicando artefatos versionados no R2 (twolp-bucket)..."
+          for pkg in dist/packages/*; do
+            filename=$(basename "$pkg")
+            npx wrangler r2 object put "twolp-bucket/downloads/lauda/${CHANNEL}/${filename}" --file="$pkg" --remote
+          done
+
+          echo "★ Publicando binários unificados em latest..."
+          if [ -f target/x86_64-unknown-linux-musl/release/lauda-client ]; then
+            npx wrangler r2 object put "twolp-bucket/downloads/lauda/${CHANNEL}-latest/lauda" --file=target/x86_64-unknown-linux-musl/release/lauda-client --remote
+            npx wrangler r2 object put "twolp-bucket/downloads/lauda/${CHANNEL}-latest/lauda-linux-amd64" --file=target/x86_64-unknown-linux-musl/release/lauda-client --remote
+          fi
+          if [ -f target/aarch64-unknown-linux-musl/release/lauda-client ]; then
+            npx wrangler r2 object put "twolp-bucket/downloads/lauda/${CHANNEL}-latest/lauda-linux-arm64" --file=target/aarch64-unknown-linux-musl/release/lauda-client --remote
+          fi
+          if [ -f target/x86_64-pc-windows-gnu/release/lauda-client.exe ]; then
+            npx wrangler r2 object put "twolp-bucket/downloads/lauda/${CHANNEL}-latest/lauda.exe" --file=target/x86_64-pc-windows-gnu/release/lauda-client.exe --remote
+          fi
+
+      - name: "Update & Rotate Release Manifest in Banca Repo"
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          DATE="${{ steps.meta.outputs.date }}"
+          CHANNEL="${{ steps.meta.outputs.channel }}"
+          IS_STABLE="${{ steps.meta.outputs.is_stable }}"
+
+          if [ -z "$GIT_2LP_TOKEN" ]; then
+            echo "Aviso: GIT_2LP_TOKEN ausente. Pulando rotação na Banca."
+            exit 0
+          fi
+
+          git config --global user.name "Lumen Pink (CI Bot)"
+          git config --global user.email "bot@2lp.in"
+
+          BANCA_DIR=$(mktemp -d)
+          git clone "https://${GIT_2LP_TOKEN}@git.2lp.in/lumen/banca.git" "$BANCA_DIR"
+          cd "$BANCA_DIR"
+
+          INDEX_JSON="site/downloads/lauda/index.json"
+          if [ ! -f "$INDEX_JSON" ]; then
+            echo "Erro: $INDEX_JSON não encontrado na Banca."
+            exit 1
+          fi
+
+          SHA_LINUX_AMD64=$(sha256sum "$GITHUB_WORKSPACE/target/x86_64-unknown-linux-musl/release/lauda-client" 2>/dev/null | awk '{print $1}' || echo "")
+          SHA_LINUX_ARM64=$(sha256sum "$GITHUB_WORKSPACE/target/aarch64-unknown-linux-musl/release/lauda-client" 2>/dev/null | awk '{print $1}' || echo "")
+          SHA_WIN_AMD64=$(sha256sum "$GITHUB_WORKSPACE/target/x86_64-pc-windows-gnu/release/lauda-client.exe" 2>/dev/null | awk '{print $1}' || echo "")
+
+          ENTRY=$(jq -n \
+            --arg ver "$VERSION" \
+            --arg date "$DATE" \
+            --arg sha_bin "$SHA_LINUX_AMD64" \
+            --arg sha_l64 "$SHA_LINUX_AMD64" \
+            --arg sha_a64 "$SHA_LINUX_ARM64" \
+            --arg sha_w64 "$SHA_WIN_AMD64" \
+            --arg channel "$CHANNEL" \
+            '{
+              version: $ver,
+              date: $date,
+              url: "https://banca.2lp.in/downloads/lauda/\($channel)-latest/lauda",
+              sha256: $sha_bin,
+              artifacts: {
+                "linux-amd64": {
+                  url: "https://banca.2lp.in/downloads/lauda/\($channel)/lauda-\($ver)-linux-amd64.tar.gz",
+                  binary_url: "https://banca.2lp.in/downloads/lauda/\($channel)-latest/lauda-linux-amd64",
+                  sha256: $sha_l64
+                },
+                "linux-arm64": {
+                  url: "https://banca.2lp.in/downloads/lauda/\($channel)/lauda-\($ver)-linux-arm64.tar.gz",
+                  binary_url: "https://banca.2lp.in/downloads/lauda/\($channel)-latest/lauda-linux-arm64",
+                  sha256: $sha_a64
+                },
+                "windows-amd64": {
+                  url: "https://banca.2lp.in/downloads/lauda/\($channel)/lauda-\($ver)-windows-amd64.zip",
+                  binary_url: "https://banca.2lp.in/downloads/lauda/\($channel)-latest/lauda.exe",
+                  sha256: $sha_w64
+                }
+              }
+            }')
+
+          if [ "$IS_STABLE" = "true" ]; then
+            jq --arg ver "$VERSION" --argjson entry "$ENTRY" \
+              '.stable_latest = $ver | .stables = ([$entry] + (.stables // []))' \
+              "$INDEX_JSON" > "${INDEX_JSON}.tmp" && mv "${INDEX_JSON}.tmp" "$INDEX_JSON"
+          else
+            jq --arg ver "$VERSION" --argjson entry "$ENTRY" \
+              '.nightly_latest = $ver | .nightlies = ([$entry] + (.nightlies // []))' \
+              "$INDEX_JSON" > "${INDEX_JSON}.tmp" && mv "${INDEX_JSON}.tmp" "$INDEX_JSON"
+          fi
+
+          git add "$INDEX_JSON"
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(downloads): rotate lauda release to ${VERSION} (#49)"
+            git push origin main
+            echo "★ Manifestos da Banca atualizados e sincronizados com sucesso."
+          else
+            echo "Manifesto já se encontra atualizado na Banca."
+          fi
 
   deploy-apk:
     name: "Build Android APK & Sync Pratilera"
@@ -201,8 +355,10 @@ jobs:
     steps:
       - name: "Checkout repository"
         uses: https://github.com/actions/checkout@v4
+
       - name: "Sync Version Manifests"
         run: ./scripts/sync-version-manifests.sh
+
       - name: "Package Android APK & Sign Soberano"
         run: |
           ./scripts/package-all.sh --apk || true
@@ -210,9 +366,11 @@ jobs:
             [ -f site/lauda.apk ] && ./scripts/sign-release.sh site/lauda.apk || true
             [ -f site/lauda-latest.apk ] && ./scripts/sign-release.sh site/lauda-latest.apk || true
           fi
+
       - name: "Sync with Pratilera"
         run: |
           ./scripts/package-all.sh --sync-pratilera || true
+
       - name: "Upload APKs to Cloudflare R2"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -229,25 +387,26 @@ jobs:
           else
             echo "Cloudflare token ausente ou APK ausente, mantendo distribuição estática."
           fi
+
   trigger-pratilera:
     name: "Trigger Pratilera Store Update"
     runs-on: ubuntu-latest
     needs: [deploy-apk]
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: "Trigger Pratilera Workflow Dispatch"
+      - name: "Trigger Pratilera Store Update"
         env:
-          CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN }}
+          GIT_2LP_TOKEN: ${{ secrets.GIT_2LP_TOKEN }}
         run: |
-          if [ -n "$CODEBERG_TOKEN" ]; then
+          if [ -n "$GIT_2LP_TOKEN" ]; then
             echo "-> Notificando a Pratilera (Banca) para atualizar o catálogo..."
             curl -s -X POST \
-              -H "Authorization: token $CODEBERG_TOKEN" \
+              -H "Authorization: token $GIT_2LP_TOKEN" \
               -H "Content-Type: application/json" \
-              "https://codeberg.org/api/v1/repos/lumenpink/banca/actions/workflows/ci.yml/dispatches" \
+              "https://git.2lp.in/api/v1/repos/lumen/banca/actions/workflows/ci.yml/dispatches" \
               -d '{"ref": "main"}' || true
           else
-            echo "CODEBERG_TOKEN ausente, pulando disparo remoto da Pratilera."
+            echo "GIT_2LP_TOKEN ausente, pulando disparo remoto da Pratilera."
           fi
 
   deploy-server:

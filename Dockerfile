@@ -1,14 +1,14 @@
 # ==============================================================================
 # Lauda Server — Dockerfile Multi-Stage Minimalista
 # ==============================================================================
-FROM codeberg.org/lumenpink/gost-ci-rust:latest AS builder
+FROM docker.io/lumenpink/gost-ci-cross:latest AS builder
 
 WORKDIR /usr/src
 
 # Clonar dependências irmãs para satisfazer dev-dependencies do workspace em build hermético
-RUN git clone --depth 1 https://codeberg.org/lumenpink/ishcondidim.git /usr/src/ishcondidim && \
-    git clone --depth 1 https://codeberg.org/lumenpink/papeli.git /usr/src/papeli && \
-    git clone --depth 1 https://codeberg.org/lumenpink/urupema.git /usr/src/urupema
+RUN git clone --depth 1 https://git.2lp.in/lumen/ishcondidim.git /usr/src/ishcondidim && \
+    git clone --depth 1 https://git.2lp.in/lumen/papeli.git /usr/src/papeli && \
+    git clone --depth 1 https://git.2lp.in/lumen/urupema.git /usr/src/urupema
 
 WORKDIR /usr/src/lauda
 
