@@ -58,7 +58,12 @@ jobs:
         run: bash tests/audit_cd_workflow.sh
 
       - name: "Test APK Metadata"
-        run: bash tests/test-apk-metadata.sh
+        run: |
+          if [ -f site/lauda.apk ]; then
+            bash tests/test-apk-metadata.sh
+          else
+            echo "Aviso: site/lauda.apk não presente no checkout inicial (verificação postergada para deploy-apk)"
+          fi
 
   deploy-web:
     name: "Build Dioxus WebAssembly & Deploy to Cloudflare"

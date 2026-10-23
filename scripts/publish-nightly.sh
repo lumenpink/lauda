@@ -109,8 +109,13 @@ cat <<EOF > "$NETSEC_XML"
 EOF
 
 MANIFEST_XML="$REPO_ROOT/target/dx/lauda-client/release/android/app/app/src/main/AndroidManifest.xml"
-if [ -f "$MANIFEST_XML" ] && ! grep -q "usesCleartextTraffic" "$MANIFEST_XML"; then
-    sed -i 's/<application /<application android:usesCleartextTraffic="true" /g' "$MANIFEST_XML"
+if [ -f "$MANIFEST_XML" ]; then
+    if ! grep -q "usesCleartextTraffic" "$MANIFEST_XML"; then
+        sed -i 's/<application /<application android:usesCleartextTraffic="true" /g' "$MANIFEST_XML"
+    fi
+    # Garantir nome canônico "Lauda" e ícones oficiais
+    sed -i 's/android:label="[^"]*"/android:label="@string\/app_name"/g' "$MANIFEST_XML"
+    sed -i 's/<application /<application android:icon="@mipmap\/ic_launcher" android:roundIcon="@mipmap\/ic_launcher_round" /g' "$MANIFEST_XML"
 fi
 
 # Injetar MainActivity.kt com suporte a OnBackPressedDispatcher (gestos de voltar)
