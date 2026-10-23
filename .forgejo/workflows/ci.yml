@@ -21,10 +21,10 @@ jobs:
     name: "Rust Test, Lint & E2E (GOST-CI)"
     runs-on: ubuntu-latest
     container:
-      image: docker.io/lumenpink/gost-ci-wasm:latest
+      image: git.2lp.in/lumen/gost-ci-wasm:latest
     steps:
       - name: "Checkout repository"
-        uses: https://github.com/actions/checkout@v4
+        uses: actions/checkout@v4
 
       - name: "Checkout sibling dependencies"
         run: |
@@ -71,13 +71,13 @@ jobs:
     needs: [test]
     if: github.ref == 'refs/heads/main'
     container:
-      image: docker.io/lumenpink/gost-ci-wasm:latest
+      image: git.2lp.in/lumen/gost-ci-wasm:latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - name: "Checkout repository"
-        uses: https://github.com/actions/checkout@v4
+        uses: actions/checkout@v4
 
       - name: "Checkout sibling dependencies"
         run: |
@@ -140,14 +140,14 @@ jobs:
     needs: [test]
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     container:
-      image: docker.io/lumenpink/gost-ci-cross:latest
+      image: git.2lp.in/lumen/gost-ci-cross:latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       GIT_2LP_TOKEN: ${{ secrets.GIT_2LP_TOKEN }}
     steps:
       - name: "Checkout repository"
-        uses: https://github.com/actions/checkout@v4
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -324,7 +324,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - name: "Checkout repository"
-        uses: https://github.com/actions/checkout@v4
+        uses: actions/checkout@v4
 
       - name: "Sync Version Manifests"
         run: ./scripts/sync-version-manifests.sh
@@ -386,13 +386,17 @@ jobs:
     if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && github.event_name == 'push'
     steps:
       - name: "Checkout repository"
-        uses: https://github.com/actions/checkout@v4
+        uses: actions/checkout@v4
 
       - name: "Build local Docker Image"
         run: |
-          OLD_IMAGE_ID=$(docker inspect --format='{{.Id}}' lumenpink/lauda-server:latest 2>/dev/null || true)
+          OLD_IMAGE_ID=$(docker inspect --format='{{.Id}}' git.2lp.in/lumen/lauda-server:latest 2>/dev/null || docker inspect --format='{{.Id}}' lumenpink/lauda-server:latest 2>/dev/null || true)
           echo "OLD_IMAGE_ID=$OLD_IMAGE_ID" >> $GITHUB_ENV
-          docker build -t lumenpink/lauda-server:latest -f ./Dockerfile .
+          docker build -t git.2lp.in/lumen/lauda-server:latest -t lumenpink/lauda-server:latest -f ./Dockerfile .
+
+      - name: "Push Image to Sovereign Registry"
+        run: |
+          docker push git.2lp.in/lumen/lauda-server:latest
 
       - name: "Login to Docker Hub (Registry Backup)"
         if: env.DOCKER_PASSWORD != ''
@@ -431,6 +435,7 @@ jobs:
           if [ $SUCCESS -ne 1 ]; then
             echo "✘ [FALHA] Container lauda-server não estabilizou! Acionando Rollback..."
             if [ -n "$OLD_IMAGE_ID" ]; then
+              docker tag "$OLD_IMAGE_ID" git.2lp.in/lumen/lauda-server:latest
               docker tag "$OLD_IMAGE_ID" lumenpink/lauda-server:latest
               docker compose -f /home/lumen/stacks/mail/compose.yml up -d --no-build lauda-server
               echo "✔ Rollback concluído no obizero."
