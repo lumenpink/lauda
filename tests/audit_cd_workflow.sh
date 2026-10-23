@@ -1,7 +1,8 @@
 #!/bin/bash
 set -eo pipefail
 
-WORKFLOW="/home/lumen/src/lauda/.forgejo/workflows/ci.yml"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WORKFLOW="${ROOT_DIR}/.forgejo/workflows/ci.yml"
 
 echo "=== [TEST] Auditoria do Workflow de CD Soberano (lauda) ==="
 

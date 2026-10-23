@@ -270,81 +270,46 @@ jobs:
       - name: "Update & Rotate Release Manifest in Banca Repo"
         run: |
           VERSION="${{ steps.meta.outputs.version }}"
-          DATE="${{ steps.meta.outputs.date }}"
           CHANNEL="${{ steps.meta.outputs.channel }}"
-          IS_STABLE="${{ steps.meta.outputs.is_stable }}"
 
           if [ -z "$GIT_2LP_TOKEN" ]; then
             echo "Aviso: GIT_2LP_TOKEN ausente. Pulando rotação na Banca."
             exit 0
           fi
 
-          git config --global user.name "Lumen Pink (CI Bot)"
-          git config --global user.email "bot@2lp.in"
+          git clone --depth 1 "https://lumen:${GIT_2LP_TOKEN}@git.2lp.in/lumen/banca.git" /tmp/banca
 
-          BANCA_DIR=$(mktemp -d)
-          git clone "https://${GIT_2LP_TOKEN}@git.2lp.in/lumen/banca.git" "$BANCA_DIR"
-          cd "$BANCA_DIR"
+          if [ -d "/tmp/banca/site/downloads/lauda" ] && [ -f "/tmp/banca/scripts/rotate-downloads.py" ]; then
+            cd /tmp/banca
 
-          INDEX_JSON="site/downloads/lauda/index.json"
-          if [ ! -f "$INDEX_JSON" ]; then
-            echo "Erro: $INDEX_JSON não encontrado na Banca."
-            exit 1
-          fi
+            for ARCH in "linux-amd64" "linux-arm64" "windows-amd64"; do
+              EXT="tar.gz"
+              [ "$ARCH" = "windows-amd64" ] && EXT="zip"
+              PKG_FILE="lauda-${VERSION}-${ARCH}.${EXT}"
+              HASH=$(sha256sum "$GITHUB_WORKSPACE/dist/packages/$PKG_FILE" 2>/dev/null | awk '{print $1}' || echo "")
+              DOWNLOAD_URL="https://banca.2lp.in/downloads/lauda/${CHANNEL}/${PKG_FILE}"
 
-          SHA_LINUX_AMD64=$(sha256sum "$GITHUB_WORKSPACE/target/x86_64-unknown-linux-musl/release/lauda-client" 2>/dev/null | awk '{print $1}' || echo "")
-          SHA_LINUX_ARM64=$(sha256sum "$GITHUB_WORKSPACE/target/aarch64-unknown-linux-musl/release/lauda-client" 2>/dev/null | awk '{print $1}' || echo "")
-          SHA_WIN_AMD64=$(sha256sum "$GITHUB_WORKSPACE/target/x86_64-pc-windows-gnu/release/lauda-client.exe" 2>/dev/null | awk '{print $1}' || echo "")
+              python3 scripts/rotate-downloads.py \
+                --manifest site/downloads/lauda/index.json \
+                --channel "${CHANNEL}" \
+                --arch "${ARCH}" \
+                --version-str "${VERSION}" \
+                --url "${DOWNLOAD_URL}" \
+                --sha256 "${HASH}" \
+                --tarball "${PKG_FILE}" \
+                --app "lauda"
+            done
 
-          ENTRY=$(jq -n \
-            --arg ver "$VERSION" \
-            --arg date "$DATE" \
-            --arg sha_bin "$SHA_LINUX_AMD64" \
-            --arg sha_l64 "$SHA_LINUX_AMD64" \
-            --arg sha_a64 "$SHA_LINUX_ARM64" \
-            --arg sha_w64 "$SHA_WIN_AMD64" \
-            --arg channel "$CHANNEL" \
-            '{
-              version: $ver,
-              date: $date,
-              url: "https://banca.2lp.in/downloads/lauda/\($channel)-latest/lauda",
-              sha256: $sha_bin,
-              artifacts: {
-                "linux-amd64": {
-                  url: "https://banca.2lp.in/downloads/lauda/\($channel)/lauda-\($ver)-linux-amd64.tar.gz",
-                  binary_url: "https://banca.2lp.in/downloads/lauda/\($channel)-latest/lauda-linux-amd64",
-                  sha256: $sha_l64
-                },
-                "linux-arm64": {
-                  url: "https://banca.2lp.in/downloads/lauda/\($channel)/lauda-\($ver)-linux-arm64.tar.gz",
-                  binary_url: "https://banca.2lp.in/downloads/lauda/\($channel)-latest/lauda-linux-arm64",
-                  sha256: $sha_a64
-                },
-                "windows-amd64": {
-                  url: "https://banca.2lp.in/downloads/lauda/\($channel)/lauda-\($ver)-windows-amd64.zip",
-                  binary_url: "https://banca.2lp.in/downloads/lauda/\($channel)-latest/lauda.exe",
-                  sha256: $sha_w64
-                }
-              }
-            }')
-
-          if [ "$IS_STABLE" = "true" ]; then
-            jq --arg ver "$VERSION" --argjson entry "$ENTRY" \
-              '.stable_latest = $ver | .stables = ([$entry] + (.stables // []))' \
-              "$INDEX_JSON" > "${INDEX_JSON}.tmp" && mv "${INDEX_JSON}.tmp" "$INDEX_JSON"
-          else
-            jq --arg ver "$VERSION" --argjson entry "$ENTRY" \
-              '.nightly_latest = $ver | .nightlies = ([$entry] + (.nightlies // []))' \
-              "$INDEX_JSON" > "${INDEX_JSON}.tmp" && mv "${INDEX_JSON}.tmp" "$INDEX_JSON"
-          fi
-
-          git add "$INDEX_JSON"
-          if ! git diff --cached --quiet; then
-            git commit -m "chore(downloads): rotate lauda release to ${VERSION} (#49)"
-            git push origin main
-            echo "★ Manifestos da Banca atualizados e sincronizados com sucesso."
-          else
-            echo "Manifesto já se encontra atualizado na Banca."
+            git config user.name "Lauda Release Bot"
+            git config user.email "bot@2lp.in"
+            git add site/downloads/lauda/index.json
+            if ! git diff --staged --quiet; then
+              git commit -m "chore(downloads): rotate lauda release to ${VERSION} (#49)"
+              git push origin main || echo "Aviso: Push do manifesto na Banca falhou."
+            else
+              echo "Manifesto já se encontra atualizado na Banca."
+            fi
+            cd "$GITHUB_WORKSPACE"
           fi
 
   deploy-apk:
