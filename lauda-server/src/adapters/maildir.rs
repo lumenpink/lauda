@@ -27,6 +27,178 @@ pub fn is_sendmail_suppressed_for_tests() -> bool {
     MaildirBackend::is_sendmail_suppressed_for_tests()
 }
 
+/// Extrai o endereço de e-mail limpo de uma string que pode conter nome de exibição (ex: "Lumen <lumen@2lp.in>").
+pub fn extract_clean_email(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if let Some(start) = trimmed.find('<')
+        && let Some(end) = trimmed[start + 1..].find('>')
+    {
+        return trimmed[start + 1..start + 1 + end].trim().to_string();
+    }
+    trimmed.to_string()
+}
+
+/// Extrai múltiplos e-mails separados por vírgula.
+pub fn extract_recipient_emails(to_or_cc: &str) -> Vec<String> {
+    to_or_cc
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(extract_clean_email)
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
+/// Normaliza os dados brutos de e-mail de acordo com a RFC 5321 (dot-stuffing e terminação CRLF).
+pub fn normalize_smtp_data(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len() + 64);
+    let normalized = raw.replace("\r\n", "\n");
+    for line in normalized.lines() {
+        if line.starts_with('.') {
+            out.push('.');
+        }
+        out.push_str(line);
+        out.push_str("\r\n");
+    }
+    out
+}
+
+/// Envia e-mail diretamente via conexão TCP SMTP pura (RFC 5321).
+pub async fn dispatch_smtp_raw(
+    host: &str,
+    port: u16,
+    sender: &str,
+    recipients: &[String],
+    raw_email: &str,
+) -> Result<(), String> {
+    use std::time::Duration;
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+    use tokio::net::TcpStream;
+
+    let clean_sender = extract_clean_email(sender);
+    if clean_sender.is_empty() {
+        return Err("Remetente (MAIL FROM) inválido ou vazio".to_string());
+    }
+    if recipients.is_empty() {
+        return Err("Lista de destinatários vazia".to_string());
+    }
+
+    let addr = format!("{}:{}", host, port);
+    let connect_fut = TcpStream::connect(&addr);
+    let stream = tokio::time::timeout(Duration::from_secs(10), connect_fut)
+        .await
+        .map_err(|_| format!("Timeout ao conectar ao servidor SMTP em {}", addr))?
+        .map_err(|e| format!("Falha de conexão ao servidor SMTP em {}: {}", addr, e))?;
+
+    let (reader, mut writer) = stream.into_split();
+    let mut reader = BufReader::new(reader);
+
+    async fn read_reply<R: AsyncBufReadExt + Unpin>(
+        reader: &mut R,
+        expected_prefix: &[&str],
+    ) -> Result<String, String> {
+        let mut full_reply = String::new();
+        let mut line = String::new();
+        loop {
+            line.clear();
+            let n = tokio::time::timeout(Duration::from_secs(10), reader.read_line(&mut line))
+                .await
+                .map_err(|_| "Timeout lendo resposta SMTP".to_string())?
+                .map_err(|e| format!("Erro lendo resposta SMTP: {}", e))?;
+
+            if n == 0 {
+                return Err("Conexão fechada prematuramente pelo servidor SMTP".to_string());
+            }
+
+            full_reply.push_str(&line);
+            if line.len() >= 4 && line.as_bytes()[3] == b' ' {
+                break;
+            }
+            if line.len() == 3 {
+                break;
+            }
+        }
+
+        let code = if full_reply.len() >= 3 {
+            &full_reply[..3]
+        } else {
+            ""
+        };
+
+        if !expected_prefix.iter().any(|&p| code.starts_with(p)) {
+            return Err(format!(
+                "Erro SMTP (esperado {:?}): {}",
+                expected_prefix,
+                full_reply.trim()
+            ));
+        }
+
+        Ok(full_reply)
+    }
+
+    // 1. Banner
+    read_reply(&mut reader, &["220"]).await?;
+
+    // 2. EHLO
+    writer
+        .write_all(b"EHLO localhost\r\n")
+        .await
+        .map_err(|e| e.to_string())?;
+    writer.flush().await.map_err(|e| e.to_string())?;
+    read_reply(&mut reader, &["250"]).await?;
+
+    // 3. MAIL FROM
+    let mail_from = format!("MAIL FROM:<{}>\r\n", clean_sender);
+    writer
+        .write_all(mail_from.as_bytes())
+        .await
+        .map_err(|e| e.to_string())?;
+    writer.flush().await.map_err(|e| e.to_string())?;
+    read_reply(&mut reader, &["250"]).await?;
+
+    // 4. RCPT TO
+    for rcpt in recipients {
+        let clean_rcpt = extract_clean_email(rcpt);
+        if clean_rcpt.is_empty() {
+            continue;
+        }
+        let rcpt_to = format!("RCPT TO:<{}>\r\n", clean_rcpt);
+        writer
+            .write_all(rcpt_to.as_bytes())
+            .await
+            .map_err(|e| e.to_string())?;
+        writer.flush().await.map_err(|e| e.to_string())?;
+        read_reply(&mut reader, &["250", "251"]).await?;
+    }
+
+    // 5. DATA
+    writer
+        .write_all(b"DATA\r\n")
+        .await
+        .map_err(|e| e.to_string())?;
+    writer.flush().await.map_err(|e| e.to_string())?;
+    read_reply(&mut reader, &["354"]).await?;
+
+    // 6. Envio dos dados normalizados + finalizador . CRLF
+    let normalized = normalize_smtp_data(raw_email);
+    writer
+        .write_all(normalized.as_bytes())
+        .await
+        .map_err(|e| e.to_string())?;
+    writer
+        .write_all(b".\r\n")
+        .await
+        .map_err(|e| e.to_string())?;
+    writer.flush().await.map_err(|e| e.to_string())?;
+    read_reply(&mut reader, &["250"]).await?;
+
+    // 7. QUIT
+    let _ = writer.write_all(b"QUIT\r\n").await;
+    let _ = writer.flush().await;
+
+    Ok(())
+}
+
 impl MaildirBackend {
     pub fn new(base_dir: impl Into<PathBuf>) -> Self {
         let dir: PathBuf = base_dir.into();
@@ -302,6 +474,9 @@ impl MaildirBackend {
 
     /// Verifica se o ambiente atual é de testes ou CI para suprimir envio real de e-mails
     pub fn is_sendmail_suppressed_for_tests() -> bool {
+        if std::env::var("LAUDA_FORCE_DISPATCH").is_ok() {
+            return false;
+        }
         if cfg!(test) {
             return true;
         }
@@ -320,10 +495,14 @@ impl MaildirBackend {
         false
     }
 
-    fn dispatch_sendmail(raw_email: &str) -> Result<(), String> {
+    pub async fn dispatch_email(
+        sender: &str,
+        recipients: &[String],
+        raw_email: &str,
+    ) -> Result<(), String> {
         if Self::is_sendmail_suppressed_for_tests() {
             tracing::info!(
-                "lauda-server: modo de teste ativo, despacho real de sendmail suprimido com sucesso"
+                "lauda-server: modo de teste ativo, despacho real de e-mail suprimido com sucesso"
             );
             return Ok(());
         }
@@ -348,39 +527,26 @@ impl MaildirBackend {
             return Ok(());
         }
 
-        // Tentar via docker exec no container mailserver se ativo
-        let docker_check = std::process::Command::new("docker")
-            .args(["ps", "-q", "-f", "name=mailserver"])
-            .output();
+        let host = std::env::var("LAUDA_SMTP_HOST").unwrap_or_else(|_| "mailserver".to_string());
+        let port: u16 = std::env::var("LAUDA_SMTP_PORT")
+            .ok()
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(25);
 
-        if let Ok(output) = docker_check {
-            let out_str = String::from_utf8_lossy(&output.stdout);
-            if !out_str.trim().is_empty() {
-                let mut child = std::process::Command::new("docker")
-                    .args(["exec", "-i", "mailserver", "/usr/sbin/sendmail", "-t", "-i"])
-                    .stdin(std::process::Stdio::piped())
-                    .spawn()
-                    .map_err(|e| format!("Erro ao executar docker exec mailserver: {}", e))?;
-                if let Some(mut stdin) = child.stdin.take() {
-                    use std::io::Write;
-                    stdin
-                        .write_all(raw_email.as_bytes())
-                        .map_err(|e| e.to_string())?;
-                }
-                let status = child.wait().map_err(|e| e.to_string())?;
-                if status.success() {
-                    return Ok(());
-                }
-            }
+        dispatch_smtp_raw(&host, port, sender, recipients, raw_email).await
+    }
+
+    pub fn dispatch_sendmail(raw_email: &str) -> Result<(), String> {
+        if Self::is_sendmail_suppressed_for_tests() {
+            return Ok(());
         }
-
-        // Fallback: /usr/sbin/sendmail no host se existir
-        if std::path::Path::new("/usr/sbin/sendmail").exists() {
-            let mut child = std::process::Command::new("/usr/sbin/sendmail")
-                .args(["-t", "-i"])
+        if let Ok(custom_cmd) = std::env::var("LAUDA_SENDMAIL_CMD") {
+            let mut child = std::process::Command::new("sh")
+                .arg("-c")
+                .arg(&custom_cmd)
                 .stdin(std::process::Stdio::piped())
                 .spawn()
-                .map_err(|e| format!("Erro ao executar /usr/sbin/sendmail: {}", e))?;
+                .map_err(|e| format!("Erro ao iniciar comando configurado: {}", e))?;
             if let Some(mut stdin) = child.stdin.take() {
                 use std::io::Write;
                 stdin
@@ -388,12 +554,12 @@ impl MaildirBackend {
                     .map_err(|e| e.to_string())?;
             }
             let status = child.wait().map_err(|e| e.to_string())?;
-            if status.success() {
-                return Ok(());
+            if !status.success() {
+                return Err(format!("Comando retornou erro: {:?}", status.code()));
             }
+            return Ok(());
         }
-
-        Ok(())
+        Err("dispatch_sendmail síncrono legado indisponível".to_string())
     }
 }
 
@@ -767,10 +933,22 @@ impl MailBackend for MaildirBackend {
         };
 
         let filename = format!("{}.M{}P{}.lauda:2,S", timestamp, timestamp % 1000, pid);
-        let _ = std::fs::write(sent_dir.join(filename), &raw_email);
+        let sent_file_path = sent_dir.join(filename);
+        std::fs::write(&sent_file_path, &raw_email).map_err(|e| {
+            BackendError::Internal(format!("Erro ao gravar mensagem em .Sent: {}", e))
+        })?;
 
-        if let Err(e) = Self::dispatch_sendmail(&raw_email) {
-            tracing::warn!("Aviso ao despachar e-mail via sendmail: {}", e);
+        let mut recipients = extract_recipient_emails(&form.to);
+        if let Some(ref cc) = form.cc {
+            recipients.extend(extract_recipient_emails(cc));
+        }
+
+        if let Err(e) = Self::dispatch_email(&form.from, &recipients, &raw_email).await {
+            let _ = std::fs::remove_file(&sent_file_path);
+            return Err(BackendError::Internal(format!(
+                "Falha ao despachar e-mail: {}",
+                e
+            )));
         }
 
         Ok(())
