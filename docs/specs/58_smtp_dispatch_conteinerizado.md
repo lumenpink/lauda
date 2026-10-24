@@ -1,7 +1,7 @@
 # Especificação Técnica — Despacho SMTP Resiliente em Ambiente Conteinerizado (#58)
 
 - **ID do Ticket:** #58
-- **Status:** Aprovado
+- **Status:** Concluído (Fases 1 a 9 validadas)
 - **Autora:** Lumen
 - **Alinhamento:** GOST 1.5.0
 
@@ -26,3 +26,14 @@ Atualmente, o método `dispatch_sendmail` em `lauda-server/src/adapters/maildir.
 ## 3. Critérios de Aceitação
 - Teste de integração automatizado com servidor SMTP mock (`tests/smtp_dispatch_test.rs`) validando o diálogo SMTP completo e tratamento de erros.
 - Validação estrita via `cargo fmt -- --check`, `cargo clippy` e `cccp check --strict`.
+
+## 4. Checklist de Ciclo GOST DD-TDD
+- [x] **Fase 1: Ticket** — Ticket #58 criado e mapeado.
+- [x] **Fase 2: Branch** — `fix/58-smtp-dispatch-conteinerizado` isolada da `main`.
+- [x] **Fase 3: Spec** — Requisitos técnicos e arquitetura RFC 5321 documentados.
+- [x] **Fase 4: Red Test** — Criado `smtp_dispatch_test.rs` com falha inicial comprovada.
+- [x] **Fase 5: Green Implement** — Implementado `dispatch_smtp_raw` e limpeza em `send_message`.
+- [x] **Fase 6: Refactor** — Simplificação e colapso de condicionais conforme rustfmt/clippy.
+- [x] **Fase 7: Mutation Test** — Cobertura de casos extremos de parsing, dot-stuffing e porta fechada.
+- [x] **Fase 8: Quality Gate** — 100% de aprovação em testes, clippy e Gosplan check.
+- [x] **Fase 9: Finish & Close** — Changelog atualizado e fechamento canônico.
