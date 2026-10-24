@@ -87,13 +87,26 @@ async fn run_app_loop(
             && app.active_message().is_none()
         {
             let current_box = app.current_mailbox_name().to_string();
+            let mut target_msg = None;
             if let Ok(Some(cached_msg)) = cache.load_message(&current_box, uid) {
-                app.set_active_message(Some(cached_msg));
+                target_msg = Some(cached_msg);
             } else if let Some(ref tok) = token
                 && let Ok(server_msg) = client.get_message(tok, &current_box, uid).await
             {
                 let _ = cache.save_message(&current_box, &server_msg);
-                app.set_active_message(Some(server_msg));
+                target_msg = Some(server_msg);
+            }
+
+            if let Some(mut msg) = target_msg {
+                if !msg.envelope.is_read {
+                    msg.envelope.is_read = true;
+                    app.mark_envelope_read(uid, true);
+                    let _ = cache.mark_envelope_read(&current_box, uid, true);
+                    if let Some(ref tok) = token {
+                        let _ = client.mark_read(tok, &current_box, uid, true).await;
+                    }
+                }
+                app.set_active_message(Some(msg));
             }
         }
 

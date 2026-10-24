@@ -104,6 +104,12 @@ impl TuiApp {
         }
     }
 
+    pub fn mark_envelope_read(&mut self, uid: u32, read: bool) {
+        if let Some(env) = self.envelopes.iter_mut().find(|e| e.uid == uid) {
+            env.is_read = read;
+        }
+    }
+
     pub fn set_mailboxes(&mut self, boxes: Vec<MailboxInfo>) {
         self.mailboxes = boxes;
         if self.selected_mailbox_idx >= self.mailboxes.len() {

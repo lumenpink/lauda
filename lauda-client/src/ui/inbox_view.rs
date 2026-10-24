@@ -5,6 +5,8 @@ use crate::adapters::HttpApiClient;
 use crate::domain::cache::{LocalMessageCache, get_default_cache_dir};
 use crate::domain::ports::MailApiClient;
 use crate::domain::session::{SessionConfig, clear_session};
+use crate::domain::sync::{ActionType, ActionsQueue};
+use crate::domain::time::current_unix_timestamp;
 use crate::ui::state::Screen;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -454,22 +456,42 @@ pub fn InboxView(
                                     onclick: move |_| {
                                         let sess = session.read().clone();
                                         let box_name = current_mailbox.read().clone();
+                                        let cache_dir = get_default_cache_dir();
+                                        let cache = LocalMessageCache::new(&cache_dir);
+                                        let actions = ActionsQueue::new(&cache_dir);
+                                        let now_unix = current_unix_timestamp();
+
+                                        let was_unread = unread;
+                                        if was_unread {
+                                            // Atualização reativa imediata na UI local (optimistic update)
+                                            if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
+                                                m.is_read = true;
+                                            }
+                                            if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name)
+                                                && mb.unread_messages > 0
+                                            {
+                                                mb.unread_messages -= 1;
+                                            }
+                                            // Persiste imediatamente no cache local (SQLite / Storage)
+                                            let _ = cache.mark_envelope_read(&box_name, uid, true);
+                                            // Enfileira na fila offline para garantir resiliência
+                                            let _ = actions.enqueue(uid, &box_name, ActionType::MarkRead { read: true }, now_unix);
+                                        }
+
+                                        // 1. Abertura atômica imediata via cache local (0ms de latência)
+                                        if let Ok(Some(mut cached_msg)) = cache.load_message(&box_name, uid) {
+                                            if was_unread {
+                                                cached_msg.envelope.is_read = true;
+                                            }
+                                            active_message.set(Some(cached_msg));
+                                            screen.set(Screen::MessageDetail(uid));
+                                            return;
+                                        }
+
+                                        // 2. Se não estiver no cache local, busca na rede
                                         if let Some(token) = sess.token.clone() {
                                             loading_uid.set(Some(uid));
                                             error_msg.set(None);
-
-                                            // Atualização reativa imediata na UI local (optimistic update)
-                                            let was_unread = unread;
-                                            if was_unread {
-                                                if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
-                                                    m.is_read = true;
-                                                }
-                                                if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name)
-                                                    && mb.unread_messages > 0
-                                                {
-                                                    mb.unread_messages -= 1;
-                                                }
-                                            }
 
                                             spawn(async move {
                                                 let client = HttpApiClient::new(sess.server_url.clone());
@@ -478,12 +500,11 @@ pub fn InboxView(
                                                         if was_unread {
                                                             msg.envelope.is_read = true;
                                                         }
+                                                        let cache = LocalMessageCache::new(get_default_cache_dir());
+                                                        let _ = cache.save_message(&box_name, &msg);
+
                                                         active_message.set(Some(msg));
                                                         screen.set(Screen::MessageDetail(uid));
-                                                        if was_unread {
-                                                            let client_read = HttpApiClient::new(sess.server_url);
-                                                            let _ = client_read.mark_read(&token, &box_name, uid, true).await;
-                                                        }
                                                     }
                                                     Err(e) => {
                                                         // Reverter estado se falhou ao abrir a mensagem
@@ -494,6 +515,7 @@ pub fn InboxView(
                                                             if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name) {
                                                                 mb.unread_messages += 1;
                                                             }
+                                                            let _ = cache.mark_envelope_read(&box_name, uid, false);
                                                         }
                                                         error_msg.set(Some(format!("Falha ao abrir mensagem #{}: {}", uid, e)));
                                                     }

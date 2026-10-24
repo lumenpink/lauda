@@ -357,6 +357,97 @@ impl LocalMessageCache {
         }
     }
 
+    /// Atualiza o status de leitura do envelope (e mensagem completa correspondente, se em cache)
+    /// no SQLite e no Storage Web de forma atômica.
+    pub fn mark_envelope_read(&self, mailbox: &str, uid: u32, read: bool) -> std::io::Result<()> {
+        #[cfg(target_arch = "wasm32")]
+        {
+            let key = format!("lauda_cache_envelopes_{}", Self::sanitize_slug(mailbox));
+            if let Some(window) = web_sys::window()
+                && let Ok(Some(storage)) = window.local_storage()
+            {
+                if let Ok(Some(content)) = storage.get_item(&key)
+                    && let Ok(mut envelopes) =
+                        serde_json::from_str::<Vec<MessageEnvelope>>(&content)
+                {
+                    if let Some(env) = envelopes.iter_mut().find(|e| e.uid == uid) {
+                        env.is_read = read;
+                    }
+                    if let Ok(json) = serde_json::to_string(&envelopes) {
+                        let _ = storage.set_item(&key, &json);
+                    }
+                }
+
+                let msg_key = format!("lauda_cache_msg_{}_{}", Self::sanitize_slug(mailbox), uid);
+                if let Ok(Some(msg_content)) = storage.get_item(&msg_key)
+                    && let Ok(mut msg) = serde_json::from_str::<Message>(&msg_content)
+                {
+                    msg.envelope.is_read = read;
+                    if let Ok(msg_json) = serde_json::to_string(&msg) {
+                        let _ = storage.set_item(&msg_key, &msg_json);
+                    }
+                }
+            }
+            Ok(())
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let mut conn = self
+                .conn
+                .lock()
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+            let tx = conn
+                .transaction()
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            // 1. Atualizar envelope em cache_envelopes
+            let env_opt: Option<String> = tx
+                .query_row(
+                    "SELECT envelope_json FROM cache_envelopes WHERE mailbox = ?1 AND uid = ?2",
+                    params![mailbox, uid as i64],
+                    |row| row.get(0),
+                )
+                .ok();
+
+            if let Some(json) = env_opt
+                && let Ok(mut env) = serde_json::from_str::<MessageEnvelope>(&json)
+            {
+                env.is_read = read;
+                if let Ok(new_json) = serde_json::to_string(&env) {
+                    let _ = tx.execute(
+                        "UPDATE cache_envelopes SET envelope_json = ?1 WHERE mailbox = ?2 AND uid = ?3",
+                        params![new_json, mailbox, uid as i64],
+                    );
+                }
+            }
+
+            // 2. Atualizar mensagem completa em cache_messages se existir
+            let msg_opt: Option<String> = tx
+                .query_row(
+                    "SELECT message_json FROM cache_messages WHERE mailbox = ?1 AND uid = ?2",
+                    params![mailbox, uid as i64],
+                    |row| row.get(0),
+                )
+                .ok();
+
+            if let Some(json) = msg_opt
+                && let Ok(mut msg) = serde_json::from_str::<Message>(&json)
+            {
+                msg.envelope.is_read = read;
+                if let Ok(new_json) = serde_json::to_string(&msg) {
+                    let _ = tx.execute(
+                        "UPDATE cache_messages SET message_json = ?1 WHERE mailbox = ?2 AND uid = ?3",
+                        params![new_json, mailbox, uid as i64],
+                    );
+                }
+            }
+
+            tx.commit()
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
+            Ok(())
+        }
+    }
+
     /// Grava o corpo completo de uma mensagem individual de forma atômica no SQLite ou storage Web.
     pub fn save_message(&self, mailbox: &str, msg: &Message) -> std::io::Result<()> {
         #[cfg(target_arch = "wasm32")]
@@ -449,8 +540,7 @@ impl LocalMessageCache {
     }
 
     /// Parser minimalista para timestamps ISO-8601 UTC (ex: "2026-10-10T12:00:00Z" ou "2026-10-10 12:00:00").
-    #[cfg(not(target_arch = "wasm32"))]
-    fn parse_iso_date_to_unix(date_str: &str) -> Option<u64> {
+    pub fn parse_iso_date_to_unix(date_str: &str) -> Option<u64> {
         let parts: Vec<&str> = date_str.split(&['T', ' '][..]).collect();
         if parts.is_empty() {
             return None;

@@ -232,7 +232,29 @@ pub fn App() -> Element {
                         #[cfg(not(target_arch = "wasm32"))]
                         let _ = cache.save_envelopes(&active_box, &server_msgs);
                         if *messages.read() != server_msgs && messages.read().len() <= 50 {
-                            messages.set(server_msgs);
+                            messages.set(server_msgs.clone());
+                        }
+
+                        // Pré-carregamento em background dos corpos de mensagens dos últimos 90 dias
+                        #[cfg(not(target_arch = "wasm32"))]
+                        {
+                            let cutoff_unix = crate::domain::time::current_unix_timestamp()
+                                .saturating_sub(90 * 86400);
+
+                            for env in &server_msgs {
+                                let env_unix = crate::domain::cache::LocalMessageCache::parse_iso_date_to_unix(&env.date).unwrap_or(0);
+                                if env_unix >= cutoff_unix
+                                    && cache
+                                        .load_message(&active_box, env.uid)
+                                        .ok()
+                                        .flatten()
+                                        .is_none()
+                                    && let Ok(full_msg) =
+                                        client.get_message(&token, &active_box, env.uid).await
+                                {
+                                    let _ = cache.save_message(&active_box, &full_msg);
+                                }
+                            }
                         }
                     }
 

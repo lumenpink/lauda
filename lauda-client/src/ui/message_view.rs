@@ -111,6 +111,20 @@ pub fn MessageView(
                 }
             }
 
+            // Persiste no cache SQLite/Storage local e enfileira na fila offline
+            let cache_dir = crate::domain::cache::get_default_cache_dir();
+            let cache = crate::domain::cache::LocalMessageCache::new(&cache_dir);
+            let _ = cache.mark_envelope_read(&box_name, uid, new_read);
+
+            let actions = crate::domain::sync::ActionsQueue::new(&cache_dir);
+            let now_unix = crate::domain::time::current_unix_timestamp();
+            let _ = actions.enqueue(
+                uid,
+                &box_name,
+                crate::domain::sync::ActionType::MarkRead { read: new_read },
+                now_unix,
+            );
+
             spawn(async move {
                 let client = HttpApiClient::new(sess.server_url);
                 if client
