@@ -137,8 +137,11 @@ fn test_email_parsing_helpers() {
         extract_clean_email("  <destino@exemplo.com>  "),
         "destino@exemplo.com"
     );
+    assert_eq!(extract_clean_email(""), "");
+    assert_eq!(extract_clean_email("   "), "");
 
-    let recs = extract_recipient_emails("lumen@2lp.in, Destinatário <dest@2lp.in>, copy@2lp.in");
+    let recs =
+        extract_recipient_emails("lumen@2lp.in, Destinatário <dest@2lp.in>, copy@2lp.in, ,  ");
     assert_eq!(recs, vec!["lumen@2lp.in", "dest@2lp.in", "copy@2lp.in"]);
 }
 
@@ -150,6 +153,11 @@ fn test_smtp_dot_stuffing_normalization() {
         normalized,
         "Linha 1\r\n..Linha que comeca com ponto\r\n...Duplo ponto\r\nNormal\r\n"
     );
+
+    // Linhas já em CRLF
+    let raw_crlf = "Corpo\r\n.Ponto\r\nFim";
+    let norm_crlf = normalize_smtp_data(raw_crlf);
+    assert_eq!(norm_crlf, "Corpo\r\n..Ponto\r\nFim\r\n");
 }
 
 #[tokio::test]
