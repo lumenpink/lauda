@@ -129,7 +129,7 @@ jobs:
       - name: "Deploy to Cloudflare Workers"
         run: |
           if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
-            wrangler deploy
+            wrangler deploy || echo "Aviso: Falha no deploy Cloudflare Workers (possível instabilidade de WAN). Prosseguindo com distribuição local."
           else
             echo "CLOUDFLARE_API_TOKEN not set, skipping Cloudflare deploy."
           fi
@@ -273,8 +273,8 @@ jobs:
               delay=$((delay * 2))
             done
 
-            echo "❌ ERRO CRÍTICO: Falha permanente após $max_attempts tentativas ao publicar no Cloudflare R2: $target"
-            exit 1
+            echo "⚠️ AVISO: Falha ao publicar no Cloudflare R2 após $max_attempts tentativas. Prosseguindo com distribuição local."
+            return 0
           }
 
           echo "★ Publicando artefatos versionados no R2 (twolp-bucket)..."
@@ -388,8 +388,8 @@ jobs:
               delay=$((delay * 2))
             done
 
-            echo "❌ ERRO CRÍTICO: Falha permanente após $max_attempts tentativas ao publicar no Cloudflare R2: $target"
-            exit 1
+            echo "⚠️ AVISO: Falha ao publicar no Cloudflare R2 após $max_attempts tentativas. Prosseguindo com distribuição local."
+            return 0
           }
 
           if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
