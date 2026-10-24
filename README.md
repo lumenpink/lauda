@@ -8,6 +8,12 @@
 
 ---
 
+## 🦀 Compilação Soberana & Cache Local de Crates
+
+O projeto está configurado para consumir o pull-through cache transparente soberano (`sparse+https://crates.2lp.in/index/`) hospedado no nó central `obizero`, garantindo compilações herméticas e resiliência offline contra oscilações de link externo.
+
+---
+
 ## ⚡ Visão Geral do Sistema
 
 O **`lauda`** substitui a complexidade pesada dos clientes tradicionais por uma micro-API JSON enxuta trafegando sobre rede segura privada (Tailscale / WireGuard):
