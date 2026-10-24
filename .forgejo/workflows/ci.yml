@@ -434,6 +434,14 @@ jobs:
       - name: "Checkout repository"
         uses: actions/checkout@v4
 
+      - name: "Log in to Sovereign Container Registry"
+        run: |
+          if [ -n "$GIT_2LP_TOKEN" ]; then
+            echo "$GIT_2LP_TOKEN" | docker login gambi.2lp.in -u lumen --password-stdin
+          else
+            echo "Aviso: GIT_2LP_TOKEN não configurado para autenticação no Docker registry."
+          fi
+      
       - name: "Build local Docker Image"
         run: |
           OLD_IMAGE_ID=$(docker inspect --format='{{.Id}}' gambi.2lp.in/lumen/lauda-server:latest 2>/dev/null || true)
