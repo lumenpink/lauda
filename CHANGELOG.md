@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **client:** resolver comparacao de versao com LAUDA_APP_VERSION (#61)
 
 ### Bug Fixes
+- **backend:** despacho smtp nativo conteinerizado e remocao de falso positivo (closes #58)
 - **calendar:** higienizar conectores temporais do titulo de eventos (#85)
 - **calendar:** interpretar expressoes de data ordinal por dia da semana e mes (#84)
 - **ci:** estabilizar esteira com imagem funcional e publicacao de apk (closes #77)
