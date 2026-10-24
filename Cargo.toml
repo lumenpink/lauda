@@ -31,3 +31,7 @@ lto = "fat"
 codegen-units = 1
 panic = "abort"
 strip = true
+
+[profile.wasm-release]
+inherits = "release"
+strip = false
