@@ -12,18 +12,18 @@ REMOTE_KEY="lauda-nightly.apk"
 NIGHTLY_APK_PATH="$SITE_DIR/lauda-nightly.apk"
 MANIFEST_PATH="$SITE_DIR/version-nightly.json"
 
-export JAVA_HOME="/usr/lib/jvm/java-21-openjdk-amd64"
-export ANDROID_HOME="/usr/lib/android-sdk"
-export ANDROID_NDK_HOME="/opt/android-ndk/android-ndk-r27c"
-export NDK_HOME="/opt/android-ndk/android-ndk-r27c"
-export PATH="/usr/lib/jvm/java-21-openjdk-amd64/bin:/opt/android-ndk/android-ndk-r27c/toolchains/llvm/prebuilt/linux-x86_64/bin:/home/lumen/.local/dx-0.7/bin:$PATH"
+export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk-amd64}"
+export ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
+export ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-/opt/android-sdk/ndk/27.2.12479018}"
+export NDK_HOME="${NDK_HOME:-$ANDROID_NDK_HOME}"
+export PATH="${JAVA_HOME}/bin:${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin:${PATH}"
 
-DX_BIN="/home/lumen/.local/dx-0.7/bin/dx"
-if [ ! -x "$DX_BIN" ]; then
-    DX_BIN="dx"
+DX_BIN="$(command -v dx 2>/dev/null || echo "/home/lumen/.local/dx-0.7/bin/dx")"
+
+LLVM_STRIP="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
+if [ ! -x "$LLVM_STRIP" ]; then
+    LLVM_STRIP="$(command -v llvm-strip 2>/dev/null || echo "llvm-strip")"
 fi
-
-LLVM_STRIP="/opt/android-ndk/android-ndk-r27c/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
 
 echo "================================================================="
 echo "Lauda — Compilação e Publicação do Canal Nightly"

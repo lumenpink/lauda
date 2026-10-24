@@ -123,7 +123,12 @@ if [ "$DO_BUILD_APK" = true ]; then
     python3 "$SCRIPT_DIR/gerar-recursos-android.py"
     "$REPO_ROOT/tests/test-android-icons.sh"
 
-    if command -v dx >/dev/null 2>&1 && rustup target list | grep -q 'aarch64-linux-android (installed)' && [ -d "${ANDROID_NDK_HOME:-/opt/android-ndk/android-ndk-r27c}" ]; then
+    NDK_CHECK_DIR="${ANDROID_NDK_HOME:-/opt/android-sdk/ndk/27.2.12479018}"
+    if [ ! -d "$NDK_CHECK_DIR" ] && [ -d "/opt/android-ndk/android-ndk-r27c" ]; then
+        NDK_CHECK_DIR="/opt/android-ndk/android-ndk-r27c"
+    fi
+
+    if command -v dx >/dev/null 2>&1 && rustup target list | grep -q 'aarch64-linux-android (installed)' && [ -d "$NDK_CHECK_DIR" ]; then
         echo "-> Compilando Android APK nativo (aarch64)..."
         "$SCRIPT_DIR/publish-nightly.sh" || echo "Aviso: Build Android concluída com avisos."
     else
