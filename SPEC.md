@@ -823,3 +823,28 @@ A fim de manter a loja soberana Pratilera (`banca`) sempre sincronizada com os �
 - [x] Invocação de API no Codeberg via curl com cabeçalho de autenticação e payload `{"ref": "main"}`.
 - [x] Teste de validação em `tests/distribution_test.rs` garantindo a presença do gatilho no workflow.
 - [x] Quality gate estrito verde (`cccp check --strict`).
+
+---
+
+## 28. Cache Offline dos 90 Dias, Abertura Atômica e Persistência de Leitura (Ticket #56)
+
+### 28.1 Diagnóstico e Arquitetura Offline-First
+1. **Abertura Atômica (0ms)**:
+   - Toda mensagem selecionada na lista deve consultar primeiramente o `LocalMessageCache` (`cache.load_message`). Estando presente em disco/SQLite local, a abertura da visualização de detalhe (`Screen::MessageDetail`) deve ser instantânea, com zero round-trips de rede.
+   - Mensagens baixadas via rede devem ser imediatamente persistidas no `LocalMessageCache` (`cache.save_message`).
+2. **Sincronização dos 90 Dias em Segundo Plano**:
+   - O sincronizador em segundo plano (SWR) deve identificar envelopes dos últimos 90 dias presentes na caixa ativa que ainda não tenham o corpo completo em `cache_messages` e pré-carregá-los de forma assíncrona não-bloqueante.
+3. **Persistência Confiável de Leitura**:
+   - `LocalMessageCache` deve fornecer o método `mark_envelope_read(mailbox, uid, read)` para atualizar o registro correspondente em `cache_envelopes` no SQLite / storage local.
+   - A operação de marcação de leitura não deve ser cancelada pela troca de tela (desmontagem do componente Dioxus) e deve registrar a ação na `ActionsQueue` quando offline para retry garantido.
+   - Na TUI (`tui/runner.rs`), a abertura de mensagens não lidas deve sincronizar a leitura no cache e no servidor.
+
+### 28.2 Critérios de Aceite (Ticket #56)
+- [ ] `LocalMessageCache::mark_envelope_read` atualiza o estado de leitura do envelope no SQLite/storage local.
+- [ ] Abertura de mensagem no cliente Dioxus prioriza `cache.load_message`, garantindo carregamento instantâneo se já cacheada.
+- [ ] Mensagens buscadas pela rede são salvas em `cache_messages` para consultas subsequentes sem rede.
+- [ ] Marcação de leitura é persistida localmente e enfileirada confiavelmente sem perda por desmontagem de componente.
+- [ ] TUI aciona marcação de leitura ao abrir mensagens não lidas.
+- [ ] Testes automatizados herméticos validam persistência de status de leitura, prefetch e cache de 90 dias.
+- [ ] Quality gate estrito aprovado via `cccp check --strict`.
+
