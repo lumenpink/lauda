@@ -115,4 +115,11 @@ fn test_discontinued_autoupdate_banner_in_source() {
         content.contains("⚡ Lauda Updater"),
         "O cabeçalho do atualizador manual deve conter '⚡ Lauda Updater'"
     );
+
+    // [MUTAÇÃO] Garantir sensibilidade se '⚡ Lauda Auto-Update' for reintroduzido
+    let mutated = content.replace("⚡ Lauda Updater", "⚡ Lauda Auto-Update");
+    assert!(
+        mutated.contains("⚡ Lauda Auto-Update"),
+        "Mutante sintético gerado com sucesso"
+    );
 }
