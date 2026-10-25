@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **updater:** explicitar atualizacao manual e descontinuar auto-update (closes #55)
 - **deps:** migrar urupema para crate gambi e converter testes para e2e real (closes #61)
 - **ci:** remover campo permissions incompativel com forgejo actions (closes #60)
 - **ci:** sanear pipeline para operacao offline, pull-through cache crates e gambi (closes #57)
