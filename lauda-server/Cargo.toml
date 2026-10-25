@@ -26,18 +26,16 @@ rusqlite = { version = "0.33", features = ["bundled"] }
 base64 = "0.22"
 html2text = "0.12"
 lauda-index = { path = "../lauda-index" }
-urupema = { path = "../../urupema" }
+urupema = { version = "0.1", registry = "gambi" }
 
 [dev-dependencies]
 base64 = "0.22"
 chrono = "0.4"
 http-body-util = "0.1"
-ishcondidim = { path = "../../ishcondidim" }
 lauda-client = { path = "../lauda-client" }
 minijinja = "2"
-papeli = { path = "../../papeli" }
 tempfile = "3.10"
-urupema = { path = "../../urupema" }
+urupema = { version = "0.1", registry = "gambi" }
 
 
 [lints]

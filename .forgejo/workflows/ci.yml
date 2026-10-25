@@ -23,22 +23,6 @@ jobs:
       - name: "Checkout repository"
         uses: actions/checkout@v4
 
-      - name: "Checkout sibling dependencies"
-        run: |
-          mkdir -p ../ishcondidim ../papeli ../urupema
-          if [ -d /opt/gost/deps/ishcondidim ]; then
-            ln -sf /opt/gost/deps/* ../ 2>/dev/null || true
-          fi
-          if [ ! -f ../ishcondidim/Cargo.toml ]; then
-            git clone --depth 1 https://gambi.2lp.in/lumen/ishcondidim.git ../ishcondidim
-          fi
-          if [ ! -f ../papeli/Cargo.toml ]; then
-            git clone --depth 1 https://gambi.2lp.in/lumen/papeli.git ../papeli
-          fi
-          if [ ! -f ../urupema/Cargo.toml ]; then
-            git clone --depth 1 https://gambi.2lp.in/lumen/urupema.git ../urupema
-          fi
-
       - name: "Sync Version Manifests"
         run: ./scripts/sync-version-manifests.sh
 
@@ -75,22 +59,6 @@ jobs:
     steps:
       - name: "Checkout repository"
         uses: actions/checkout@v4
-
-      - name: "Checkout sibling dependencies"
-        run: |
-          mkdir -p ../ishcondidim ../papeli ../urupema
-          if [ -d /opt/gost/deps/ishcondidim ]; then
-            ln -sf /opt/gost/deps/* ../ 2>/dev/null || true
-          fi
-          if [ ! -f ../ishcondidim/Cargo.toml ]; then
-            git clone --depth 1 https://gambi.2lp.in/lumen/ishcondidim.git ../ishcondidim
-          fi
-          if [ ! -f ../papeli/Cargo.toml ]; then
-            git clone --depth 1 https://gambi.2lp.in/lumen/papeli.git ../papeli
-          fi
-          if [ ! -f ../urupema/Cargo.toml ]; then
-            git clone --depth 1 https://gambi.2lp.in/lumen/urupema.git ../urupema
-          fi
 
       - name: "Sync Version Manifests"
         run: ./scripts/sync-version-manifests.sh
@@ -148,28 +116,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: "Checkout sibling dependencies"
-        run: |
-          mkdir -p ../ishcondidim ../papeli ../urupema
-          if [ -d /opt/gost/deps/ishcondidim ]; then
-            ln -sf /opt/gost/deps/* ../ 2>/dev/null || true
-          fi
-          if [ ! -f ../ishcondidim/Cargo.toml ]; then
-            git clone --depth 1 https://gambi.2lp.in/lumen/ishcondidim.git ../ishcondidim
-          fi
-          if [ ! -f ../papeli/Cargo.toml ]; then
-            git clone --depth 1 https://gambi.2lp.in/lumen/papeli.git ../papeli
-          fi
-          if [ ! -f ../urupema/Cargo.toml ]; then
-            git clone --depth 1 https://gambi.2lp.in/lumen/urupema.git ../urupema
-          fi
-
-      - name: "Configure Sovereign Lumen Cargo Registry"
+      - name: "Configure Sovereign Gambi Cargo Registry"
         run: |
           mkdir -p "$HOME/.cargo"
-          printf '[registries.lumen]\nindex = "sparse+https://gambi.2lp.in/api/packages/lumen/cargo/"\n' > "$HOME/.cargo/config.toml"
-          if [ -n "${{ secrets.LUMEN_REGISTRY_TOKEN }}" ]; then
-            printf '[registries.lumen]\ntoken = "${{ secrets.LUMEN_REGISTRY_TOKEN }}"\n' > "$HOME/.cargo/credentials.toml"
+          printf '[registries.gambi]\nindex = "sparse+https://gambi.2lp.in/api/packages/lumen/cargo/"\n' > "$HOME/.cargo/config.toml"
+          if [ -n "${{ secrets.GAMBI_2LP_IN_TOKEN }}" ]; then
+            printf '[registries.gambi]\ntoken = "${{ secrets.GAMBI_2LP_IN_TOKEN }}"\n' > "$HOME/.cargo/credentials.toml"
           fi
 
       - name: "Determine Version & Release Metadata"

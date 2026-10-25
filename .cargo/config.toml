@@ -4,6 +4,9 @@ replace-with = "sovereign-crates"
 [registries.sovereign-crates]
 index = "sparse+https://crates.2lp.in/index/"
 
+[registries.gambi]
+index = "sparse+https://gambi.2lp.in/api/packages/lumen/cargo/"
+
 [target.x86_64-unknown-linux-musl]
 rustflags = ["-C", "target-feature=+crt-static"]
 

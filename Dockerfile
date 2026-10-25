@@ -5,14 +5,9 @@ FROM docker.io/lumenpink/gost-ci-cross:latest AS builder
 
 WORKDIR /usr/src
 
-# Configurar pull-through cache soberano para crates.io no obizero
+# Configurar registros soberanos para crates.io e pacotes da gambi no obizero
 RUN mkdir -p /root/.cargo && \
-    printf '[source.crates-io]\nreplace-with = "sovereign-crates"\n\n[registries.sovereign-crates]\nindex = "sparse+https://crates.2lp.in/index/"\n' > /root/.cargo/config.toml
-
-# Clonar dependências irmãs para satisfazer dev-dependencies do workspace em build hermético
-RUN git clone --depth 1 https://gambi.2lp.in/lumen/ishcondidim.git /usr/src/ishcondidim && \
-    git clone --depth 1 https://gambi.2lp.in/lumen/papeli.git /usr/src/papeli && \
-    git clone --depth 1 https://gambi.2lp.in/lumen/urupema.git /usr/src/urupema
+    printf '[source.crates-io]\nreplace-with = "sovereign-crates"\n\n[registries.sovereign-crates]\nindex = "sparse+https://crates.2lp.in/index/"\n\n[registries.gambi]\nindex = "sparse+https://gambi.2lp.in/api/packages/lumen/cargo/"\n' > /root/.cargo/config.toml
 
 WORKDIR /usr/src/lauda
 
