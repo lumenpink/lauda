@@ -54,3 +54,9 @@ O `lauda` adiciona os seguintes subcomandos:
 
 ## 6. Pipeline de Entrega na Esteira
 No workflow de CI (`.forgejo/workflows/ci.yml`), a etapa de build publica os artefatos compilados na rota `/srv/banca/downloads/lauda/` e no R2 da Banca, atualizando os links `stable-latest` ou `nightly-latest` e o arquivo `version` correspondente.
+
+## 7. Soberania e Descontinuação de Auto-Update Intrusivo (Ticket #55)
+Em conformidade com a decisão soberana de arquitetura, o Lauda **não** executa rotinas de auto-update, auto-check periódico em background ou daemons no arranque (startup).
+A verificação periódica ou em background de todo o ecossistema é delegada à **Jornaleira** para as usuárias que optarem por utilizá-la.
+O cliente do Lauda preserva de forma estrita e autônoma seus comandos manuais sob demanda (`lauda check-update` e `lauda update`), assegurando que a usuária não é obrigada a usar um gerenciador externo caso deseje atualizar o Lauda de forma standalone.
+
