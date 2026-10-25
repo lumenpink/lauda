@@ -101,3 +101,18 @@ fn test_resolve_channel_env_empty() {
     let ch = resolve_channel(None, Some("   "), Some(&config_file));
     assert_eq!(ch, "stable");
 }
+
+#[test]
+fn test_discontinued_autoupdate_banner_in_source() {
+    let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let update_rs = manifest_dir.join("src").join("update.rs");
+    let content = std::fs::read_to_string(&update_rs).expect("update.rs deve existir");
+    assert!(
+        !content.contains("⚡ Lauda Auto-Update"),
+        "A string legada '⚡ Lauda Auto-Update' deve ser removida em favor de '⚡ Lauda Updater // Atualização Manual' (#55)"
+    );
+    assert!(
+        content.contains("⚡ Lauda Updater"),
+        "O cabeçalho do atualizador manual deve conter '⚡ Lauda Updater'"
+    );
+}
