@@ -58,10 +58,11 @@ check_not_present "$WORKFLOW" 'git.2lp.in' "Ausência de git.2lp.in legado no ci
 check_present "$CARGO_CONFIG" 'sparse+https://crates.2lp.in/index/' "Pull-through cache configurado em .cargo/config.toml" || FAILED=1
 check_present "$DOCKERFILE" 'crates.2lp.in' "Pull-through cache configurado no Dockerfile" || FAILED=1
 
-# 8. Clonagem hermética de dependências irmãs via gambi.2lp.in no Dockerfile (#57)
-check_present "$DOCKERFILE" 'https://gambi.2lp.in/lumen/ishcondidim.git' "Clone hermético ishcondidim via gambi.2lp.in" || FAILED=1
-check_present "$DOCKERFILE" 'https://gambi.2lp.in/lumen/papeli.git' "Clone hermético papeli via gambi.2lp.in" || FAILED=1
-check_present "$DOCKERFILE" 'https://gambi.2lp.in/lumen/urupema.git' "Clone hermético urupema via gambi.2lp.in" || FAILED=1
+# 8. Ausência de clones manuais e configuração do registro gambi (#61)
+check_not_present "$DOCKERFILE" 'git clone' "Ausência de clones de dependências no Dockerfile" || FAILED=1
+check_not_present "$WORKFLOW" 'git clone --depth 1' "Ausência de clones de dependências no ci.yml" || FAILED=1
+check_present "$CARGO_CONFIG" 'https://gambi.2lp.in/api/packages/lumen/cargo/' "Registro soberano gambi configurado em .cargo/config.toml" || FAILED=1
+check_present "$DOCKERFILE" 'https://gambi.2lp.in/api/packages/lumen/cargo/' "Registro soberano gambi configurado no Dockerfile" || FAILED=1
 
 # 9. Testes de mutação
 echo "=== [MUTATION] Testes de Mutantes Críticos ==="
