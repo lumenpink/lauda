@@ -217,7 +217,7 @@ pub fn cmd_update(
     let download_url = get_download_url(&channel, pin);
     let current_ver = get_current_version();
 
-    println!("⚡ Lauda Auto-Update");
+    println!("⚡ Lauda Updater // Atualização Manual");
     println!("Canal Selecionado : {}", channel);
     if let Some(p) = pin {
         println!("Versão Fixada     : v{}", p);
