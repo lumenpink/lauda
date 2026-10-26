@@ -109,7 +109,7 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      GIT_2LP_TOKEN: ${{ secrets.GIT_2LP_TOKEN }}
+      GAMBI_2LP_IN_TOKEN: ${{ secrets.GAMBI_2LP_IN_TOKEN }}
     steps:
       - name: "Checkout repository"
         uses: actions/checkout@v4
@@ -249,12 +249,12 @@ jobs:
           VERSION="${{ steps.meta.outputs.version }}"
           CHANNEL="${{ steps.meta.outputs.channel }}"
 
-          if [ -z "$GIT_2LP_TOKEN" ]; then
-            echo "Aviso: GIT_2LP_TOKEN ausente. Pulando rotação na Banca."
+          if [ -z "$GAMBI_2LP_IN_TOKEN" ]; then
+            echo "Aviso: GAMBI_2LP_IN_TOKEN ausente. Pulando rotação na Banca."
             exit 0
           fi
 
-          git clone --depth 1 "https://lumen:${GIT_2LP_TOKEN}@gambi.2lp.in/lumen/banca.git" /tmp/banca
+          git clone --depth 1 "https://lumen:${GAMBI_2LP_IN_TOKEN}@gambi.2lp.in/lumen/banca.git" /tmp/banca
 
           if [ -d "/tmp/banca/site/downloads/lauda" ] && [ -f "/tmp/banca/scripts/rotate-downloads.py" ]; then
             cd /tmp/banca
@@ -363,17 +363,17 @@ jobs:
     steps:
       - name: "Trigger Pratilera Store Update"
         env:
-          GIT_2LP_TOKEN: ${{ secrets.GIT_2LP_TOKEN }}
+          GAMBI_2LP_IN_TOKEN: ${{ secrets.GAMBI_2LP_IN_TOKEN }}
         run: |
-          if [ -n "$GIT_2LP_TOKEN" ]; then
+          if [ -n "$GAMBI_2LP_IN_TOKEN" ]; then
             echo "-> Notificando a Pratilera (Banca) para atualizar o catálogo..."
             curl -s -X POST \
-              -H "Authorization: token $GIT_2LP_TOKEN" \
+              -H "Authorization: token $GAMBI_2LP_IN_TOKEN" \
               -H "Content-Type: application/json" \
               "https://gambi.2lp.in/api/v1/repos/lumen/banca/actions/workflows/ci.yml/dispatches" \
               -d '{"ref": "main"}' || true
           else
-            echo "GIT_2LP_TOKEN ausente, pulando disparo remoto da Pratilera."
+            echo "GAMBI_2LP_IN_TOKEN ausente, pulando disparo remoto da Pratilera."
           fi
 
   deploy-server:
@@ -381,16 +381,18 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test]
     if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && github.event_name == 'push'
+    env:
+      GAMBI_2LP_IN_TOKEN: ${{ secrets.GAMBI_2LP_IN_TOKEN }}
     steps:
       - name: "Checkout repository"
         uses: actions/checkout@v4
 
       - name: "Log in to Sovereign Container Registry"
         run: |
-          if [ -n "$GIT_2LP_TOKEN" ]; then
-            echo "$GIT_2LP_TOKEN" | docker login gambi.2lp.in -u lumen --password-stdin
+          if [ -n "$GAMBI_2LP_IN_TOKEN" ]; then
+            echo "$GAMBI_2LP_IN_TOKEN" | docker login gambi.2lp.in -u lumen --password-stdin
           else
-            echo "Aviso: GIT_2LP_TOKEN não configurado para autenticação no Docker registry."
+            echo "Aviso: GAMBI_2LP_IN_TOKEN não configurado para autenticação no Docker registry."
           fi
       
       - name: "Build local Docker Image"

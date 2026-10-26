@@ -2,7 +2,7 @@
 
 > Cliente de correio eletrônico acolhedor, focado na experiência aconchegante de ler cartas com calma e escrever com tranquilidade e sem ruído, construído em Rust com **Dioxus 0.7**, backend em **Axum** e motor inteligente de indexação **lauda-index**.
 
-[![GOST Compliance](https://img.shields.io/badge/GOST-1.5.0-crimson)](https://codeberg.org/lumenpink/gost)
+[![GOST Compliance](https://img.shields.io/badge/GOST-1.5.0-crimson)](https://gambi.2lp.in/lumen/gost)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](./LICENSE)
 [![Website](https://img.shields.io/badge/portal-lauda.2lp.in-red)](https://lauda.2lp.in)
 
@@ -55,7 +55,7 @@ lauda/
 
 ## 🧪 Testes e Qualidade
 
-O projeto segue rigorosamente o ciclo **DD-TDD** e as diretrizes da norma [GOST](https://codeberg.org/lumenpink/gost):
+O projeto segue rigorosamente o ciclo **DD-TDD** e as diretrizes da norma [GOST](https://gambi.2lp.in/lumen/gost):
 
 ```bash
 # Executar todos os testes de unidade de todos os crates do workspace (45+ testes)

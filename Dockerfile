@@ -1,7 +1,7 @@
 # ==============================================================================
 # Lauda Server — Dockerfile Multi-Stage Minimalista
 # ==============================================================================
-FROM docker.io/lumenpink/gost-ci-cross:latest AS builder
+FROM gambi.2lp.in/lumen/gost-ci-cross:latest AS builder
 
 WORKDIR /usr/src
 
@@ -22,9 +22,9 @@ COPY lauda-server ./lauda-server
 RUN cargo build --release --bin lauda-server
 
 # ==============================================================================
-# Estágio de Execução (Debian Slim Minimal)
+# Estágio de Execução (Debian Slim Minimal Soberano)
 # ==============================================================================
-FROM debian:bookworm-slim
+FROM gambi.2lp.in/lumen/mirror-debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
