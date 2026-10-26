@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **ci:** cd soberano do lauda-server no obizero via ssh autenticado (closes #64)
+
 ### Changed
 - **updater:** explicitar atualizacao manual e descontinuar auto-update (closes #55)
 - **deps:** migrar urupema para crate gambi e converter testes para e2e real (closes #61)
