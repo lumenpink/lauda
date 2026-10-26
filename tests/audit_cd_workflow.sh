@@ -38,7 +38,9 @@ FAILED=0
 check_not_present "$WORKFLOW" 'WATCHTOWER' "Ausência de variáveis e webhooks do Watchtower" || FAILED=1
 check_not_present "$WORKFLOW" 'watchtower' "Ausência de referências literais ao Watchtower" || FAILED=1
 
-# 2. Deploy local soberano no obizero
+# 2. Deploy local soberano no obizero via SSH (#64)
+check_present "$WORKFLOW" 'OBIZERO_SSH_HOST' "Presença de configuração de SSH para deploy local no obizero" || FAILED=1
+check_present "$WORKFLOW" 'ssh $SSH_OPTS' "Invocação de deploy soberano via SSH no obizero" || FAILED=1
 check_present "$WORKFLOW" 'docker compose -f /home/lumen/stacks/mail/compose.yml up -d --no-build lauda-server' "Comando de deploy local sem download redundante" || FAILED=1
 
 # 3. Sondagem ativa de healthcheck
