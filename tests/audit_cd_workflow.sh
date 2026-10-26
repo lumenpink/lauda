@@ -113,6 +113,11 @@ if grep -q "git.2lp.in" "$TMP_MUTANT"; then
     echo "  [PASS] Mutante D (reintrodução de git.2lp.in) isolado"
 fi
 
+grep -v 'ssh \$SSH_OPTS' "$WORKFLOW" > "$TMP_MUTANT"
+if ! grep -q 'ssh \$SSH_OPTS' "$TMP_MUTANT"; then
+    echo "  [PASS] Mutante G (omissão de despacho SSH) isolado"
+fi
+
 if [ $FAILED -ne 0 ]; then
     echo "❌ [RED TEST] Auditoria falhou: pendências de saneamento detectadas."
     exit 1
