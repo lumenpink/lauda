@@ -543,11 +543,25 @@ fn test_ci_workflow_avoids_unreachable_container_and_has_stable_hermetic_test_pi
         "ci.yml não deve referenciar imagem inexistente codeberg.org/lumenpink/gost-ci-lauda"
     );
 
-    // 2. Job test deve utilizar imagem funcional no Docker Hub ou runner hermético
+    // 2. Job test deve utilizar imagem soberana da forja local gambi.2lp.in
     assert!(
-        content.contains("docker.io/lumenpink/gost-ci-wasm")
+        content.contains("gambi.2lp.in/lumen/gost-ci-wasm")
             || content.contains("runs-on: ubuntu-latest"),
         "Job test deve usar imagem funcional suportada"
+    );
+
+    // 2.1 Não deve conter referências a forges externas ou credenciais legadas
+    assert!(
+        !content.contains("docker.io"),
+        "ci.yml não deve conter referências a docker.io"
+    );
+    assert!(
+        !content.contains("codeberg.org"),
+        "ci.yml não deve conter referências a codeberg.org"
+    );
+    assert!(
+        !content.contains("GIT_2LP_TOKEN"),
+        "ci.yml deve utilizar GAMBI_2LP_IN_TOKEN em vez de GIT_2LP_TOKEN"
     );
 
     // 3. Deve conter gatilho de dispatch para a Pratilera

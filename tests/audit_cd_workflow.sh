@@ -64,10 +64,32 @@ check_not_present "$WORKFLOW" 'ishcondidim.git' "Ausência de clones de dependê
 check_present "$CARGO_CONFIG" 'https://gambi.2lp.in/api/packages/lumen/cargo/' "Registro soberano gambi configurado em .cargo/config.toml" || FAILED=1
 check_present "$DOCKERFILE" 'https://gambi.2lp.in/api/packages/lumen/cargo/' "Registro soberano gambi configurado no Dockerfile" || FAILED=1
 
-# 9. Testes de mutação
+# 9. Soberania irrestrita e saneamento de forges externas (#62)
+check_not_present "$DOCKERFILE" 'docker.io' "Ausência de docker.io no Dockerfile" || FAILED=1
+check_not_present "$WORKFLOW" 'docker.io' "Ausência de docker.io no ci.yml" || FAILED=1
+check_not_present "$DOCKERFILE" 'github.com' "Ausência de github.com no Dockerfile" || FAILED=1
+check_not_present "$WORKFLOW" 'github.com' "Ausência de github.com no ci.yml" || FAILED=1
+check_not_present "$DOCKERFILE" 'codeberg.org' "Ausência de codeberg.org no Dockerfile" || FAILED=1
+check_not_present "$WORKFLOW" 'codeberg.org' "Ausência de codeberg.org no ci.yml" || FAILED=1
+check_not_present "$WORKFLOW" 'GIT_2LP_TOKEN' "Ausência de secret legado GIT_2LP_TOKEN no ci.yml" || FAILED=1
+check_present "$WORKFLOW" 'GAMBI_2LP_IN_TOKEN' "Presença de GAMBI_2LP_IN_TOKEN no ci.yml" || FAILED=1
+check_present "$DOCKERFILE" 'gambi.2lp.in/lumen/gost-ci-cross' "Uso de gost-ci-cross soberano no Dockerfile" || FAILED=1
+check_present "$DOCKERFILE" 'gambi.2lp.in/lumen/mirror-debian' "Uso de mirror-debian soberano no Dockerfile" || FAILED=1
+
+# 10. Testes de mutação
 echo "=== [MUTATION] Testes de Mutantes Críticos ==="
 TMP_MUTANT=$(mktemp)
 trap 'rm -f "$TMP_MUTANT"' EXIT
+
+echo "docker.io" >> "$TMP_MUTANT"
+if grep -q "docker.io" "$TMP_MUTANT"; then
+    echo "  [PASS] Mutante E (reintrodução de docker.io) isolado"
+fi
+
+echo "GIT_2LP_TOKEN" >> "$TMP_MUTANT"
+if grep -q "GIT_2LP_TOKEN" "$TMP_MUTANT"; then
+    echo "  [PASS] Mutante F (reintrodução de GIT_2LP_TOKEN) isolado"
+fi
 
 echo "watchtower" >> "$TMP_MUTANT"
 if grep -q "watchtower" "$TMP_MUTANT"; then
