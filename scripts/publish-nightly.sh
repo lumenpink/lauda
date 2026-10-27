@@ -30,6 +30,7 @@ echo "Lauda — Compilação e Publicação do Canal Nightly"
 echo "================================================================="
 
 cd "$REPO_ROOT"
+git config --global --add safe.directory "$REPO_ROOT" 2>/dev/null || true
 
 # 1. Metadados da versão
 BASE_VERSION="$(cat "$REPO_ROOT/VERSION" | tr -d '[:space:]')"
@@ -113,9 +114,14 @@ if [ -f "$MANIFEST_XML" ]; then
     if ! grep -q "usesCleartextTraffic" "$MANIFEST_XML"; then
         sed -i 's/<application /<application android:usesCleartextTraffic="true" /g' "$MANIFEST_XML"
     fi
+    if ! grep -q "roundIcon" "$MANIFEST_XML"; then
+        sed -i 's/<application /<application android:roundIcon="@mipmap\/ic_launcher_round" /g' "$MANIFEST_XML"
+    fi
+    if ! grep -q "android:icon=" "$MANIFEST_XML"; then
+        sed -i 's/<application /<application android:icon="@mipmap\/ic_launcher" /g' "$MANIFEST_XML"
+    fi
     # Garantir nome canônico "Lauda" e ícones oficiais
     sed -i 's/android:label="[^"]*"/android:label="@string\/app_name"/g' "$MANIFEST_XML"
-    sed -i 's/<application /<application android:icon="@mipmap\/ic_launcher" android:roundIcon="@mipmap\/ic_launcher_round" /g' "$MANIFEST_XML"
 fi
 
 # Injetar MainActivity.kt com suporte a OnBackPressedDispatcher (gestos de voltar)
