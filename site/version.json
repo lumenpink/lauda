@@ -1,8 +1,8 @@
 {
-  "version": "0.5.0-dev.281+20261026.2d3d6fb",
+  "version": "0.5.0-dev.289+20261027.bf671e9",
   "min_compatible_version": "0.1.0",
   "apk_url": "https://bucket.2lp.in/lauda.apk",
   "package_id": "in.twolp.lauda",
-  "release_notes": "Build contínua do Lauda Smolclient (commit bb0fe5d).",
-  "published_at": "2026-10-26T12:43:57Z"
+  "release_notes": "Build contínua do Lauda Smolclient (commit dd40296).",
+  "published_at": "2026-10-27T10:57:35Z"
 }
