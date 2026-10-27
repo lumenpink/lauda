@@ -130,7 +130,7 @@ if [ "$DO_BUILD_APK" = true ]; then
 
     if command -v dx >/dev/null 2>&1 && rustup target list | grep -q 'aarch64-linux-android (installed)' && [ -d "$NDK_CHECK_DIR" ]; then
         echo "-> Compilando Android APK nativo (aarch64)..."
-        "$SCRIPT_DIR/publish-nightly.sh" || echo "Aviso: Build Android concluída com avisos."
+        "$SCRIPT_DIR/publish-nightly.sh"
     else
         echo "-> Ambiente Android NDK/SDK não disponível diretamente; mantendo APK existente em $SITE_DIR/lauda-latest.apk"
     fi

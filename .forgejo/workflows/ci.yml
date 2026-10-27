@@ -305,10 +305,10 @@ jobs:
 
       - name: "Package Android APK & Sign Soberano"
         run: |
-          ./scripts/package-all.sh --apk || true
+          ./scripts/package-all.sh --apk
           if [ -f scripts/sign-release.sh ]; then
-            [ -f site/lauda.apk ] && ./scripts/sign-release.sh site/lauda.apk || true
-            [ -f site/lauda-latest.apk ] && ./scripts/sign-release.sh site/lauda-latest.apk || true
+            [ -f site/lauda.apk ] && ./scripts/sign-release.sh site/lauda.apk
+            [ -f site/lauda-latest.apk ] && ./scripts/sign-release.sh site/lauda-latest.apk
           fi
 
       - name: "Sync with Pratilera"
@@ -350,9 +350,12 @@ jobs:
             elif [ -f site/lauda-latest.apk ]; then
               upload_r2_with_retry "twolp-bucket/lauda.apk" "site/lauda-latest.apk"
               upload_r2_with_retry "twolp-bucket/lauda-latest.apk" "site/lauda-latest.apk"
+            else
+              echo "❌ ERRO: Nenhum APK Android encontrado para upload no Cloudflare R2!" >&2
+              exit 1
             fi
           else
-            echo "Cloudflare token ausente ou APK ausente, mantendo distribuição estática."
+            echo "Cloudflare token ausente, mantendo distribuição estática."
           fi
 
   trigger-pratilera:

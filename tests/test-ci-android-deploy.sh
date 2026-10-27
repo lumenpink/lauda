@@ -52,7 +52,12 @@ check_not_present "$PUBLISH_SCRIPT" '^export JAVA_HOME="/usr' "Ausência de expo
 # 4. Derivação de LLVM_STRIP dinamicamente
 check_present "$PUBLISH_SCRIPT" 'LLVM_STRIP="?\$\{ANDROID_NDK_HOME\}' "LLVM_STRIP derivado de ANDROID_NDK_HOME"
 
-# 5. [MUTAÇÃO] Sensibilidade da validação a regressões
+# 5. Execução estrita do empacotamento na CI (#65)
+check_not_present "$WORKFLOW" '\./scripts/package-all\.sh --apk \|\| true' "Execucao estrita de package-all.sh --apk sem mascaramento || true"
+check_not_present "$PACKAGE_SCRIPT" 'publish-nightly\.sh"\s*\|\|\s*echo' "Execucao estrita de publish-nightly.sh sem mascaramento || echo"
+check_present "$WORKFLOW" 'Nenhum APK Android encontrado para upload no Cloudflare R2' "Fail-fast no upload R2 quando APK estiver ausente"
+
+# 6. [MUTAÇÃO] Sensibilidade da validação a regressões
 echo "-> [MUTAÇÃO] Testando sensibilidade do teste contra mutantes..."
 TEMP_WORKFLOW=$(mktemp)
 cp "$WORKFLOW" "$TEMP_WORKFLOW"
@@ -64,6 +69,24 @@ if grep -qE "image:\s*gambi\.2lp\.in/lumen/gost-ci-android:latest" "$TEMP_WORKFL
     FAILED=1
 else
     echo "  [PASS] Mutação 1: remoção do container detectada com sucesso."
+fi
+
+# Mutação 2: Reintrodução de mascaramento || true em package-all.sh --apk
+sed -i 's/\.\/scripts\/package-all\.sh --apk/\.\/scripts\/package-all\.sh --apk || true/' "$TEMP_WORKFLOW"
+if ! grep -qE -- '\./scripts/package-all\.sh --apk \|\| true' "$TEMP_WORKFLOW"; then
+    echo "  [FAIL] Mutação 2 falhou: injeção de mascaramento || true não ocorreu no teste!"
+    FAILED=1
+else
+    echo "  [PASS] Mutação 2: sensibilidade a mascaramento || true validada."
+fi
+
+# Mutação 3: Ausência de fail-fast de APK no upload R2
+sed -i '/Nenhum APK Android encontrado para upload no Cloudflare R2/d' "$TEMP_WORKFLOW"
+if grep -q "Nenhum APK Android encontrado para upload no Cloudflare R2" "$TEMP_WORKFLOW"; then
+    echo "  [FAIL] Mutação 3 falhou: omissão do fail-fast não foi detectada!"
+    FAILED=1
+else
+    echo "  [PASS] Mutação 3: sensibilidade à omissão do fail-fast R2 validada."
 fi
 rm -f "$TEMP_WORKFLOW"
 
