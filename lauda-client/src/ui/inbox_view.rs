@@ -57,7 +57,18 @@ pub fn InboxView(
                     .await
                 {
                     has_more.set(msgs.len() == 50);
-                    messages.set(msgs);
+                    messages.set(msgs.clone());
+
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        let cache = LocalMessageCache::new(get_default_cache_dir());
+                        let _ = cache.save_envelopes(&box_name, &msgs);
+                        let now_unix = crate::domain::time::current_unix_timestamp();
+                        let _ = crate::domain::prefetch_missing_bodies(
+                            &client, &token, &box_name, &msgs, &cache, 5, now_unix,
+                        )
+                        .await;
+                    }
                 }
                 // Sincroniza a fatia de 90 dias em background no cache local
                 if let Ok(docs) = client.fetch_index_slice(&token, &box_name, 90).await {
@@ -84,6 +95,28 @@ pub fn InboxView(
                 {
                     if more_msgs.len() < 50 {
                         has_more.set(false);
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        let cache = LocalMessageCache::new(get_default_cache_dir());
+                        let _ = cache.save_envelopes(&box_name, &more_msgs);
+                        let now_unix = crate::domain::time::current_unix_timestamp();
+                        let client_clone = client;
+                        let token_clone = token.clone();
+                        let box_name_clone = box_name.clone();
+                        let msgs_clone = more_msgs.clone();
+                        spawn(async move {
+                            let _ = crate::domain::prefetch_missing_bodies(
+                                &client_clone,
+                                &token_clone,
+                                &box_name_clone,
+                                &msgs_clone,
+                                &cache,
+                                5,
+                                now_unix,
+                            )
+                            .await;
+                        });
                     }
                     messages.write().extend(more_msgs);
                 }

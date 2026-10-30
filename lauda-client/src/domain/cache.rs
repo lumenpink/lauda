@@ -539,14 +539,39 @@ impl LocalMessageCache {
         }
     }
 
-    /// Parser minimalista para timestamps ISO-8601 UTC (ex: "2026-10-10T12:00:00Z" ou "2026-10-10 12:00:00").
+    /// Parser robusto para timestamps de mensagens (ISO-8601/RFC-3339 e RFC-2822).
+    /// Suporta offsets de fuso horário (+00:00, -03:00, +0000, -0300) e converte para segundos Unix UTC.
     pub fn parse_iso_date_to_unix(date_str: &str) -> Option<u64> {
-        let parts: Vec<&str> = date_str.split(&['T', ' '][..]).collect();
-        if parts.is_empty() {
+        let trimmed = date_str.trim();
+        if trimmed.is_empty() {
             return None;
         }
 
-        let date_parts: Vec<&str> = parts[0].split('-').collect();
+        // Se contiver vírgula (ex: "Fri, 30 Oct 2026 13:00:00 -0300"), descarta o dia da semana
+        let s = if let Some(idx) = trimmed.find(',') {
+            trimmed[idx + 1..].trim()
+        } else {
+            trimmed
+        };
+
+        // Se o primeiro segmento contiver '-', trata como RFC-3339 / ISO-8601 (ex: YYYY-MM-DD).
+        // Caso contrário, trata como RFC-2822 (ex: DD Mon YYYY).
+        let first_segment = s.split(&[' ', 'T'][..]).next().unwrap_or("");
+        if first_segment.contains('-') {
+            Self::parse_rfc3339_to_unix(s)
+        } else {
+            Self::parse_rfc2822_to_unix(s)
+        }
+    }
+
+    fn parse_rfc3339_to_unix(s: &str) -> Option<u64> {
+        let (date_part, time_and_tz) = if let Some(idx) = s.find(['T', ' ']) {
+            (&s[..idx], &s[idx + 1..])
+        } else {
+            (s, "00:00:00")
+        };
+
+        let date_parts: Vec<&str> = date_part.split('-').collect();
         if date_parts.len() != 3 {
             return None;
         }
@@ -555,15 +580,133 @@ impl LocalMessageCache {
         let month: u64 = date_parts[1].parse().ok()?;
         let day: u64 = date_parts[2].parse().ok()?;
 
-        let time_part = if parts.len() > 1 {
-            parts[1].trim_end_matches('Z')
-        } else {
-            "00:00:00"
-        };
+        let (time_part, offset_secs) = Self::extract_time_and_offset(time_and_tz);
+
         let time_parts: Vec<&str> = time_part.split(':').collect();
         let hour: u64 = time_parts.first().and_then(|s| s.parse().ok()).unwrap_or(0);
         let min: u64 = time_parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+        let sec: u64 = time_parts
+            .get(2)
+            .and_then(|s| s.split('.').next())
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+
+        let local_secs = Self::ymd_hms_to_unix(year, month, day, hour, min, sec)?;
+        let utc_secs = (local_secs as i64) - offset_secs;
+        if utc_secs < 0 {
+            Some(0)
+        } else {
+            Some(utc_secs as u64)
+        }
+    }
+
+    fn extract_time_and_offset(s: &str) -> (&str, i64) {
+        let trimmed = s.trim();
+        if let Some(t) = trimmed.strip_suffix('Z') {
+            return (t.trim(), 0);
+        }
+
+        // Procura '+' ou '-' após pelo menos 2 caracteres de hora
+        if trimmed.len() > 2
+            && let Some(idx) = trimmed[2..].find(['+', '-'])
+        {
+            let actual_idx = 2 + idx;
+            let time_part = trimmed[..actual_idx].trim();
+            let tz_part = trimmed[actual_idx..].trim();
+            let sign = if tz_part.starts_with('+') { 1 } else { -1 };
+            let raw_tz = tz_part.trim_start_matches(['+', '-']);
+            let offset_secs = Self::parse_tz_digits(raw_tz) * sign;
+            return (time_part, offset_secs);
+        }
+
+        (trimmed, 0)
+    }
+
+    fn parse_tz_digits(raw: &str) -> i64 {
+        if let Some((h_str, m_str)) = raw.split_once(':') {
+            let h: i64 = h_str.parse().unwrap_or(0);
+            let m: i64 = m_str.parse().unwrap_or(0);
+            h * 3600 + m * 60
+        } else if raw.len() == 4 {
+            let h: i64 = raw[..2].parse().unwrap_or(0);
+            let m: i64 = raw[2..].parse().unwrap_or(0);
+            h * 3600 + m * 60
+        } else if raw.len() == 2 {
+            let h: i64 = raw.parse().unwrap_or(0);
+            h * 3600
+        } else {
+            0
+        }
+    }
+
+    fn parse_rfc2822_to_unix(s: &str) -> Option<u64> {
+        let parts: Vec<&str> = s.split_whitespace().collect();
+        if parts.len() < 4 {
+            return None;
+        }
+
+        let day: u64 = parts[0].parse().ok()?;
+        let month = match parts[1].to_ascii_lowercase().as_str() {
+            "jan" => 1,
+            "feb" => 2,
+            "mar" => 3,
+            "apr" => 4,
+            "may" => 5,
+            "jun" => 6,
+            "jul" => 7,
+            "aug" => 8,
+            "sep" => 9,
+            "oct" => 10,
+            "nov" => 11,
+            "dec" => 12,
+            _ => return None,
+        };
+        let year: i64 = parts[2].parse().ok()?;
+
+        let time_parts: Vec<&str> = parts[3].split(':').collect();
+        let hour: u64 = time_parts.first().and_then(|s| s.parse().ok()).unwrap_or(0);
+        let min: u64 = time_parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
         let sec: u64 = time_parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(0);
+
+        let offset_secs = if parts.len() > 4 {
+            let tz_part = parts[4];
+            let sign = if tz_part.starts_with('+') {
+                1
+            } else if tz_part.starts_with('-') {
+                -1
+            } else {
+                0
+            };
+            if sign != 0 {
+                let raw = tz_part.trim_start_matches(['+', '-']);
+                Self::parse_tz_digits(raw) * sign
+            } else {
+                0
+            }
+        } else {
+            0
+        };
+
+        let local_secs = Self::ymd_hms_to_unix(year, month, day, hour, min, sec)?;
+        let utc_secs = (local_secs as i64) - offset_secs;
+        if utc_secs < 0 {
+            Some(0)
+        } else {
+            Some(utc_secs as u64)
+        }
+    }
+
+    fn ymd_hms_to_unix(
+        year: i64,
+        month: u64,
+        day: u64,
+        hour: u64,
+        min: u64,
+        sec: u64,
+    ) -> Option<u64> {
+        if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+            return None;
+        }
 
         let mut days: i64 = 0;
         for y in 1970..year {
@@ -596,8 +739,7 @@ impl LocalMessageCache {
             return None;
         }
 
-        let secs = (days as u64) * 86400 + hour * 3600 + min * 60 + sec;
-        Some(secs)
+        Some((days as u64) * 86400 + hour * 3600 + min * 60 + sec)
     }
 
     /// Executa purga de mensagens anteriores a uma determinada duração (ex: 90 dias)

@@ -154,3 +154,124 @@ impl ActionsQueue {
         Ok(actions.len())
     }
 }
+
+use crate::domain::cache::LocalMessageCache;
+use crate::domain::ports::{ClientError, MailApiClient};
+use lauda_types::MessageEnvelope;
+
+/// Janela normativa padrão para sincronização e retenção integral de mensagens (90 dias).
+pub const RETENTION_90_DAYS_SECS: u64 = 90 * 86400;
+
+/// Estrutura para executar um conjunto de futures em paralelo de forma cooperativa sem dependências externas.
+struct BatchJoin<F: std::future::Future> {
+    futures: Vec<Option<F>>,
+    results: Vec<Option<F::Output>>,
+    completed: usize,
+}
+
+impl<F> BatchJoin<F>
+where
+    F: std::future::Future + Unpin,
+    F::Output: Unpin,
+{
+    fn new(futs: Vec<F>) -> Self {
+        let len = futs.len();
+        Self {
+            futures: futs.into_iter().map(Some).collect(),
+            results: (0..len).map(|_| None).collect(),
+            completed: 0,
+        }
+    }
+}
+
+impl<F> std::future::Future for BatchJoin<F>
+where
+    F: std::future::Future + Unpin,
+    F::Output: Unpin,
+{
+    type Output = Vec<F::Output>;
+
+    fn poll(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let this = self.get_mut();
+        for i in 0..this.futures.len() {
+            if let Some(fut) = &mut this.futures[i]
+                && let std::task::Poll::Ready(val) = std::pin::Pin::new(fut).poll(cx)
+            {
+                this.futures[i] = None;
+                this.results[i] = Some(val);
+                this.completed += 1;
+            }
+        }
+
+        if this.completed == this.results.len() {
+            let out = std::mem::take(&mut this.results)
+                .into_iter()
+                .map(|o| o.unwrap())
+                .collect();
+            std::task::Poll::Ready(out)
+        } else {
+            std::task::Poll::Pending
+        }
+    }
+}
+
+/// Prefetch eager e concorrente dos corpos de mensagens situadas na janela de 90 dias
+/// que ainda não existem no cache local.
+///
+/// Prioriza as mensagens mais recentes (ordem decrescente de UID).
+/// Executa as requisições em lotes assíncronos controlados por `concurrency_limit` (ex.: 5).
+pub async fn prefetch_missing_bodies<C: MailApiClient + ?Sized>(
+    client: &C,
+    token: &str,
+    mailbox: &str,
+    envelopes: &[MessageEnvelope],
+    cache: &LocalMessageCache,
+    concurrency_limit: usize,
+    now_unix: u64,
+) -> Result<usize, ClientError> {
+    let cutoff_unix = now_unix.saturating_sub(RETENTION_90_DAYS_SECS);
+
+    let mut missing_uids = Vec::new();
+    for env in envelopes {
+        let env_unix = LocalMessageCache::parse_iso_date_to_unix(&env.date).unwrap_or(0);
+        if env_unix >= cutoff_unix {
+            let already_cached = cache
+                .load_message(mailbox, env.uid)
+                .ok()
+                .flatten()
+                .is_some();
+            if !already_cached {
+                missing_uids.push(env.uid);
+            }
+        }
+    }
+
+    if missing_uids.is_empty() {
+        return Ok(0);
+    }
+
+    // Mais recentes primeiro
+    missing_uids.sort_by(|a, b| b.cmp(a));
+
+    let max_concurrent = std::cmp::max(1, concurrency_limit);
+    let mut total_prefetched = 0;
+
+    for chunk in missing_uids.chunks(max_concurrent) {
+        let mut futs = Vec::with_capacity(chunk.len());
+        for &uid in chunk {
+            futs.push(Box::pin(client.get_message(token, mailbox, uid)));
+        }
+
+        let results = BatchJoin::new(futs).await;
+        for full_msg in results.into_iter().flatten() {
+            if cache.save_message(mailbox, &full_msg).is_ok() {
+                total_prefetched += 1;
+            }
+        }
+    }
+
+    Ok(total_prefetched)
+}

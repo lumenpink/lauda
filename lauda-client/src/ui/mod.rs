@@ -235,26 +235,20 @@ pub fn App() -> Element {
                             messages.set(server_msgs.clone());
                         }
 
-                        // Pré-carregamento em background dos corpos de mensagens dos últimos 90 dias
+                        // Pré-carregamento eager e concorrente dos corpos de mensagens dos últimos 90 dias
                         #[cfg(not(target_arch = "wasm32"))]
                         {
-                            let cutoff_unix = crate::domain::time::current_unix_timestamp()
-                                .saturating_sub(90 * 86400);
-
-                            for env in &server_msgs {
-                                let env_unix = crate::domain::cache::LocalMessageCache::parse_iso_date_to_unix(&env.date).unwrap_or(0);
-                                if env_unix >= cutoff_unix
-                                    && cache
-                                        .load_message(&active_box, env.uid)
-                                        .ok()
-                                        .flatten()
-                                        .is_none()
-                                    && let Ok(full_msg) =
-                                        client.get_message(&token, &active_box, env.uid).await
-                                {
-                                    let _ = cache.save_message(&active_box, &full_msg);
-                                }
-                            }
+                            let now_unix = crate::domain::time::current_unix_timestamp();
+                            let _ = crate::domain::prefetch_missing_bodies(
+                                &client,
+                                &token,
+                                &active_box,
+                                &server_msgs,
+                                &cache,
+                                5,
+                                now_unix,
+                            )
+                            .await;
                         }
                     }
 

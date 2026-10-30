@@ -14,7 +14,10 @@ fn test_parse_date_robust_rfc3339_and_rfc2822() {
 
     // 2. RFC 3339 com timezone offset (-03:00)
     let ts2 = LocalMessageCache::parse_iso_date_to_unix("2026-10-30T13:00:00-03:00");
-    assert!(ts2.is_some(), "Deveria parsear RFC 3339 com offset negativo");
+    assert!(
+        ts2.is_some(),
+        "Deveria parsear RFC 3339 com offset negativo"
+    );
     assert_eq!(
         ts1.unwrap(),
         ts2.unwrap(),
@@ -119,7 +122,10 @@ async fn test_eager_prefetch_bodies_within_90_days() {
     .expect("prefetch success");
 
     // Deve ter pré-carregado exatamente 1 mensagem (101). A 102 é antiga (>90d), a 103 já estava em cache.
-    assert_eq!(prefetched_count, 1, "Deveria pré-carregar apenas a mensagem 101");
+    assert_eq!(
+        prefetched_count, 1,
+        "Deveria pré-carregar apenas a mensagem 101"
+    );
 
     // Verifica se a mensagem 101 agora reside em cache SQLite (acesso atômico 0ms)
     let loaded_101 = cache
@@ -133,5 +139,95 @@ async fn test_eager_prefetch_bodies_within_90_days() {
 
     // Mensagem antiga (102) não deve ter sido baixada
     let loaded_102 = cache.load_message("INBOX", 102).expect("load");
-    assert!(loaded_102.is_none(), "Mensagem com mais de 90 dias não deve ter corpo em cache");
+    assert!(
+        loaded_102.is_none(),
+        "Mensagem com mais de 90 dias não deve ter corpo em cache"
+    );
+}
+
+#[tokio::test]
+async fn test_mutation_detection_on_prefetch_cutoff_and_caching() {
+    let temp = tempdir().expect("tempdir");
+    let cache = LocalMessageCache::new(temp.path());
+    let client = Arc::new(InMemoryApiClient::new());
+
+    let now_unix: u64 = 1793376000;
+
+    // Mensagem de 85 dias atrás: deve ser incluída rigorosamente na janela de 90 dias
+    let days_85_ago_secs = now_unix - (85 * 86400);
+    let env_85d = MessageEnvelope {
+        uid: 205,
+        subject: "Mensagem Limiar 85d".to_string(),
+        sender: "limiar@example.com".to_string(),
+        date: "2026-08-06T16:00:00Z".to_string(),
+        is_read: true,
+        is_flagged: false,
+        cc: None,
+        has_attachments: false,
+        crypto_meta: None,
+    };
+    let parsed_85d = LocalMessageCache::parse_iso_date_to_unix(&env_85d.date).expect("parse 85d");
+    assert!(
+        (parsed_85d as i64 - days_85_ago_secs as i64).abs() <= 86400,
+        "Timestamp parsed deve coincidir com ~85 dias atrás"
+    );
+
+    client.add_message(
+        "INBOX",
+        Message {
+            envelope: env_85d.clone(),
+            txt_auto: Some("Conteudo de 85 dias".to_string()),
+            txt_original: Some("Conteudo de 85 dias".to_string()),
+            html_sanitized: None,
+            attachments: vec![],
+        },
+    );
+
+    // Mensagem de 95 dias atrás: deve ser excluída
+    let env_95d = MessageEnvelope {
+        uid: 206,
+        subject: "Mensagem Fora 95d".to_string(),
+        sender: "fora@example.com".to_string(),
+        date: "2026-07-27T16:00:00Z".to_string(),
+        is_read: true,
+        is_flagged: false,
+        cc: None,
+        has_attachments: false,
+        crypto_meta: None,
+    };
+    client.add_message(
+        "INBOX",
+        Message {
+            envelope: env_95d.clone(),
+            txt_auto: Some("Conteudo de 95 dias".to_string()),
+            txt_original: Some("Conteudo de 95 dias".to_string()),
+            html_sanitized: None,
+            attachments: vec![],
+        },
+    );
+
+    let prefetched = prefetch_missing_bodies(
+        &*client,
+        "token",
+        "INBOX",
+        &[env_85d, env_95d],
+        &cache,
+        5,
+        now_unix,
+    )
+    .await
+    .expect("prefetch");
+
+    assert_eq!(
+        prefetched, 1,
+        "Apenas a mensagem de 85 dias deve ser baixada"
+    );
+    assert!(
+        cache.load_message("INBOX", 205).unwrap().is_some(),
+        "Mensagem de 85 dias deve estar salva em cache"
+    );
+    assert!(
+        cache.load_message("INBOX", 206).unwrap().is_none(),
+        "Mensagem de 95 dias não deve estar em cache"
+    );
 }
