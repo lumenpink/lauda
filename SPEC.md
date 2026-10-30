@@ -845,6 +845,28 @@ A fim de manter a loja soberana Pratilera (`banca`) sempre sincronizada com os �
 - [ ] Mensagens buscadas pela rede são salvas em `cache_messages` para consultas subsequentes sem rede.
 - [ ] Marcação de leitura é persistida localmente e enfileirada confiavelmente sem perda por desmontagem de componente.
 - [ ] TUI aciona marcação de leitura ao abrir mensagens não lidas.
-- [ ] Testes automatizados herméticos validam persistência de status de leitura, prefetch e cache de 90 dias.
-- [ ] Quality gate estrito aprovado via `cccp check --strict`.
+- [x] Testes automatizados herméticos validam persistência de status de leitura, prefetch e cache de 90 dias.
+- [x] Quality gate estrito aprovado via `cccp check --strict`.
+
+---
+
+## 29. Sincronização Integral e Eager dos Corpos de Mensagens dos Últimos 90 Dias (Ticket #68)
+
+### 29.1 Prefetch Concorrente Eager e Acesso Atômico Imediato
+1. **Pipeline de Pré-Carregamento Imediato**:
+   - Ao sincronizar mensagens (via SSE, polling periódico ou refresh manual da caixa), o cliente deve identificar de forma determinística todos os envelopes recebidos cuja data esteja dentro da janela normativa dos últimos 90 dias e cujo corpo completo ainda não exista em `cache_messages`.
+   - O pré-carregamento dos corpos faltantes deve ocorrer de maneira *eager*, assíncrona e não-bloqueante, utilizando concorrência controlada (semáforo assíncrono limitado a 5 tarefas paralelas) com prioridade para as mensagens mais recentes (ordem decrescente de UID/data).
+2. **Resiliência e Unificação do Parsing Temporal**:
+   - O cálculo do corte temporal de 90 dias (`cutoff_unix = now - 90 * 86400`) deve processar de forma infalível formatos RFC 3339 / ISO-8601 (com e sem offset de fuso horário, ex.: `+00:00`, `-03:00`, `Z`) e carimbos de data RFC 2822 / RFC 5322 emitidos por servidores de correio e Maildir.
+   - Qualquer falha de parsing não deve descartar silenciosamente mensagens recém-chegadas, garantindo que novas mensagens sejam tratadas como dentro da janela prioritária.
+3. **Garantia de 0ms de Latência na Abertura**:
+   - Nenhuma mensagem recebida dentro dos últimos 90 dias deve depender de uma requisição de rede com RTT perceptível no momento do clique do usuário na interface, uma vez que o corpo é atratado e persistido no SQLite local logo na sua detecção inicial.
+
+### 29.2 Critérios de Aceite Normativos (Ticket #68)
+- [ ] Módulo de parsing de data suporta formalmente RFC 3339 com fusos horários e RFC 2822 sem retornar 0 para mensagens válidas recentes.
+- [ ] Função de prefetch concorrente (`prefetch_missing_bodies`) implementada no domínio de sincronização do `lauda-client`.
+- [ ] Sincronização e refresh em `ui/mod.rs` e `ui/inbox_view.rs` acionam o prefetch eager em segundo plano.
+- [ ] Mensagens recebidas recentemente abrem instantaneamente (acesso atômico) a partir do cache SQLite.
+- [ ] Testes automatizados herméticos cobrem parsing de datas, prefetch concorrente e abertura atômica.
+- [ ] Conformidade total no quality gate nativo (`cargo clippy`, `cargo test`).
 
