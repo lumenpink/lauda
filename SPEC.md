@@ -894,9 +894,60 @@ A fim de manter a loja soberana Pratilera (`banca`) sempre sincronizada com os �
    - No compilado nativo com `feature = "desktop"`, o lançamento da aplicação via Dioxus deve configurar a janela nativa com os bytes RGBA do ícone do Lauda embutidos via `dioxus::desktop::WindowBuilder::new().with_window_icon(...)`, garantindo renderização instantânea no compositor de janelas e barra de tarefas antes do carregamento completo do DOM.
 
 ### 30.2 Critérios de Aceite Normativos (Ticket #71)
-- [ ] No Android, `launchable-activity` possui ícone devidamente apontado no manifesto e validado em teste automatizado (`tests/test-apk-metadata.sh`).
-- [ ] Arquivo canônico `assets/lauda.desktop` criado e validado em teste automatizado (`tests/test-desktop-integration.sh`).
-- [ ] Script de instalação desktop (`scripts/install-desktop.sh`) instala atalho e árvore hicolor de ícones.
-- [ ] Runtime Dioxus Desktop embute e carrega o ícone de janela na inicialização.
-- [ ] Quality gate aprovado sem quebra de testes ou regressões.
+- [x] No Android, `launchable-activity` possui ícone devidamente apontado no manifesto e validado em teste automatizado (`tests/test-apk-metadata.sh`).
+- [x] Arquivo canônico `assets/lauda.desktop` criado e validado em teste automatizado (`tests/test-desktop-integration.sh`).
+- [x] Script de instalação desktop (`scripts/install-desktop.sh`) instala atalho e árvore hicolor de ícones.
+- [x] Runtime Dioxus Desktop embute e carrega o ícone de janela na inicialização.
+- [x] Quality gate aprovado sem quebra de testes ou regressões.
+
+---
+
+## 31. Busca Híbrida (BM25 + IA) em Linguagem Natural, Fusão Progressiva e Micro-Spinners (Tickets #70 e #66)
+
+### 31.1 Filosofia Conceitual de Busca ("Conversar com a Caixa Postal")
+1. **Interpretação Semântica por Intenção**:
+   - A barra de busca do Lauda deve aceitar frases em linguagem natural cotidiana (ex.: *"sobre uma oferta de pós graduação"*, *"resultado de exame de sangue"*, *"festa de aniversário"*, *"de lisiane sobre trabalhos dos alunos"*).
+   - O sistema não deve exigir sintaxe técnica nem fragmentar preposições e conectivos em cláusulas booleanas obrigatórias que descartem documentos por ausência de correspondência literal.
+   - A intenção semântica da consulta é vetorizada pelo `EmbeddingProvider` com a instrução assimétrica E5 (`query: <frase>`), viabilizando a correspondência por similaridade de cosseno contra os vetores de segmentos (`Header` e `Body` via Urupema) persistidos em `embeddings_blob`.
+
+2. **Extração Contextual Não-Destrutiva**:
+   - Expressões indicando remetente (ex.: `"de Lisiane"`, `"from:Lisiane"`) extraem um qualificador de remetente (`QueryClause::From`), enquanto o núcleo semântico restante (`"trabalhos dos alunos"`) alimenta a vetorização semântica e termos de busca livre.
+
+3. **Motor Híbrido no Servidor (`lauda-server`)**:
+   - O método `SqliteIndexStore::search_hybrid(mailbox, query_str, limit)` calcula o ranqueamento híbrido linear:
+     $$\text{Score}(d) = \alpha \cdot \text{BM25}_{\text{norm}}(d) + (1 - \alpha) \cdot \text{CosineSim}(v_q, v_d)$$
+     onde $\alpha = 0.4$ balanceia correspondências literais e afinidade conceitual vetorial.
+   - Filtros relacionais (`From`, anexo, leitura) são aplicados como critérios prévios ou boosts de pontuação.
+   - Reconciliação do acervo: O servidor dispara em segundo plano (`tokio::spawn`) um worker cooperativo não-bloqueante que processa em lotes contínuos todas as mensagens pendentes até cobrir 100% da caixa postal (~60 mil e-mails).
+
+4. **Estratégia Fast-First e Fusão das 4 Fontes (`lauda-client`)**:
+   - **Busca Local Imediata (T0)**: Executa `search_hybrid` sobre o cache local dos últimos 90 dias em sub-milissegundos (~0,05 ms), renderizando os resultados no topo da lista instantaneamente.
+   - **Busca Remota Assíncrona (T1)**: Concomitantemente, consulta o endpoint remoto `/messages/search` no servidor para varrer todo o acervo histórico.
+   - **Fusão e Reordenação Suave**:
+     - Deduplicação por `uid`: E-mails encontrados em ambos os fluxos recebem reforço de relevância.
+     - E-mails históricos (> 90 dias) retornados pelo servidor são intercalados na lista na posição exata de seus scores sem deslocar a posição de rolagem de forma disruptiva.
+   - **Prefetch Eager dos Resultados Remotos**:
+     - Assim que o servidor retorna envelopes de e-mails históricos, o cliente inicia imediatamente o download assíncrono dos seus corpos completos.
+     - Ao clicar para ler qualquer resultado da busca, a abertura é imediata com 0ms de RTT adicional.
+   - **Ciclo de Vida e Retenção**:
+     - Mensagens históricas baixadas como resultado de busca são automaticamente expurgadas na rotina de manutenção/sincronização periódica através de `purge_expired_messages(90 dias)`.
+
+5. **Interface Não-Intrusiva com Micro-Spinners Padronizados**:
+   - Indicadores visuais integrados de forma sutil:
+     - Micro-indicador local (`⚡`): pulsa durante a busca local e apaga ao terminar.
+     - Micro-spinner remoto (`🌐`): animação discreta indicando que a consulta ao servidor continua em background.
+   - Texto de estado transparente: exibe contagem local de imediato e atualiza com total consolidado ao término da busca remota.
+   - A interface nunca bloqueia cliques ou leitura de mensagens locais enquanto a busca remota está em trânsito.
+
+### 31.2 Critérios de Aceite Normativos (Tickets #70 e #66)
+- [ ] Parser semântico e `search_hybrid` em `lauda-index` recuperam e ranqueiam e-mails conceituais por similaridade de cosseno mesmo sem sobreposição de palavras-chave literais.
+- [ ] Qualificador contextual `"de <nome>"` extrai remetente mantendo o núcleo semântico da consulta.
+- [ ] Servidor implementa `search_hybrid` sobre `indexed_documents` e `embeddings_blob`.
+- [ ] Servidor implementa background indexer assíncrono contínuo cobrindo a totalidade do Maildir.
+- [ ] Cliente implementa busca concorrente Fast-First (local instantânea + remota assíncrona com fusão e reordenação).
+- [ ] Prefetch assíncrono eager dos corpos dos resultados remotos garante 0 RTT no clique.
+- [ ] Rotina de retenção de 90 dias expurga mensagens históricas de busca nos ciclos regulares.
+- [ ] Micro-spinners discretos e texto de status transparente adicionados na barra de busca do cliente.
+- [ ] Cobertura de testes automatizados e aprovação em todos os quality gates nativos.
+
 
