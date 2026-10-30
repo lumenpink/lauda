@@ -53,6 +53,7 @@ if command -v aapt >/dev/null 2>&1; then
     APP_LABEL="$(echo "$BADGE" | grep "application: " | grep -o "label='[^']*'" | cut -d"'" -f2 || true)"
     ACT_LABEL="$(echo "$BADGE" | grep "launchable-activity: " | grep -o "label='[^']*'" | cut -d"'" -f2 || true)"
     APP_ICON="$(echo "$BADGE" | grep "application: " | grep -o "icon='[^']*'" | cut -d"'" -f2 || true)"
+    ACT_ICON="$(echo "$BADGE" | grep "launchable-activity: " | grep -o "icon='[^']*'" | cut -d"'" -f2 || true)"
 
     if [ "$APP_LABEL" = "LaudaClient" ] || [ "$ACT_LABEL" = "LaudaClient" ]; then
         echo "ERRO: O aplicativo está se apresentando como LaudaClient no Android em vez de Lauda."
@@ -66,6 +67,11 @@ if command -v aapt >/dev/null 2>&1; then
         echo "ERRO: O aplicativo não possui ícone configurado na tag <application>."
         exit 1
     fi
+    if [ -z "$ACT_ICON" ]; then
+        echo "ERRO: launchable-activity está sem ícone definido (icon='')."
+        exit 1
+    fi
+    echo "✅ Nome do app ($APP_LABEL) e ícone de activity ($ACT_ICON) configurados com sucesso!"
     echo "✅ Nome do app ($APP_LABEL) e ícone configurados com sucesso!"
     echo "✅ Metadados aapt validados com sucesso!"
 fi
