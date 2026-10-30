@@ -113,6 +113,7 @@ if [ "$DO_BUILD_DESKTOP" = true ]; then
     mkdir -p "$DIST_DIR/desktop"
     if [ -f "$REPO_ROOT/target/release/lauda-client" ]; then
         cp "$REPO_ROOT/target/release/lauda-client" "$DIST_DIR/desktop/lauda-desktop"
+        cp "$REPO_ROOT/assets/lauda.desktop" "$DIST_DIR/desktop/lauda.desktop"
         echo "✓ Binário Desktop gerado em $DIST_DIR/desktop/lauda-desktop"
     fi
 fi

@@ -6,11 +6,18 @@ fn main() {
         console_error_panic_hook::set_once();
     }
 
-    #[cfg(any(
-        feature = "desktop",
-        feature = "mobile",
-        feature = "web",
-        target_arch = "wasm32"
+    #[cfg(feature = "desktop")]
+    {
+        let window = dioxus::desktop::WindowBuilder::new().with_title("Lauda");
+        let config = dioxus::desktop::Config::new().with_window(window);
+        dioxus::LaunchBuilder::desktop()
+            .with_cfg(config)
+            .launch(App);
+    }
+
+    #[cfg(all(
+        not(feature = "desktop"),
+        any(feature = "mobile", feature = "web", target_arch = "wasm32")
     ))]
     {
         dioxus::launch(App);

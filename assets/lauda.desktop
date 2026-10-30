@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Lauda
+GenericName=Email Client
+Comment=Smolclient minimalista para correio eletrônico e redação rápida
+Exec=lauda-desktop
+Icon=lauda
+Terminal=false
+Categories=Network;Email;Office;
+StartupWMClass=lauda
+Keywords=email;mail;inbox;message;

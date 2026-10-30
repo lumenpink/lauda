@@ -120,6 +120,8 @@ if [ -f "$MANIFEST_XML" ]; then
     if ! grep -q "android:icon=" "$MANIFEST_XML"; then
         sed -i 's/<application /<application android:icon="@mipmap\/ic_launcher" /g' "$MANIFEST_XML"
     fi
+    # Injetar explicitamente ícone na MainActivity para reconhecimento em launchers Android
+    sed -i 's/<activity /<activity android:icon="@mipmap\/ic_launcher" android:roundIcon="@mipmap\/ic_launcher_round" /g' "$MANIFEST_XML"
     # Garantir nome canônico "Lauda" e ícones oficiais
     sed -i 's/android:label="[^"]*"/android:label="@string\/app_name"/g' "$MANIFEST_XML"
 fi
