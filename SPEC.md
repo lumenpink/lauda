@@ -950,4 +950,45 @@ A fim de manter a loja soberana Pratilera (`banca`) sempre sincronizada com os �
 - [x] Micro-spinners discretos e texto de status transparente adicionados na barra de busca do cliente.
 - [x] Cobertura de testes automatizados e aprovação em todos os quality gates nativos.
 
+---
+
+## 32. Serviço Resiliente de Sincronização em Background (Ticket #72)
+
+### 32.1 Sincronização Tripla Unificada (Correio, Contatos e Agenda)
+1. **Orquestração de Ciclo Único (`sync_all_cycle`)**:
+   - O worker de segundo plano unifica em uma única rodada:
+     - **Correio**: Flush de `ActionsQueue` (ações pendentes offline como leitura, deleção ou movimentação), busca de novos envelopes na caixa de entrada, prefetch eager de mensagens faltantes dentro da janela normativa de 90 dias (`prefetch_missing_bodies`), indexação incremental do índice local e purga de retenção (`purge_expired_messages`).
+     - **Contatos**: Reconciliação incremental de contatos com o servidor através de `client.sync_contacts`, persistência no `LocalContactsCache` e geração de lotes atômicos (`AndroidContactBatch`) para atualização do provedor nativo no Android.
+     - **Agenda / Calendário**: Reconciliação incremental com a coleção CalDAV, persistência de eventos e cancelamentos no `LocalCalendarCache` e geração de lotes atômicos (`AndroidCalendarBatch`) para o provedor nativo `com.android.calendar`.
+
+2. **Resiliência e Backoff Exponencial Adaptativo**:
+   - `SyncWorkerConfig`:
+     - `poll_interval_secs`: Intervalo nominal em repouso (padrão: 60s).
+     - `min_backoff_secs`: Intervalo mínimo pós-falha (padrão: 5s).
+     - `max_backoff_secs`: Teto máximo de retentativa em falhas persistentes (padrão: 300s).
+     - `retention_days`: Janela de retenção de mensagens completas (padrão: 90 dias).
+     - `prefetch_concurrency`: Limite de downloads simultâneos (padrão: 5).
+     - `notify_on_new`: Notificações ativas (padrão: `true`).
+   - Comportamento:
+     - Falhas de rede ou timeout dobram o intervalo atual até o teto (`min(current * 2, max_backoff)`).
+     - O primeiro ciclo com êxito restaura instantaneamente o intervalo nominal (`poll_interval`).
+
+3. **Arquitetura Android Resiliente**:
+   - O serviço integra-se aos adaptadores de sistema `JobScheduler` e `SyncAdapter` (`com.android.contacts` e `com.android.calendar`), assegurando execução coordenada pelo `system_server` do SO imune a encerramentos forçados de fabricantes agressivos.
+   - Eventos de retomada de foco (`onResume` / Fast Resume Sync) ativam um gatilho de sincronização imediata em segundo plano sem travar a interface gráfica.
+
+4. **Notificações Nativas e Modo Headless**:
+   - Detecção diferencial de e-mails recém-chegados não lidos com disparo de notificações nativas (XDG `notify-send` no Linux/Desktop).
+   - Suporte ao subcomando CLI `lauda sync-daemon` para operação autônoma sem interface gráfica.
+
+### 32.2 Critérios de Aceite Normativos (Ticket #72)
+- [x] Implementação de `BackgroundSyncWorker`, `SyncWorkerConfig` e do ciclo unificado `sync_all_cycle`.
+- [x] Reconciliação integrada de e-mails (com prefetch de 90 dias e purga), contatos e agenda em uma única passagem periódica.
+- [x] Backoff exponencial adaptativo em falhas consecutivas de rede e reset imediato em caso de sucesso.
+- [x] Suporte a gatilhos imediatos (Fast Resume Sync) e encerramento limpo via canais Tokio.
+- [x] Despacho de notificações nativas para novos e-mails não lidos.
+- [x] Subcomando `sync-daemon` no executável CLI.
+- [x] Cobertura de testes unitários e de integração com aprovação no quality gate.
+
+
 

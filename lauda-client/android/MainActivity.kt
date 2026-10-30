@@ -14,6 +14,14 @@ class MainActivity : WryActivity() {
         webViewRef = webView
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Fast Resume Sync: ao retornar ao primeiro plano, avisa para disparar sincronização imediata
+        webViewRef?.evaluateJavascript(
+            "(function() { if (window.__lauda_trigger_sync) window.__lauda_trigger_sync(); })()"
+        ) { _ -> }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 

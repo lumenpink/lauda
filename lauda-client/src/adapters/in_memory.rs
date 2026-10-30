@@ -15,11 +15,21 @@ pub struct InMemoryApiClient {
     mailboxes: RwLock<Vec<MailboxInfo>>,
     messages: RwLock<HashMap<String, Vec<Message>>>, // mailbox -> msgs
     sent: RwLock<Vec<ComposeForm>>,
+    contacts_delta: RwLock<Option<lauda_types::contact::ContactSyncResponse>>,
+    calendar_delta: RwLock<Option<crate::domain::ports::CalendarSyncResponse>>,
 }
 
 impl InMemoryApiClient {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn set_contacts_sync_response(&self, resp: lauda_types::contact::ContactSyncResponse) {
+        *self.contacts_delta.write().unwrap() = Some(resp);
+    }
+
+    pub fn set_calendar_sync_response(&self, resp: crate::domain::ports::CalendarSyncResponse) {
+        *self.calendar_delta.write().unwrap() = Some(resp);
     }
 
     pub fn add_mailbox(&self, info: MailboxInfo) {
@@ -291,11 +301,29 @@ impl MailApiClient for InMemoryApiClient {
         _token: &str,
         _req: &lauda_types::contact::ContactSyncRequest,
     ) -> Result<lauda_types::contact::ContactSyncResponse, ClientError> {
+        if let Some(ref delta) = *self.contacts_delta.read().unwrap() {
+            return Ok(delta.clone());
+        }
         Ok(lauda_types::contact::ContactSyncResponse {
             sync_token: "ts:in-memory".to_string(),
             updated: vec![],
             deleted_ids: vec![],
             has_more: false,
+        })
+    }
+
+    async fn sync_calendar(
+        &self,
+        _token: &str,
+        sync_token: Option<&str>,
+    ) -> Result<crate::domain::ports::CalendarSyncResponse, ClientError> {
+        if let Some(ref delta) = *self.calendar_delta.read().unwrap() {
+            return Ok(delta.clone());
+        }
+        Ok(crate::domain::ports::CalendarSyncResponse {
+            sync_token: sync_token.unwrap_or("ts:in-memory").to_string(),
+            updated: vec![],
+            deleted_ids: vec![],
         })
     }
 

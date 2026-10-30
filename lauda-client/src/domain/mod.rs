@@ -21,7 +21,11 @@ pub use ports::{ClientError, MailApiClient};
 pub use session::{
     SessionConfig, clear_session, get_default_session_path, load_session, save_session,
 };
-pub use sync::{ActionType, ActionsQueue, QueuedAction, prefetch_missing_bodies};
+pub use sync::{
+    ActionType, ActionsQueue, BackgroundSyncWorker, NewMessageNotification, QueuedAction,
+    SyncCycleResult, SyncWorkerConfig, SyncWorkerHandle, calculate_next_backoff,
+    detect_new_unread_messages, prefetch_missing_bodies, sync_all_cycle,
+};
 pub use time::{async_sleep, current_unix_timestamp};
 pub use update::{UpdateManifest, UpdateStatus, check_update, fetch_remote_manifest};
 pub use view::{

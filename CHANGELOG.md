@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **build:** otimizar tamanho de binario com profile.release e habilitar linking estatico musl crt-static (closes #53)
 
 ### Features
+- **sync:** implementar servico resiliente de sincronizacao em background (closes #72)
 - **search:** busca hibrida por bm25 e ia com interpretacao de linguagem natural (closes #70, #66)
 - **sync:** sincronizar integralmente corpos de mensagens recentes dos ultimos 90 dias (closes #68)
 - **ci:** continuous deployment do lauda-server no obizero, healthcheck de 15s, rollback e remocao do watchtower (closes #89)

@@ -235,17 +235,17 @@ pub fn App() -> Element {
                             messages.set(server_msgs.clone());
                         }
 
-                        // Pré-carregamento eager e concorrente dos corpos de mensagens dos últimos 90 dias
+                        // Sincronização tripla unificada em background (corpos 90d, purga, contatos e agenda)
                         #[cfg(not(target_arch = "wasm32"))]
                         {
                             let now_unix = crate::domain::time::current_unix_timestamp();
-                            let _ = crate::domain::prefetch_missing_bodies(
+                            let sync_cfg = crate::domain::sync::SyncWorkerConfig::default();
+                            let _ = crate::domain::sync::sync_all_cycle(
                                 &client,
                                 &token,
                                 &active_box,
-                                &server_msgs,
-                                &cache,
-                                5,
+                                &cache_dir,
+                                &sync_cfg,
                                 now_unix,
                             )
                             .await;

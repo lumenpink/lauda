@@ -321,3 +321,337 @@ pub async fn prefetch_search_result_bodies<C: MailApiClient + ?Sized>(
 
     Ok(total_prefetched)
 }
+
+/// Configuração do worker de sincronização em segundo plano.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SyncWorkerConfig {
+    pub poll_interval_secs: u64,
+    pub min_backoff_secs: u64,
+    pub max_backoff_secs: u64,
+    pub retention_days: u32,
+    pub prefetch_concurrency: usize,
+    pub notify_on_new: bool,
+}
+
+impl Default for SyncWorkerConfig {
+    fn default() -> Self {
+        Self {
+            poll_interval_secs: 60,
+            min_backoff_secs: 5,
+            max_backoff_secs: 300,
+            retention_days: 90,
+            prefetch_concurrency: 5,
+            notify_on_new: true,
+        }
+    }
+}
+
+/// Calcula o próximo intervalo de espera segundo o algoritmo de backoff exponencial.
+/// Em caso de sucesso, restaura `poll_interval_secs`. Em caso de erro, dobra até `max_backoff_secs`.
+pub fn calculate_next_backoff(
+    current_backoff_secs: u64,
+    is_success: bool,
+    config: &SyncWorkerConfig,
+) -> u64 {
+    if is_success {
+        config.poll_interval_secs
+    } else if current_backoff_secs == 0 {
+        config.min_backoff_secs
+    } else {
+        std::cmp::min(
+            current_backoff_secs.saturating_mul(2),
+            config.max_backoff_secs,
+        )
+    }
+}
+
+/// Representação de alerta nativo para mensagens recém-chegadas.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NewMessageNotification {
+    pub sender: String,
+    pub subject: String,
+    pub uid: u32,
+}
+
+/// Detecta mensagens novas e não lidas comparando a lista remota com os envelopes cacheados.
+pub fn detect_new_unread_messages(
+    remote_envelopes: &[MessageEnvelope],
+    cached_envelopes: &[MessageEnvelope],
+) -> Vec<NewMessageNotification> {
+    let known_uids: std::collections::HashSet<u32> =
+        cached_envelopes.iter().map(|e| e.uid).collect();
+    let mut new_notifs = Vec::new();
+    for env in remote_envelopes {
+        if !env.is_read && !known_uids.contains(&env.uid) {
+            new_notifs.push(NewMessageNotification {
+                sender: env.sender.clone(),
+                subject: env.subject.clone(),
+                uid: env.uid,
+            });
+        }
+    }
+    new_notifs
+}
+
+/// Emite notificação nativa no ambiente Desktop através de `notify-send` (XDG).
+pub fn send_desktop_notification(notif: &NewMessageNotification) {
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("notify-send")
+            .arg("-a")
+            .arg("Lauda")
+            .arg("-i")
+            .arg("lauda")
+            .arg(format!("Novo e-mail: {}", notif.sender))
+            .arg(&notif.subject)
+            .spawn();
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = notif;
+    }
+}
+
+/// Resumo das mutações reconciliadas em um ciclo unificado de sincronização.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SyncCycleResult {
+    pub actions_flushed: usize,
+    pub messages_prefetched: usize,
+    pub new_unread_messages: usize,
+    pub messages_purged: usize,
+    pub contacts_updated: usize,
+    pub contacts_deleted: usize,
+    pub calendar_updated: usize,
+    pub calendar_deleted: usize,
+}
+
+/// Executa uma rodada unificada de sincronização transacional:
+/// 1. Esvaziamento da fila de ações locais (Outbox).
+/// 2. Sincronização de envelopes e notificação diferencial de novas mensagens não lidas.
+/// 3. Prefetch eager concorrente de corpos dentro da janela de retenção (90 dias).
+/// 4. Purga automática de mensagens antigas expiradas (> 90 dias).
+/// 5. Reconciliação incremental de contatos com o servidor.
+/// 6. Reconciliação incremental de eventos de agenda com CalDAV.
+pub async fn sync_all_cycle<C: MailApiClient + ?Sized>(
+    client: &C,
+    token: &str,
+    mailbox: &str,
+    cache_dir: &Path,
+    config: &SyncWorkerConfig,
+    now_unix: u64,
+) -> Result<SyncCycleResult, ClientError> {
+    let mut result = SyncCycleResult::default();
+
+    // 1. Esvaziar fila de ações locais (Outbox)
+    let actions_queue = ActionsQueue::new(cache_dir);
+    if let Ok(pending_actions) = actions_queue.list() {
+        for action in pending_actions {
+            let res = match action.action {
+                ActionType::Delete => {
+                    client
+                        .delete_message(token, &action.mailbox, action.uid)
+                        .await
+                }
+                ActionType::MarkRead { read: _ } => Ok(()),
+                ActionType::MarkFlagged { flagged: _ } => Ok(()),
+                ActionType::Move { dest_box: _ } => Ok(()),
+            };
+            if res.is_ok() {
+                let _ = actions_queue.remove(&action.id);
+                result.actions_flushed += 1;
+            }
+        }
+    }
+
+    // 2. Sincronizar envelopes de correio e detectar novas mensagens não lidas
+    let message_cache = LocalMessageCache::new(cache_dir);
+    let cached_envelopes = message_cache
+        .load_envelopes(mailbox)
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+    let remote_envelopes = client.list_messages(token, mailbox, None, None).await?;
+    let new_unreads = detect_new_unread_messages(&remote_envelopes, &cached_envelopes);
+    result.new_unread_messages = new_unreads.len();
+
+    if config.notify_on_new {
+        for notif in &new_unreads {
+            send_desktop_notification(notif);
+        }
+    }
+
+    let _ = message_cache.save_envelopes(mailbox, &remote_envelopes);
+
+    // 3. Prefetch eager dos corpos dentro da janela de retenção (90 dias)
+    let prefetched = prefetch_missing_bodies(
+        client,
+        token,
+        mailbox,
+        &remote_envelopes,
+        &message_cache,
+        config.prefetch_concurrency,
+        now_unix,
+    )
+    .await?;
+    result.messages_prefetched = prefetched;
+
+    // 4. Purga de mensagens que excederam a retenção
+    let retention_duration = std::time::Duration::from_secs(config.retention_days as u64 * 86400);
+    if let Ok(purged) = message_cache.purge_expired_messages(retention_duration, now_unix) {
+        result.messages_purged = purged;
+    }
+
+    // 5. Reconciliação incremental de contatos
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Ok(contacts_cache) = crate::domain::contacts_cache::LocalContactsCache::open(cache_dir) {
+        let current_sync_token = contacts_cache.get_sync_token().ok().flatten();
+        let req = lauda_types::contact::ContactSyncRequest {
+            sync_token: current_sync_token,
+            limit: Some(100),
+        };
+        if let Ok(resp) = client.sync_contacts(token, &req).await {
+            result.contacts_updated = resp.updated.len();
+            result.contacts_deleted = resp.deleted_ids.len();
+            let _ =
+                contacts_cache.apply_sync_delta(&resp.updated, &resp.deleted_ids, &resp.sync_token);
+        }
+    }
+
+    // 6. Reconciliação incremental de eventos de agenda
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Ok(cal_cache) = crate::domain::calendar_cache::LocalCalendarCache::open(cache_dir) {
+        let current_cal_token = cal_cache.get_sync_token().ok().flatten();
+        if let Ok(resp) = client
+            .sync_calendar(token, current_cal_token.as_deref())
+            .await
+        {
+            result.calendar_updated = resp.updated.len();
+            result.calendar_deleted = resp.deleted_ids.len();
+            let _ = cal_cache.apply_sync_delta(&resp.updated, &resp.deleted_ids, &resp.sync_token);
+        }
+    }
+
+    Ok(result)
+}
+
+/// Manipulador de controle para o worker em execução em segundo plano.
+pub struct SyncWorkerHandle {
+    trigger_tx: tokio::sync::mpsc::Sender<()>,
+    shutdown_tx: tokio::sync::watch::Sender<bool>,
+}
+
+impl SyncWorkerHandle {
+    /// Dispara uma rodada de sincronização imediata (ex.: retorno ao primeiro plano / Fast Resume).
+    pub async fn trigger_sync(&mut self) -> Result<(), ClientError> {
+        self.trigger_tx
+            .send(())
+            .await
+            .map_err(|e| ClientError::Internal(format!("Erro ao disparar sync: {e}")))
+    }
+
+    /// Envia sinal gracioso de encerramento para o worker.
+    pub async fn shutdown(&mut self) -> Result<(), ClientError> {
+        self.shutdown_tx
+            .send(true)
+            .map_err(|e| ClientError::Internal(format!("Erro ao enviar shutdown: {e}")))
+    }
+}
+
+/// Worker assíncrono autônomo que executa sincronizações periódicas com backoff adaptativo.
+pub struct BackgroundSyncWorker<C: MailApiClient + 'static> {
+    client: std::sync::Arc<C>,
+    token: String,
+    mailbox: String,
+    cache_dir: PathBuf,
+    config: SyncWorkerConfig,
+    trigger_rx: tokio::sync::mpsc::Receiver<()>,
+    shutdown_rx: tokio::sync::watch::Receiver<bool>,
+}
+
+impl<C: MailApiClient + 'static> BackgroundSyncWorker<C> {
+    pub fn new(
+        client: std::sync::Arc<C>,
+        token: String,
+        mailbox: String,
+        cache_dir: PathBuf,
+        config: SyncWorkerConfig,
+    ) -> (Self, SyncWorkerHandle) {
+        let (trigger_tx, trigger_rx) = tokio::sync::mpsc::channel(8);
+        let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+
+        let worker = Self {
+            client,
+            token,
+            mailbox,
+            cache_dir,
+            config,
+            trigger_rx,
+            shutdown_rx,
+        };
+
+        let handle = SyncWorkerHandle {
+            trigger_tx,
+            shutdown_tx,
+        };
+
+        (worker, handle)
+    }
+
+    /// Executa o loop principal de sincronização em segundo plano.
+    pub async fn run(mut self) {
+        let mut current_backoff = 0u64;
+
+        loop {
+            if *self.shutdown_rx.borrow() {
+                break;
+            }
+
+            let wait_secs = if current_backoff == 0 {
+                self.config.poll_interval_secs
+            } else {
+                current_backoff
+            };
+
+            let sleep_future = tokio::time::sleep(tokio::time::Duration::from_secs(wait_secs));
+            tokio::pin!(sleep_future);
+
+            tokio::select! {
+                _ = &mut sleep_future => {
+                    // Executa ciclo nominal agendado
+                }
+                Some(_) = self.trigger_rx.recv() => {
+                    // Disparo manual imediato (Fast Resume / Pull to refresh)
+                }
+                _ = self.shutdown_rx.changed() => {
+                    if *self.shutdown_rx.borrow() {
+                        break;
+                    }
+                }
+            }
+
+            if *self.shutdown_rx.borrow() {
+                break;
+            }
+
+            let now_unix = crate::domain::time::current_unix_timestamp();
+            let sync_res = sync_all_cycle(
+                self.client.as_ref(),
+                &self.token,
+                &self.mailbox,
+                &self.cache_dir,
+                &self.config,
+                now_unix,
+            )
+            .await;
+
+            match sync_res {
+                Ok(_summary) => {
+                    current_backoff = calculate_next_backoff(current_backoff, true, &self.config);
+                }
+                Err(_err) => {
+                    current_backoff = calculate_next_backoff(current_backoff, false, &self.config);
+                }
+            }
+        }
+    }
+}

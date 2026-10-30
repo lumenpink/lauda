@@ -16,6 +16,14 @@ pub enum ClientError {
     Internal(String),
 }
 
+/// Resposta de sincronização incremental de eventos de calendário.
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub struct CalendarSyncResponse {
+    pub sync_token: String,
+    pub updated: Vec<lauda_types::calendar::CalendarEvent>,
+    pub deleted_ids: Vec<String>,
+}
+
 /// Porta de comunicação com a API remota do Lauda.
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -82,6 +90,18 @@ pub trait MailApiClient: Send + Sync {
         token: &str,
         req: &lauda_types::contact::ContactSyncRequest,
     ) -> Result<lauda_types::contact::ContactSyncResponse, ClientError>;
+    async fn sync_calendar(
+        &self,
+        token: &str,
+        sync_token: Option<&str>,
+    ) -> Result<CalendarSyncResponse, ClientError> {
+        let _ = (token, sync_token);
+        Ok(CalendarSyncResponse {
+            sync_token: sync_token.unwrap_or("ts:0").to_string(),
+            updated: vec![],
+            deleted_ids: vec![],
+        })
+    }
     async fn get_rules(
         &self,
         token: &str,

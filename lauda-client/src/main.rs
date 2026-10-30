@@ -111,12 +111,53 @@ fn main() {
                         return;
                     }
                 }
+                "sync-daemon" => {
+                    let session = match lauda_client::domain::session::load_session(None) {
+                        Some(s) if s.token.is_some() => s,
+                        _ => {
+                            eprintln!(
+                                "Erro: Nenhuma sessão ativa encontrada. Efetue login previamente via interface ou TUI."
+                            );
+                            std::process::exit(1);
+                        }
+                    };
+
+                    let token = session.token.unwrap();
+                    let server_url = session.server_url;
+                    let cache_dir = lauda_client::domain::cache::get_default_cache_dir();
+                    let client = std::sync::Arc::new(
+                        lauda_client::adapters::http::HttpApiClient::new(&server_url),
+                    );
+                    let config = lauda_client::domain::sync::SyncWorkerConfig::default();
+
+                    println!(
+                        "Iniciando Lauda Sync Daemon para {} em {}...",
+                        session.username, server_url
+                    );
+                    let (worker, _handle) = lauda_client::domain::sync::BackgroundSyncWorker::new(
+                        client,
+                        token,
+                        "INBOX".to_string(),
+                        cache_dir,
+                        config,
+                    );
+
+                    let rt = tokio::runtime::Builder::new_multi_thread()
+                        .enable_all()
+                        .build()
+                        .expect("Falha ao inicializar runtime tokio para Sync Daemon");
+
+                    rt.block_on(worker.run());
+                    return;
+                }
                 "tui" => {
                     // segue para execução tui
                 }
                 _ => {
                     println!("Lauda Smolclient — compile com --features desktop, mobile ou web.");
-                    println!("Comandos disponíveis: tui, update, check-update, config.");
+                    println!(
+                        "Comandos disponíveis: tui, sync-daemon, update, check-update, config."
+                    );
                     let _ = App;
                     return;
                 }
