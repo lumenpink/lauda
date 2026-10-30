@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::serve;
 use lauda_client::adapters::HttpApiClient;
@@ -11,7 +12,19 @@ use lauda_server::adapters::in_memory::InMemoryMailBackend;
 use lauda_server::app_router;
 use lauda_types::{ComposeForm, LoginRequest, Message, MessageEnvelope};
 use serde_json::Value;
-use tokio::net::TcpListener;
+use tokio::io::AsyncWriteExt;
+use tokio::net::{TcpListener, TcpStream};
+
+async fn wait_for_tcp_ready(addr: SocketAddr) {
+    for _ in 0..50 {
+        if let Ok(mut stream) = TcpStream::connect(addr).await {
+            let _ = stream.shutdown().await;
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    panic!("Timeout aguardando prontidão TCP em {addr}");
+}
 
 const TEST_SECRET: &str = "jwt-secret-apk-e2e-suite-2026";
 
@@ -336,6 +349,8 @@ async fn test_e2e_apk_mobile_client_live_server_full_loop() {
     tokio::spawn(async move {
         serve(listener, app).await.expect("Servidor HTTP ativo");
     });
+
+    wait_for_tcp_ready(server_addr).await;
 
     let base_url = format!("http://{server_addr}");
 

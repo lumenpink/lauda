@@ -1,4 +1,6 @@
+use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use lauda_client::adapters::HttpApiClient;
 use lauda_client::domain::ports::MailApiClient;
@@ -6,9 +8,22 @@ use lauda_client::domain::view::parse_markdown_to_html;
 use lauda_server::adapters::in_memory::InMemoryMailBackend;
 use lauda_server::app_router;
 use lauda_types::{ComposeForm, LoginRequest, Message, MessageEnvelope};
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
 use urupema::adapters::InMemorySink;
 use urupema::application::Pipeline;
 use urupema::domain::RawEmail;
+
+async fn wait_for_tcp_ready(addr: SocketAddr) {
+    for _ in 0..50 {
+        if let Ok(mut stream) = TcpStream::connect(addr).await {
+            let _ = stream.shutdown().await;
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    panic!("Timeout aguardando prontidão TCP em {addr}");
+}
 
 const TEST_SECRET: &str = "jwt-secret-full-chain-sovereign-mail-123456";
 const SECURITY_WORD: &str = "CAFE_COM_PAO_DE_QUEIJO_SUL_MINAS_2026";
@@ -65,6 +80,8 @@ async fn test_full_integrated_mail_chain_with_in_memory_backend() {
     tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();
     });
+
+    wait_for_tcp_ready(local_addr).await;
 
     // 2. Instancia o HttpApiClient apontando para a URL TCP real
     let client = HttpApiClient::new(&base_url);
@@ -252,10 +269,13 @@ Content-Type: text/html; charset=utf-8\r\n\
 
     let app = app_router(backend.clone(), TEST_SECRET);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let base_url = format!("http://{}", listener.local_addr().unwrap());
+    let local_addr = listener.local_addr().unwrap();
+    let base_url = format!("http://{}", local_addr);
     tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();
     });
+
+    wait_for_tcp_ready(local_addr).await;
 
     let client = HttpApiClient::new(base_url);
     let token = client

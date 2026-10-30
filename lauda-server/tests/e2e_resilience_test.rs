@@ -1,4 +1,6 @@
+use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use jsonwebtoken::{EncodingKey, Header, encode};
 use lauda_client::adapters::HttpApiClient;
@@ -7,9 +9,22 @@ use lauda_server::adapters::in_memory::InMemoryMailBackend;
 use lauda_server::app_router;
 use lauda_types::LoginRequest;
 use serde::{Deserialize, Serialize};
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
 use urupema::adapters::InMemorySink;
 use urupema::application::Pipeline;
 use urupema::domain::{ProcessResult, RawEmail};
+
+async fn wait_for_tcp_ready(addr: SocketAddr) {
+    for _ in 0..50 {
+        if let Ok(mut stream) = TcpStream::connect(addr).await {
+            let _ = stream.shutdown().await;
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    panic!("Timeout aguardando prontidão TCP em {addr}");
+}
 
 const TEST_SECRET: &str = "jwt-secret-resilience-testing-sovereign-mail-999";
 
@@ -111,11 +126,14 @@ async fn test_lauda_jwt_tampering_and_unauthorized_attacks() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("Bind TCP");
-    let base_url = format!("http://{}", listener.local_addr().unwrap());
+    let local_addr = listener.local_addr().expect("Local addr");
+    let base_url = format!("http://{local_addr}");
 
     tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();
     });
+
+    wait_for_tcp_ready(local_addr).await;
 
     let client = HttpApiClient::new(&base_url);
 

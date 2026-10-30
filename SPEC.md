@@ -1015,6 +1015,27 @@ A fim de manter a loja soberana Pratilera (`banca`) sempre sincronizada com os �
 - [x] Apresentação formatada das notas de contatos com autolink.
 - [x] Testes automatizados cobrindo todos os cenários e aprovação no quality gate.
 
+---
+
+## 34. Polling de Prontidão TCP nos Testes E2E (Ticket #73)
+
+### 34.1 Protocolo de Sonda Ativa contra Race Conditions de Inicialização
+1. **Problema**:
+   - Testes de integração de ponta a ponta (`e2e_apk_test.rs`, `e2e_full_chain_test.rs`, `e2e_resilience_test.rs`) iniciam o servidor HTTP com `axum::serve(listener, app)` despachado via `tokio::spawn`.
+   - O agendamento assíncrono em ambientes concorrentes pode atrasar a execução do loop de `accept()` em relação às primeiras chamadas do cliente HTTP, disparando erros espúrios de `Connection refused` (`Network error`).
+2. **Solução Normativa (`wait_for_tcp_ready`)**:
+   - Antes de efetuar requisições através do cliente HTTP, o teste deve executar uma sondagem ativa contra o endereço TCP efêmero alocado (`server_addr`).
+   - A sonda tenta estabelecer conexão TCP (`TcpStream::connect`), efetuando encerramento gracioso via `shutdown()` assim que bem-sucedida.
+   - O limite de espera é de 50 tentativas intervaladas por 10ms (teto de 500ms), com resposta instantânea (< 1ms) em condições normais e tolerância a atrasos de escalonamento em ambientes sobrecarregados de CI.
+
+### 34.2 Critérios de Aceite Normativos (Ticket #73)
+- [x] Implementação da rotina assíncrona de sondagem `wait_for_tcp_ready` em `e2e_apk_test.rs`.
+- [x] Implementação da rotina assíncrona de sondagem `wait_for_tcp_ready` em `e2e_full_chain_test.rs`.
+- [x] Implementação da rotina assíncrona de sondagem `wait_for_tcp_ready` em `e2e_resilience_test.rs`.
+- [x] Eliminação de falhas intermitentes por `Connection refused` na inicialização de testes E2E.
+- [x] Aprovação completa dos testes e zero warnings no quality gate.
+
+
 
 
 
