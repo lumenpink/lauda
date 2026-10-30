@@ -863,10 +863,40 @@ A fim de manter a loja soberana Pratilera (`banca`) sempre sincronizada com os �
    - Nenhuma mensagem recebida dentro dos últimos 90 dias deve depender de uma requisição de rede com RTT perceptível no momento do clique do usuário na interface, uma vez que o corpo é atratado e persistido no SQLite local logo na sua detecção inicial.
 
 ### 29.2 Critérios de Aceite Normativos (Ticket #68)
-- [ ] Módulo de parsing de data suporta formalmente RFC 3339 com fusos horários e RFC 2822 sem retornar 0 para mensagens válidas recentes.
-- [ ] Função de prefetch concorrente (`prefetch_missing_bodies`) implementada no domínio de sincronização do `lauda-client`.
-- [ ] Sincronização e refresh em `ui/mod.rs` e `ui/inbox_view.rs` acionam o prefetch eager em segundo plano.
-- [ ] Mensagens recebidas recentemente abrem instantaneamente (acesso atômico) a partir do cache SQLite.
-- [ ] Testes automatizados herméticos cobrem parsing de datas, prefetch concorrente e abertura atômica.
-- [ ] Conformidade total no quality gate nativo (`cargo clippy`, `cargo test`).
+- [x] Módulo de parsing de data suporta formalmente RFC 3339 com fusos horários e RFC 2822 sem retornar 0 para mensagens válidas recentes.
+- [x] Função de prefetch concorrente (`prefetch_missing_bodies`) implementada no domínio de sincronização do `lauda-client`.
+- [x] Sincronização e refresh em `ui/mod.rs` e `ui/inbox_view.rs` acionam o prefetch eager em segundo plano.
+- [x] Mensagens recebidas recentemente abrem instantaneamente (acesso atômico) a partir do cache SQLite.
+- [x] Testes automatizados herméticos cobrem parsing de datas, prefetch concorrente e abertura atômica.
+- [x] Conformidade total no quality gate nativo (`cargo clippy`, `cargo test`).
+
+---
+
+## 30. Integração Visual e Exibição de Ícones no Desktop e Android (Ticket #71)
+
+### 30.1 Conformidade com Launchers Android e Padrão XDG Desktop
+1. **Manifesto Android & Launchable Activity**:
+   - Para que os lançadores de aplicativos do Android exibam corretamente o ícone oficial da aplicação, a tag `<activity>` principal com `CATEGORY_LAUNCHER` (em `dev.dioxus.main.MainActivity`) deve declarar explicitamente os atributos `android:icon="@mipmap/ic_launcher"` e `android:roundIcon="@mipmap/ic_launcher_round"`.
+   - A extração via `aapt dump badging` deve atestar que `launchable-activity` referencia o ícone e nunca retorne `icon=''`.
+2. **Especificação XDG Desktop Entry (Linux)**:
+   - O aplicativo deve fornecer arquivo normativo `lauda.desktop` compatível com a especificação FreeDesktop / XDG:
+     - `Type=Application`
+     - `Name=Lauda`
+     - `GenericName=Email Client`
+     - `Comment=Smolclient minimalista para correio eletrônico e redação rápida`
+     - `Exec=lauda-desktop`
+     - `Icon=lauda`
+     - `Terminal=false`
+     - `Categories=Network;Email;Office;`
+     - `StartupWMClass=lauda`
+   - Deve ser fornecido script normativo `scripts/install-desktop.sh` capaz de instalar o arquivo de entrada em `$XDG_DATA_HOME/applications` (ou `~/.local/share/applications`) e distribuir os ícones PNG nas pastas `$XDG_DATA_HOME/icons/hicolor/<size>/apps/lauda.png` (48x48, 72x72, 96x96, 144x144, 192x192, 512x512) e SVG em `scalable/apps/lauda.svg`.
+3. **Ícone Nativo da Janela Dioxus Desktop**:
+   - No compilado nativo com `feature = "desktop"`, o lançamento da aplicação via Dioxus deve configurar a janela nativa com os bytes RGBA do ícone do Lauda embutidos via `dioxus::desktop::WindowBuilder::new().with_window_icon(...)`, garantindo renderização instantânea no compositor de janelas e barra de tarefas antes do carregamento completo do DOM.
+
+### 30.2 Critérios de Aceite Normativos (Ticket #71)
+- [ ] No Android, `launchable-activity` possui ícone devidamente apontado no manifesto e validado em teste automatizado (`tests/test-apk-metadata.sh`).
+- [ ] Arquivo canônico `assets/lauda.desktop` criado e validado em teste automatizado (`tests/test-desktop-integration.sh`).
+- [ ] Script de instalação desktop (`scripts/install-desktop.sh`) instala atalho e árvore hicolor de ícones.
+- [ ] Runtime Dioxus Desktop embute e carrega o ícone de janela na inicialização.
+- [ ] Quality gate aprovado sem quebra de testes ou regressões.
 
