@@ -29,7 +29,17 @@ pub struct Query {
     pub clauses: Vec<QueryClause>,
 }
 
-/// Parser de consultas em formato texto inspirado na barra de busca do Gmail.
+const STOP_WORDS: &[&str] = &[
+    "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas", "um", "uma", "uns", "umas",
+    "o", "a", "os", "as", "e", "ou", "por", "para", "com", "sobre",
+];
+
+fn is_stop_word(w: &str) -> bool {
+    let lower = w.to_lowercase();
+    STOP_WORDS.contains(&lower.as_str())
+}
+
+/// Parser de consultas em formato texto inspirado na barra de busca do Gmail e linguagem natural.
 pub fn parse_query(input: &str) -> Query {
     let mut clauses = Vec::new();
     let parts = split_query_tokens(input);
@@ -51,13 +61,69 @@ pub fn parse_query(input: &str) -> Query {
                     clauses.push(prev);
                 }
             }
-        } else {
-            clauses.push(parse_single_clause(token));
+            i += 1;
+            continue;
         }
+
+        // Reconhecimento de linguagem natural: "de <autor>" no início da query ou após pontuação
+        if token.eq_ignore_ascii_case("de") && i + 1 < parts.len() {
+            let next_tok = &parts[i + 1];
+            let next_norm = normalize(next_tok);
+            // Verifica se é remetente (não uma stop word ou termo comum de assunto)
+            if !is_stop_word(next_tok)
+                && !next_tok.contains(':')
+                && (i == 0 || !is_compound_noun_particle(&parts, i))
+            {
+                clauses.push(QueryClause::From(next_norm));
+                i += 2;
+                continue;
+            }
+        }
+
+        // Reconhecimento de "com anexo"
+        if token.eq_ignore_ascii_case("com")
+            && i + 1 < parts.len()
+            && parts[i + 1].eq_ignore_ascii_case("anexo")
+        {
+            clauses.push(QueryClause::HasAttachment);
+            i += 2;
+            continue;
+        }
+
+        // Reconhecimento de "nao lido" / "não lido"
+        if (token.eq_ignore_ascii_case("nao") || token.eq_ignore_ascii_case("não"))
+            && i + 1 < parts.len()
+            && parts[i + 1].eq_ignore_ascii_case("lido")
+        {
+            clauses.push(QueryClause::IsRead(false));
+            i += 2;
+            continue;
+        }
+
+        // Stop words avulsas sem prefixo técnico são ignoradas para não quebrar a busca
+        if is_stop_word(token) && !token.contains(':') && !token.starts_with('"') {
+            i += 1;
+            continue;
+        }
+
+        clauses.push(parse_single_clause(token));
         i += 1;
     }
 
     Query { clauses }
+}
+
+/// Identifica se o conectivo "de" faz parte de uma locução substantiva composta
+/// (ex: "resultado de exame", "festa de aniversario", "oferta de pós")
+fn is_compound_noun_particle(parts: &[String], idx: usize) -> bool {
+    if idx == 0 {
+        return false;
+    }
+    let prev = normalize(&parts[idx - 1]);
+    matches!(
+        prev.as_str(),
+        "resultado" | "exame" | "festa" | "oferta" | "teste" | "laudo" | "dia" | "fim" | "sala"
+    )
 }
 
 fn parse_single_clause(token: &str) -> QueryClause {

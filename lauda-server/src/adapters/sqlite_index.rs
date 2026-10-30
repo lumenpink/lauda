@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
-use lauda_index::{IndexedDoc, MessageIndex};
+use lauda_index::{EmbeddingProvider, IndexedDoc, MessageIndex};
 use lauda_types::{MailboxSyncStatus, MessageEnvelope};
 use rusqlite::{Connection, params};
 use urupema::domain::SegmentKind;
@@ -385,6 +385,174 @@ impl SqliteIndexStore {
             envelopes.push(r?);
         }
         Ok(envelopes)
+    }
+
+    /// Executa busca híbrida combinando BM25 textual relacional e similaridade vetorial (cosseno)
+    /// sobre os embeddings de segmentos persistidos em SQLite.
+    pub fn search_hybrid(
+        &self,
+        mailbox: &str,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<MessageEnvelope>, rusqlite::Error> {
+        let parsed = lauda_index::parse_query(query);
+        let provider = lauda_index::SimpleCpuEmbeddingProvider;
+        let query_vec = provider.embed_query(query);
+
+        let conn = self.conn.lock().unwrap();
+
+        // 1. Coleta pontuações BM25
+        let tokens = lauda_index::tokenize(query);
+        let mut bm25_scores: HashMap<u32, f64> = HashMap::new();
+        let mut max_bm25 = 0.0f64;
+
+        if !tokens.is_empty() {
+            let placeholders = tokens
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("?{}", i + 2))
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            let sql_bm25 = format!(
+                "SELECT d.uid, SUM(i.tf) AS score
+                 FROM inverted_index i
+                 JOIN indexed_documents d ON d.mailbox = i.mailbox AND d.uid = i.uid
+                 WHERE i.mailbox = ?1 AND i.term IN ({})
+                 GROUP BY d.uid",
+                placeholders
+            );
+
+            let mut params: Vec<rusqlite::types::Value> = Vec::with_capacity(tokens.len() + 1);
+            params.push(mailbox.to_string().into());
+            for t in &tokens {
+                params.push(t.clone().into());
+            }
+
+            if let Ok(mut stmt) = conn.prepare(&sql_bm25)
+                && let Ok(rows) = stmt.query_map(rusqlite::params_from_iter(params.iter()), |row| {
+                    let uid: u32 = row.get(0)?;
+                    let score: f64 = row.get(1)?;
+                    Ok((uid, score))
+                })
+            {
+                for r in rows.flatten() {
+                    if r.1 > max_bm25 {
+                        max_bm25 = r.1;
+                    }
+                    bm25_scores.insert(r.0, r.1);
+                }
+            }
+        }
+
+        // 2. Coleta vetorial e envelopes candidatos
+        let mut stmt = conn.prepare(
+            "SELECT uid, subject, sender, date, is_read, is_flagged, has_attachments, embeddings_blob
+             FROM indexed_documents WHERE mailbox = ?1",
+        )?;
+
+        let mut candidates = Vec::new();
+
+        let rows = stmt.query_map(params![mailbox], |row| {
+            let uid: u32 = row.get(0)?;
+            let subject: String = row.get(1)?;
+            let sender: String = row.get(2)?;
+            let date: String = row.get(3)?;
+            let is_read: bool = row.get::<_, i64>(4)? != 0;
+            let is_flagged: bool = row.get::<_, i64>(5)? != 0;
+            let has_attachments: bool = row.get::<_, i64>(6)? != 0;
+            let embeddings_blob: Vec<u8> = row.get(7)?;
+            Ok((
+                MessageEnvelope {
+                    uid,
+                    subject,
+                    sender,
+                    date,
+                    cc: None,
+                    has_attachments,
+                    is_read,
+                    is_flagged,
+                    crypto_meta: None,
+                },
+                embeddings_blob,
+            ))
+        })?;
+
+        for r in rows {
+            let (env, blob) = r?;
+
+            // Verifica filtros estruturais da query
+            let mut matches_filters = true;
+            for clause in &parsed.clauses {
+                match clause {
+                    lauda_index::QueryClause::From(author) => {
+                        let author_norm = lauda_index::normalize(author);
+                        let sender_norm = lauda_index::normalize(&env.sender);
+                        if !sender_norm.contains(&author_norm) {
+                            matches_filters = false;
+                            break;
+                        }
+                    }
+                    lauda_index::QueryClause::HasAttachment if !env.has_attachments => {
+                        matches_filters = false;
+                        break;
+                    }
+                    lauda_index::QueryClause::IsRead(read) if env.is_read != *read => {
+                        matches_filters = false;
+                        break;
+                    }
+                    lauda_index::QueryClause::IsFlagged(flagged) if env.is_flagged != *flagged => {
+                        matches_filters = false;
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            if !matches_filters {
+                continue;
+            }
+
+            // Similaridade de cosseno sobre os segmentos persistidos
+            let segment_embeddings = decode_segment_embeddings(&blob);
+            let mut max_sim = 0.0f32;
+            for (_kind, emb) in &segment_embeddings {
+                let sim = lauda_index::cosine_similarity(&query_vec, emb);
+                if sim > max_sim {
+                    max_sim = sim;
+                }
+            }
+
+            let raw_bm25 = bm25_scores.get(&env.uid).copied().unwrap_or(0.0);
+            let norm_bm25 = if max_bm25 > 0.0 {
+                raw_bm25 / max_bm25
+            } else {
+                0.0
+            };
+
+            let semantic_score = if max_sim >= 0.15 { max_sim as f64 } else { 0.0 };
+
+            let alpha = 0.4;
+            let combined_score = alpha * norm_bm25 + (1.0 - alpha) * semantic_score;
+
+            if combined_score > 0.0 || (tokens.is_empty() && parsed.clauses.is_empty()) {
+                candidates.push((env, combined_score));
+            }
+        }
+
+        // Ordenar por score decrescente e por UID decrescente
+        candidates.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.0.uid.cmp(&a.0.uid))
+        });
+
+        let results: Vec<MessageEnvelope> = candidates
+            .into_iter()
+            .take(limit)
+            .map(|(env, _score)| env)
+            .collect();
+
+        Ok(results)
     }
 
     /// Retorna a fatia de mensagens indexadas dos últimos N dias para sincronização offline dos clientes.

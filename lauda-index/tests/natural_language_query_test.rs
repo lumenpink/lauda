@@ -24,7 +24,9 @@ fn test_natural_language_query_parsing() {
         })
         .collect();
     assert!(
-        semantic_terms.iter().any(|t| t == "trabalhos" || t == "alunos"),
+        semantic_terms
+            .iter()
+            .any(|t| t == "trabalhos" || t == "alunos"),
         "Deveria manter termos semânticos relevantes, obtido: {:?}",
         semantic_terms
     );
@@ -98,16 +100,58 @@ fn test_conceptual_semantic_search_without_exact_keywords() {
 
     // Consulta 1: "resultado de exame de sangue" -> deve encontrar o E-mail 101 no topo
     let res1 = index.search_hybrid("resultado de exame de sangue", &provider, 0.4);
-    assert!(!res1.is_empty(), "Deveria encontrar resultados conceituais para 'resultado de exame de sangue'");
-    assert_eq!(res1[0].uid, 101, "Top 1 para 'resultado de exame de sangue' deveria ser o laudo de hemograma (UID 101)");
+    assert!(
+        !res1.is_empty(),
+        "Deveria encontrar resultados conceituais para 'resultado de exame de sangue'"
+    );
+    assert_eq!(
+        res1[0].uid, 101,
+        "Top 1 para 'resultado de exame de sangue' deveria ser o laudo de hemograma (UID 101)"
+    );
 
     // Consulta 2: "festa de aniversário" -> deve encontrar o E-mail 102 no topo
     let res2 = index.search_hybrid("festa de aniversário", &provider, 0.4);
-    assert!(!res2.is_empty(), "Deveria encontrar resultados conceituais para 'festa de aniversário'");
-    assert_eq!(res2[0].uid, 102, "Top 1 para 'festa de aniversário' deveria ser a comemoração com bolo (UID 102)");
+    assert!(
+        !res2.is_empty(),
+        "Deveria encontrar resultados conceituais para 'festa de aniversário'"
+    );
+    assert_eq!(
+        res2[0].uid, 102,
+        "Top 1 para 'festa de aniversário' deveria ser a comemoração com bolo (UID 102)"
+    );
 
     // Consulta 3: "sobre uma oferta de pós graduação" -> deve encontrar o E-mail 103 no topo
     let res3 = index.search_hybrid("sobre uma oferta de pós graduação", &provider, 0.4);
-    assert!(!res3.is_empty(), "Deveria encontrar resultados para 'sobre uma oferta de pós graduação'");
-    assert_eq!(res3[0].uid, 103, "Top 1 para 'sobre uma oferta de pós graduação' deveria ser a inscrição de mestrado (UID 103)");
+    assert!(
+        !res3.is_empty(),
+        "Deveria encontrar resultados para 'sobre uma oferta de pós graduação'"
+    );
+    assert_eq!(
+        res3[0].uid, 103,
+        "Top 1 para 'sobre uma oferta de pós graduação' deveria ser a inscrição de mestrado (UID 103)"
+    );
+}
+
+#[test]
+fn test_mutation_detection_on_stopwords_and_prepositions() {
+    // Valida que stop words não criam cláusulas restritivas que quebrem busca
+    let q = parse_query("uma oferta de pos graduacao");
+    // "uma" e "de" são stop words e não devem figurar como QueryClause::Term("uma")
+    let has_uma = q.clauses.iter().any(|c| match c {
+        lauda_index::QueryClause::Term(t) => t == "uma",
+        _ => false,
+    });
+    assert!(
+        !has_uma,
+        "Stop word 'uma' não deve se tornar termo restritivo"
+    );
+
+    let has_de = q.clauses.iter().any(|c| match c {
+        lauda_index::QueryClause::Term(t) => t == "de",
+        _ => false,
+    });
+    assert!(
+        !has_de,
+        "Preposição 'de' não deve se tornar termo restritivo"
+    );
 }

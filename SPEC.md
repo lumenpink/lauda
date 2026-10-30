@@ -940,14 +940,14 @@ A fim de manter a loja soberana Pratilera (`banca`) sempre sincronizada com os �
    - A interface nunca bloqueia cliques ou leitura de mensagens locais enquanto a busca remota está em trânsito.
 
 ### 31.2 Critérios de Aceite Normativos (Tickets #70 e #66)
-- [ ] Parser semântico e `search_hybrid` em `lauda-index` recuperam e ranqueiam e-mails conceituais por similaridade de cosseno mesmo sem sobreposição de palavras-chave literais.
-- [ ] Qualificador contextual `"de <nome>"` extrai remetente mantendo o núcleo semântico da consulta.
-- [ ] Servidor implementa `search_hybrid` sobre `indexed_documents` e `embeddings_blob`.
-- [ ] Servidor implementa background indexer assíncrono contínuo cobrindo a totalidade do Maildir.
-- [ ] Cliente implementa busca concorrente Fast-First (local instantânea + remota assíncrona com fusão e reordenação).
-- [ ] Prefetch assíncrono eager dos corpos dos resultados remotos garante 0 RTT no clique.
-- [ ] Rotina de retenção de 90 dias expurga mensagens históricas de busca nos ciclos regulares.
-- [ ] Micro-spinners discretos e texto de status transparente adicionados na barra de busca do cliente.
-- [ ] Cobertura de testes automatizados e aprovação em todos os quality gates nativos.
+- [x] Parser semântico e `search_hybrid` em `lauda-index` recuperam e ranqueiam e-mails conceituais por similaridade de cosseno mesmo sem sobreposição de palavras-chave literais.
+- [x] Qualificador contextual `"de <nome>"` extrai remetente mantendo o núcleo semântico da consulta.
+- [x] Servidor implementa `search_hybrid` sobre `indexed_documents` e `embeddings_blob`.
+- [x] Servidor implementa background indexer assíncrono contínuo cobrindo a totalidade do Maildir.
+- [x] Cliente implementa busca concorrente Fast-First (local instantânea + remota assíncrona com fusão e reordenação).
+- [x] Prefetch assíncrono eager dos corpos dos resultados remotos garante 0 RTT no clique.
+- [x] Rotina de retenção de 90 dias expurga mensagens históricas de busca nos ciclos regulares.
+- [x] Micro-spinners discretos e texto de status transparente adicionados na barra de busca do cliente.
+- [x] Cobertura de testes automatizados e aprovação em todos os quality gates nativos.
 
 

@@ -254,6 +254,10 @@ impl MaildirBackend {
     }
 
     fn load_uid_maps(&self, dir: &Path) -> (HashMap<String, u32>, HashMap<u32, String>) {
+        Self::load_uid_maps_static(dir)
+    }
+
+    pub(crate) fn load_uid_maps_static(dir: &Path) -> (HashMap<String, u32>, HashMap<u32, String>) {
         let mut prefix_to_uid = HashMap::new();
         let mut uid_to_prefix = HashMap::new();
         let uidlist_file = dir.join("dovecot-uidlist");
@@ -346,7 +350,14 @@ impl MaildirBackend {
     }
 
     fn find_message_file(&self, dir: &Path, uid: u32) -> Option<(PathBuf, String, bool, bool)> {
-        let (prefix_to_uid, uid_to_prefix) = self.load_uid_maps(dir);
+        Self::find_message_file_static(dir, uid)
+    }
+
+    pub(crate) fn find_message_file_static(
+        dir: &Path,
+        uid: u32,
+    ) -> Option<(PathBuf, String, bool, bool)> {
+        let (prefix_to_uid, uid_to_prefix) = Self::load_uid_maps_static(dir);
         let target_prefix = uid_to_prefix.get(&uid);
 
         for sub in &["cur", "new"] {
@@ -561,6 +572,134 @@ impl MaildirBackend {
         }
         Err("dispatch_sendmail síncrono legado indisponível".to_string())
     }
+
+    /// Analisa bytes RFC 5322 e constrói a estrutura Message do Lauda.
+    pub(crate) fn parse_rfc5322_into_message(
+        uid: u32,
+        is_read: bool,
+        is_flagged: bool,
+        bytes: &[u8],
+    ) -> Option<Message> {
+        let parsed = MessageParser::default().parse(bytes)?;
+
+        let subject = parsed.subject().unwrap_or("(Sem assunto)").to_string();
+        let sender = parsed
+            .from()
+            .map(Self::format_address)
+            .unwrap_or_else(|| "Desconhecido".to_string());
+        let date = parsed
+            .date()
+            .map(|d| d.to_rfc3339())
+            .unwrap_or_else(|| "2026-10-05T00:00:00Z".to_string());
+        let cc = parsed.cc().map(Self::format_address);
+
+        let mut crypto_meta = Self::extract_crypto_meta_from_headers(&parsed);
+
+        let (txt_original, meta_from_txt) = match parsed.body_text(0) {
+            Some(txt) => {
+                let (cleaned, meta) = clean_ishcondidim_preamble_text(&txt);
+                (Some(cleaned), meta)
+            }
+            None => (None, None),
+        };
+
+        let (html_sanitized, meta_from_html) = match parsed.body_html(0) {
+            Some(html) => {
+                let (cleaned, meta) = clean_ishcondidim_preamble_html(&html);
+                (Some(cleaned), meta)
+            }
+            None => (None, None),
+        };
+
+        // Mesclar metadados: prioriza o mais completo (preâmbulo costuma ter key id e sender)
+        if let Some(m) = meta_from_txt.or(meta_from_html) {
+            if let Some(existing) = crypto_meta.as_mut() {
+                existing.is_encrypted = existing.is_encrypted || m.is_encrypted;
+                if m.signature_status != SignatureStatus::None {
+                    existing.signature_status = m.signature_status;
+                }
+                if m.signer_key_id.is_some() {
+                    existing.signer_key_id = m.signer_key_id;
+                }
+                if m.verified_sender.is_some() {
+                    existing.verified_sender = m.verified_sender;
+                }
+                if m.security_word.is_some() {
+                    existing.security_word = m.security_word;
+                }
+            } else {
+                crypto_meta = Some(m);
+            }
+        }
+
+        let txt_auto = if let Some(ref html) = html_sanitized {
+            let clean = Self::clean_comment_tags(html);
+            let md = html2text::from_read(clean.as_bytes(), 10_000);
+            let trimmed = md.trim().to_string();
+            if !trimmed.is_empty() {
+                Some(trimmed)
+            } else {
+                txt_original.as_deref().map(Self::clean_comment_tags)
+            }
+        } else {
+            txt_original.as_deref().map(Self::clean_comment_tags)
+        };
+
+        let attachments: Vec<lauda_types::AttachmentMeta> = parsed
+            .attachments()
+            .enumerate()
+            .map(|(idx, part)| {
+                let filename = part
+                    .attachment_name()
+                    .unwrap_or("anexo_sem_nome")
+                    .to_string();
+                let content_type = part
+                    .content_type()
+                    .map(|ct| match ct.subtype() {
+                        Some(sub) => format!("{}/{}", ct.c_type, sub),
+                        None => ct.c_type.to_string(),
+                    })
+                    .unwrap_or_else(|| "application/octet-stream".to_string());
+                let size_bytes = part.contents().len();
+
+                lauda_types::AttachmentMeta {
+                    id: idx,
+                    filename,
+                    content_type,
+                    size_bytes,
+                }
+            })
+            .collect();
+
+        let has_attachments = !attachments.is_empty();
+
+        let envelope = MessageEnvelope {
+            uid,
+            subject,
+            sender,
+            date,
+            is_read,
+            is_flagged,
+            cc,
+            has_attachments,
+            crypto_meta,
+        };
+
+        Some(Message {
+            envelope,
+            txt_auto,
+            txt_original,
+            html_sanitized,
+            attachments,
+        })
+    }
+
+    /// Lê e constrói uma mensagem completa a partir do diretório Maildir sem precisar da instância.
+    pub(crate) fn read_message_static(dir: &Path, uid: u32) -> Option<Message> {
+        let (file_path, _, is_read, is_flagged) = Self::find_message_file_static(dir, uid)?;
+        let bytes = std::fs::read(&file_path).ok()?;
+        Self::parse_rfc5322_into_message(uid, is_read, is_flagged, &bytes)
+    }
 }
 
 #[async_trait]
@@ -758,119 +897,8 @@ impl MailBackend for MaildirBackend {
             })?;
 
         let bytes = std::fs::read(&file_path).map_err(|e| BackendError::Internal(e.to_string()))?;
-        let parsed = MessageParser::default().parse(&bytes).ok_or_else(|| {
+        Self::parse_rfc5322_into_message(uid, is_read, is_flagged, &bytes).ok_or_else(|| {
             BackendError::Internal("Falha ao analisar mensagem RFC 5322".to_string())
-        })?;
-
-        let subject = parsed.subject().unwrap_or("(Sem assunto)").to_string();
-        let sender = parsed
-            .from()
-            .map(Self::format_address)
-            .unwrap_or_else(|| "Desconhecido".to_string());
-        let date = parsed
-            .date()
-            .map(|d| d.to_rfc3339())
-            .unwrap_or_else(|| "2026-10-05T00:00:00Z".to_string());
-        let cc = parsed.cc().map(Self::format_address);
-
-        let mut crypto_meta = Self::extract_crypto_meta_from_headers(&parsed);
-
-        let (txt_original, meta_from_txt) = match parsed.body_text(0) {
-            Some(txt) => {
-                let (cleaned, meta) = clean_ishcondidim_preamble_text(&txt);
-                (Some(cleaned), meta)
-            }
-            None => (None, None),
-        };
-
-        let (html_sanitized, meta_from_html) = match parsed.body_html(0) {
-            Some(html) => {
-                let (cleaned, meta) = clean_ishcondidim_preamble_html(&html);
-                (Some(cleaned), meta)
-            }
-            None => (None, None),
-        };
-
-        // Mesclar metadados: prioriza o mais completo (preâmbulo costuma ter key id e sender)
-        if let Some(m) = meta_from_txt.or(meta_from_html) {
-            if let Some(existing) = crypto_meta.as_mut() {
-                existing.is_encrypted = existing.is_encrypted || m.is_encrypted;
-                if m.signature_status != SignatureStatus::None {
-                    existing.signature_status = m.signature_status;
-                }
-                if m.signer_key_id.is_some() {
-                    existing.signer_key_id = m.signer_key_id;
-                }
-                if m.verified_sender.is_some() {
-                    existing.verified_sender = m.verified_sender;
-                }
-                if m.security_word.is_some() {
-                    existing.security_word = m.security_word;
-                }
-            } else {
-                crypto_meta = Some(m);
-            }
-        }
-
-        let txt_auto = if let Some(ref html) = html_sanitized {
-            let clean = Self::clean_comment_tags(html);
-            let md = html2text::from_read(clean.as_bytes(), 10_000);
-            let trimmed = md.trim().to_string();
-            if !trimmed.is_empty() {
-                Some(trimmed)
-            } else {
-                txt_original.as_deref().map(Self::clean_comment_tags)
-            }
-        } else {
-            txt_original.as_deref().map(Self::clean_comment_tags)
-        };
-
-        let attachments: Vec<lauda_types::AttachmentMeta> = parsed
-            .attachments()
-            .enumerate()
-            .map(|(idx, part)| {
-                let filename = part
-                    .attachment_name()
-                    .unwrap_or("anexo_sem_nome")
-                    .to_string();
-                let content_type = part
-                    .content_type()
-                    .map(|ct| match ct.subtype() {
-                        Some(sub) => format!("{}/{}", ct.c_type, sub),
-                        None => ct.c_type.to_string(),
-                    })
-                    .unwrap_or_else(|| "application/octet-stream".to_string());
-                let size_bytes = part.contents().len();
-
-                lauda_types::AttachmentMeta {
-                    id: idx,
-                    filename,
-                    content_type,
-                    size_bytes,
-                }
-            })
-            .collect();
-
-        let has_attachments = !attachments.is_empty();
-
-        let envelope = MessageEnvelope {
-            uid,
-            subject,
-            sender,
-            date,
-            is_read,
-            is_flagged,
-            cc,
-            has_attachments,
-            crypto_meta,
-        };
-
-        Ok(Message {
-            envelope,
-            txt_auto,
-            txt_original,
-            html_sanitized,
-            attachments,
         })
     }
 
@@ -1257,6 +1285,29 @@ impl MailBackend for MaildirBackend {
                 }
             }
 
+            // Iniciar worker em segundo plano para indexar o restante do acervo sem travar a API
+            if reconcile.to_index.len() > 5 {
+                let remaining_uids: Vec<u32> = reconcile.to_index[5..].to_vec();
+                let store_clone = store.clone();
+                let dir_clone = dir.clone();
+                let mailbox_clone = mailbox.to_string();
+                tokio::spawn(async move {
+                    let provider = lauda_index::SimpleCpuEmbeddingProvider;
+                    for chunk in remaining_uids.chunks(50) {
+                        for uid in chunk {
+                            if let Some(msg) = Self::read_message_static(&dir_clone, *uid) {
+                                let mut temp_index = lauda_index::MessageIndex::new();
+                                temp_index.index_message_semantic(&mailbox_clone, &msg, &provider);
+                                if let Some(doc) = temp_index.documents().get(uid) {
+                                    let _ = store_clone.save_document(&mailbox_clone, doc, 0);
+                                }
+                            }
+                        }
+                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                    }
+                });
+            }
+
             let sync_status = store
                 .get_sync_status(mailbox, total_count)
                 .unwrap_or_else(|_| MailboxSyncStatus::new(0, total_count));
@@ -1269,10 +1320,10 @@ impl MailBackend for MaildirBackend {
                 });
             }
 
-            // 2. Busca ultrarrápida direta do índice SQLite via BM25 SQL
-            let ranked = store
-                .search_bm25(mailbox, query, 50)
-                .map_err(|e| BackendError::Internal(format!("Erro na busca BM25 SQLite: {}", e)))?;
+            // 2. Busca híbrida (BM25 + Cosseno Urupema) direta do índice SQLite
+            let ranked = store.search_hybrid(mailbox, query, 50).map_err(|e| {
+                BackendError::Internal(format!("Erro na busca híbrida SQLite: {}", e))
+            })?;
 
             Ok(SearchResult {
                 messages: ranked,

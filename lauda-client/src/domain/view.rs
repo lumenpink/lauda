@@ -1,4 +1,4 @@
-pub use lauda_types::ViewMode;
+pub use lauda_types::{MessageEnvelope, ViewMode};
 use pulldown_cmark::{Options, Parser, html};
 
 /// Converte Markdown ("txt auto") em representação HTML higienizada para visualização gráfica.
@@ -296,4 +296,39 @@ pub fn format_txtauto_body_contained(markdown_html: &str) -> String {
 }}
 </style><div class="lauda-txtauto-body">{markdown_html}</div>"#
     )
+}
+
+/// Mescla resultados ranqueados de busca local e remota aplicando Reciprocal Rank Fusion (RRF).
+/// Garante boost de relevância para mensagens confirmadas em ambos os fluxos e deduplicação estrita.
+pub fn merge_search_results(
+    local: &[MessageEnvelope],
+    remote: &[MessageEnvelope],
+) -> Vec<MessageEnvelope> {
+    let mut scores: std::collections::HashMap<u32, f64> = std::collections::HashMap::new();
+    let mut envelopes: std::collections::HashMap<u32, MessageEnvelope> =
+        std::collections::HashMap::new();
+
+    for (rank, env) in local.iter().enumerate() {
+        let rrf = 1.0 / (60.0 + rank as f64);
+        *scores.entry(env.uid).or_insert(0.0) += rrf;
+        envelopes.entry(env.uid).or_insert_with(|| env.clone());
+    }
+
+    for (rank, env) in remote.iter().enumerate() {
+        let rrf = 1.0 / (60.0 + rank as f64);
+        *scores.entry(env.uid).or_insert(0.0) += rrf;
+        envelopes.entry(env.uid).or_insert_with(|| env.clone());
+    }
+
+    let mut ranked_uids: Vec<(u32, f64)> = scores.into_iter().collect();
+    ranked_uids.sort_by(|a, b| {
+        b.1.partial_cmp(&a.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| b.0.cmp(&a.0))
+    });
+
+    ranked_uids
+        .into_iter()
+        .filter_map(|(uid, _)| envelopes.remove(&uid))
+        .collect()
 }

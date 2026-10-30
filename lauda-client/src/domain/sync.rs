@@ -275,3 +275,49 @@ pub async fn prefetch_missing_bodies<C: MailApiClient + ?Sized>(
 
     Ok(total_prefetched)
 }
+
+/// Prefetch eager dos corpos das mensagens retornadas por busca remota que ainda não estão em cache,
+/// garantindo 0 RTT na abertura imediata ao clicar.
+pub async fn prefetch_search_result_bodies<C: MailApiClient + ?Sized>(
+    client: &C,
+    token: &str,
+    mailbox: &str,
+    envelopes: &[MessageEnvelope],
+    cache: &LocalMessageCache,
+    concurrency_limit: usize,
+) -> Result<usize, ClientError> {
+    let mut missing_uids = Vec::new();
+    for env in envelopes {
+        let already_cached = cache
+            .load_message(mailbox, env.uid)
+            .ok()
+            .flatten()
+            .is_some();
+        if !already_cached {
+            missing_uids.push(env.uid);
+        }
+    }
+
+    if missing_uids.is_empty() {
+        return Ok(0);
+    }
+
+    let max_concurrent = std::cmp::max(1, concurrency_limit);
+    let mut total_prefetched = 0;
+
+    for chunk in missing_uids.chunks(max_concurrent) {
+        let mut futs = Vec::with_capacity(chunk.len());
+        for &uid in chunk {
+            futs.push(Box::pin(client.get_message(token, mailbox, uid)));
+        }
+
+        let results = BatchJoin::new(futs).await;
+        for full_msg in results.into_iter().flatten() {
+            if cache.save_message(mailbox, &full_msg).is_ok() {
+                total_prefetched += 1;
+            }
+        }
+    }
+
+    Ok(total_prefetched)
+}

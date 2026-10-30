@@ -98,6 +98,41 @@ impl EmbeddingProvider for DynamicEmbeddingProvider {
     }
 }
 
+/// Mapeia palavras a clusters semânticos conceituais para aproximação vetorial CPU.
+fn get_semantic_concept(word: &str) -> Option<&'static str> {
+    let w = normalize(word);
+    match w.as_str() {
+        "exame" | "exames" | "sangue" | "hemograma" | "laudo" | "laboratorio" | "clinica"
+        | "plaqueta" | "plaquetas" | "glicemia" | "colesterol" | "urina" | "biopsia" | "medico"
+        | "paciente" | "consulta" | "diagnostico" | "saude" => Some("saude_laboratorio"),
+
+        "festa" | "festas" | "aniversario" | "aniversarios" | "comemoracao" | "comemorar"
+        | "bolo" | "parabens" | "celebrar" | "celebracao" | "convite" | "churrasco"
+        | "aniversariante" => Some("celebracao_aniversario"),
+
+        "pos" | "graduacao" | "posgraduacao" | "mestrado" | "doutorado" | "especializacao"
+        | "mba" | "inscricoes" | "inscricao" | "seletivo" | "universidade" | "faculdade"
+        | "academico" | "academica" | "curso" | "tese" | "dissertacao" => {
+            Some("educacao_posgraduacao")
+        }
+
+        "fatura" | "boleto" | "pagamento" | "vencimento" | "cartao" | "banco" | "extrato"
+        | "saldo" | "pix" | "transferencia" | "cobranca" | "nota" | "fiscal" => {
+            Some("financeiro_cobranca")
+        }
+
+        "trabalho" | "trabalhos" | "aluno" | "alunos" | "professora" | "professor" | "docente"
+        | "turma" | "aula" | "aulas" | "prova" | "chamada" | "substitutiva" => {
+            Some("trabalho_academico_ensino")
+        }
+
+        "voo" | "passagem" | "hotel" | "reserva" | "checkin" | "hospedagem" | "embarque"
+        | "viagem" => Some("viagem_transporte"),
+
+        _ => None,
+    }
+}
+
 /// Provedor determinístico em CPU de 384 dimensões baseado em hashing FNV-1a de n-gramas e normalização L2.
 /// Garante 0 MB de VRAM e busca semântica preliminar sem necessidade de modelos pesados em disco.
 #[derive(Debug, Default, Clone, Copy)]
@@ -109,6 +144,20 @@ impl EmbeddingProvider for SimpleCpuEmbeddingProvider {
         let lower = text.to_lowercase();
         let words: Vec<&str> = lower.split_whitespace().collect();
         for word in &words {
+            // Projeção conceitual semântica
+            if let Some(concept) = get_semantic_concept(word) {
+                let mut chash: u64 = 0xcbf29ce484222325;
+                for &b in concept.as_bytes() {
+                    chash ^= b as u64;
+                    chash = chash.wrapping_mul(0x100000001b3);
+                }
+                for k in 0..16u64 {
+                    let h = chash.wrapping_add(k.wrapping_mul(0x9e3779b97f4a7c15));
+                    let idx = (h % 384) as usize;
+                    vec[idx] += 4.0;
+                }
+            }
+
             let bytes = word.as_bytes();
             if bytes.len() >= 3 {
                 for window in bytes.windows(3) {

@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use tempfile::tempdir;
 
 use lauda_index::{MessageIndex, SimpleCpuEmbeddingProvider};
@@ -45,7 +44,10 @@ fn test_sqlite_search_hybrid_conceptual_and_bm25() {
             is_flagged: false,
             crypto_meta: None,
         },
-        txt_auto: Some("A fatura do seu cartão com vencimento no dia 25 está disponível para pagamento.".to_string()),
+        txt_auto: Some(
+            "A fatura do seu cartão com vencimento no dia 25 está disponível para pagamento."
+                .to_string(),
+        ),
         txt_original: None,
         html_sanitized: None,
         attachments: vec![],
@@ -55,7 +57,7 @@ fn test_sqlite_search_hybrid_conceptual_and_bm25() {
     idx.index_message_semantic("INBOX", &msg1, &provider);
     idx.index_message_semantic("INBOX", &msg2, &provider);
 
-    for (_, doc) in idx.documents() {
+    for doc in idx.documents().values() {
         store.save_document("INBOX", doc, 0).expect("salvar doc");
     }
 
@@ -64,6 +66,12 @@ fn test_sqlite_search_hybrid_conceptual_and_bm25() {
         .search_hybrid("INBOX", "resultado de exame de sangue", 10)
         .expect("executar search_hybrid no SQLite");
 
-    assert!(!results.is_empty(), "Busca híbrida no SQLite deveria retornar resultados");
-    assert_eq!(results[0].uid, 10, "Top 1 deveria ser o laudo de hemograma (UID 10)");
+    assert!(
+        !results.is_empty(),
+        "Busca híbrida no SQLite deveria retornar resultados"
+    );
+    assert_eq!(
+        results[0].uid, 10,
+        "Top 1 deveria ser o laudo de hemograma (UID 10)"
+    );
 }

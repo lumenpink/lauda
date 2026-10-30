@@ -136,52 +136,106 @@ pub fn InboxView(
 
     let username = session.read().username.clone();
 
+    let mut is_remote_searching = use_signal(|| false);
+    let mut search_status_detail = use_signal(String::new);
+    let mut fast_local_results = use_signal(Vec::<MessageEnvelope>::new);
+
     let search_resource = use_resource(move || {
         let q = search_query.read().trim().to_string();
         let box_name = current_mailbox.read().clone();
         let sess = session.read().clone();
         async move {
             if !crate::domain::is_search_active(&q) {
+                is_remote_searching.set(false);
+                search_status_detail.set(String::new());
+                fast_local_results.set(Vec::new());
                 None
-            } else if let Some(token) = sess.token {
-                let client = HttpApiClient::new(sess.server_url);
-                match client.search_messages(&token, &box_name, &q).await {
-                    Ok(result) => Some((result, false)),
-                    Err(_) => {
-                        let cache = LocalMessageCache::new(get_default_cache_dir());
-                        if let Ok(Some(local_index)) = cache.load_index_slice(&box_name) {
-                            let provider = lauda_index::SimpleCpuEmbeddingProvider;
-                            let ranked = local_index.search_hybrid(&q, &provider, 0.5);
-                            let docs = local_index.documents();
-                            let envelopes: Vec<MessageEnvelope> = ranked
-                                .into_iter()
-                                .filter_map(|r| {
-                                    docs.get(&r.uid).map(|doc| MessageEnvelope {
-                                        uid: doc.uid,
-                                        subject: doc.subject.clone(),
-                                        sender: doc.sender.clone(),
-                                        date: doc.date.clone(),
-                                        cc: None,
-                                        has_attachments: doc.has_attachments,
-                                        is_read: doc.is_read,
-                                        is_flagged: doc.is_flagged,
-                                        crypto_meta: None,
-                                    })
+            } else {
+                // 1. Busca Local Imediata (Fast-First nos 90 dias locais)
+                let cache = LocalMessageCache::new(get_default_cache_dir());
+                let local_envelopes: Vec<MessageEnvelope> =
+                    if let Ok(Some(local_index)) = cache.load_index_slice(&box_name) {
+                        let provider = lauda_index::SimpleCpuEmbeddingProvider;
+                        let ranked = local_index.search_hybrid(&q, &provider, 0.4);
+                        let docs = local_index.documents();
+                        ranked
+                            .into_iter()
+                            .filter_map(|r| {
+                                docs.get(&r.uid).map(|doc| MessageEnvelope {
+                                    uid: doc.uid,
+                                    subject: doc.subject.clone(),
+                                    sender: doc.sender.clone(),
+                                    date: doc.date.clone(),
+                                    cc: None,
+                                    has_attachments: doc.has_attachments,
+                                    is_read: doc.is_read,
+                                    is_flagged: doc.is_flagged,
+                                    crypto_meta: None,
                                 })
-                                .collect();
-                            let total = envelopes.len() as u64;
-                            let fallback = lauda_types::SearchResult {
-                                messages: envelopes,
-                                sync_status: lauda_types::MailboxSyncStatus::new(total, total),
-                            };
-                            Some((fallback, true))
-                        } else {
-                            None
+                            })
+                            .collect()
+                    } else {
+                        Vec::new()
+                    };
+
+                let local_count = local_envelopes.len();
+                fast_local_results.set(local_envelopes.clone());
+
+                if let Some(token) = sess.token {
+                    is_remote_searching.set(true);
+                    search_status_detail.set(format!(
+                        "{} locais • buscando no acervo do servidor...",
+                        local_count
+                    ));
+
+                    let client = HttpApiClient::new(sess.server_url);
+                    match client.search_messages(&token, &box_name, &q).await {
+                        Ok(remote_result) => {
+                            is_remote_searching.set(false);
+                            let remote_count = remote_result.messages.len();
+                            let merged = crate::domain::view::merge_search_results(
+                                &local_envelopes,
+                                &remote_result.messages,
+                            );
+                            let total = merged.len();
+                            search_status_detail.set(format!(
+                                "{} mensagens encontradas ({} locais, {} no servidor)",
+                                total, local_count, remote_count
+                            ));
+
+                            // Prefetch eager em background dos corpos das mensagens remotas (0 RTT no clique)
+                            let client_clone = client.clone();
+                            let token_clone = token.clone();
+                            let box_clone = box_name.clone();
+                            let envs_to_fetch = remote_result.messages.clone();
+                            spawn(async move {
+                                let c = LocalMessageCache::new(get_default_cache_dir());
+                                let _ = crate::domain::sync::prefetch_search_result_bodies(
+                                    &client_clone,
+                                    &token_clone,
+                                    &box_clone,
+                                    &envs_to_fetch,
+                                    &c,
+                                    5,
+                                )
+                                .await;
+                            });
+
+                            Some((merged, false, Some(remote_result.sync_status)))
+                        }
+                        Err(_) => {
+                            is_remote_searching.set(false);
+                            search_status_detail
+                                .set(format!("{} mensagens locais (modo offline)", local_count));
+                            Some((local_envelopes, true, None))
                         }
                     }
+                } else {
+                    is_remote_searching.set(false);
+                    search_status_detail
+                        .set(format!("{} mensagens locais (sem sessão)", local_count));
+                    Some((local_envelopes, true, None))
                 }
-            } else {
-                None
             }
         }
     });
@@ -191,16 +245,21 @@ pub fn InboxView(
     let is_searching = crate::domain::is_search_active(&query_str);
 
     let (base_list, is_offline_search, search_sync_status) = match &*search_resource.read() {
-        Some(Some((result, is_offline))) => (
-            result.messages.clone(),
-            *is_offline,
-            Some(result.sync_status.clone()),
-        ),
-        _ => (
-            crate::domain::fast_filter_envelopes(&messages.read(), &query_str),
-            false,
-            None,
-        ),
+        Some(Some((result_messages, is_offline, sync_status))) => {
+            (result_messages.clone(), *is_offline, sync_status.clone())
+        }
+        _ => {
+            let local_fast = fast_local_results.read().clone();
+            if !local_fast.is_empty() {
+                (local_fast, false, None)
+            } else {
+                (
+                    crate::domain::fast_filter_envelopes(&messages.read(), &query_str),
+                    false,
+                    None,
+                )
+            }
+        }
     };
 
     let filtered_messages: Vec<MessageEnvelope> = if !is_searching {
@@ -359,22 +418,66 @@ pub fn InboxView(
                     div {
                         style: "flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.8rem;",
 
-                        // Barra de Busca Rápida
+                        // Barra de Busca Rápida com Fast-First e Spinners Discretos
+                        style {
+                            r#"
+                            @keyframes lauda-spin {{
+                                from {{ transform: rotate(0deg); }}
+                                to {{ transform: rotate(360deg); }}
+                            }}
+                            .lauda-spin {{
+                                display: inline-block;
+                                animation: lauda-spin 1s linear infinite;
+                            }}
+                            "#
+                        }
                         div {
                             style: "border: 2px solid #0a0a0a; background: #fff; padding: 0.6rem 0.8rem; box-shadow: 3px 3px 0 #0a0a0a; display: flex; align-items: center; gap: 0.5rem;",
                             span { style: "color: #dc143c; font-weight: bold;", "🔍" }
                             input {
                                 style: "border: none; outline: none; width: 100%; font-family: monospace; font-size: 0.95rem; background: transparent; color: #0a0a0a;",
-                                placeholder: "Pesquisar por assunto ou remetente (mín. 3 caracteres)...",
+                                placeholder: "Pesquisar por assunto, remetente ou em linguagem natural...",
                                 value: "{search_query.read()}",
                                 oninput: move |e| search_query.set(e.value()),
+                            }
+                            if is_searching {
+                                if *is_remote_searching.read() {
+                                    span {
+                                        class: "lauda-spin",
+                                        title: "Buscando no servidor...",
+                                        style: "font-size: 0.95rem; cursor: wait; margin-right: 0.2rem;",
+                                        "🌐"
+                                    }
+                                } else {
+                                    span {
+                                        title: "Resultados sincronizados",
+                                        style: "font-size: 0.85rem; color: #2e7d32; font-weight: bold; margin-right: 0.2rem;",
+                                        "⚡"
+                                    }
+                                }
                             }
                             if !search_query.read().is_empty() {
                                 button {
                                     style: "background: none; border: none; cursor: pointer; color: #888; font-weight: bold; font-family: monospace;",
-                                    onclick: move |_| search_query.set(String::new()),
+                                    onclick: move |_| {
+                                        search_query.set(String::new());
+                                        fast_local_results.set(Vec::new());
+                                        is_remote_searching.set(false);
+                                    },
                                     "✕"
                                 }
+                            }
+                        }
+
+                        if is_searching && !search_status_detail.read().is_empty() {
+                            div {
+                                style: "font-family: monospace; font-size: 0.75rem; color: #555; padding: 0.1rem 0.4rem; display: flex; align-items: center; gap: 0.4rem;",
+                                if *is_remote_searching.read() {
+                                    span { class: "lauda-spin", "🌐" }
+                                } else {
+                                    span { style: "color: #2e7d32; font-weight: bold;", "✓" }
+                                }
+                                span { "{search_status_detail.read()}" }
                             }
                         }
 
