@@ -1,17 +1,275 @@
 pub use lauda_types::{MessageEnvelope, ViewMode};
 use pulldown_cmark::{Options, Parser, html};
 
-/// Converte Markdown ("txt auto") em representação HTML higienizada para visualização gráfica.
+/// Remove pontuações terminais de frases anexadas a URLs.
+fn trim_url_punctuation(raw: &str) -> (&str, &str) {
+    let mut url = raw;
+    let mut trailing = &raw[raw.len()..];
+
+    while !url.is_empty() {
+        let last_char = url.chars().last().unwrap();
+        if last_char == '.'
+            || last_char == ','
+            || last_char == ';'
+            || last_char == '!'
+            || last_char == '?'
+            || last_char == ':'
+            || last_char == '\''
+            || last_char == '"'
+            || last_char == '>'
+        {
+            let prev_len = url.len() - last_char.len_utf8();
+            url = &url[..prev_len];
+            trailing = &raw[prev_len..];
+        } else if last_char == ')' {
+            let opens = url.chars().filter(|&c| c == '(').count();
+            let closes = url.chars().filter(|&c| c == ')').count();
+            if closes > opens {
+                let prev_len = url.len() - 1;
+                url = &url[..prev_len];
+                trailing = &raw[prev_len..];
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    (url, trailing)
+}
+
+/// Remove pontuações terminais anexadas a endereços de e-mail.
+fn trim_email_punctuation(raw: &str) -> (&str, &str) {
+    let mut email = raw;
+    let mut trailing = &raw[raw.len()..];
+
+    while !email.is_empty() {
+        let last_char = email.chars().last().unwrap();
+        if last_char == '.'
+            || last_char == ','
+            || last_char == ';'
+            || last_char == '!'
+            || last_char == '?'
+            || last_char == ':'
+            || last_char == '\''
+            || last_char == '"'
+            || last_char == ')'
+            || last_char == ']'
+            || last_char == '>'
+        {
+            let prev_len = email.len() - last_char.len_utf8();
+            email = &email[..prev_len];
+            trailing = &raw[prev_len..];
+        } else {
+            break;
+        }
+    }
+    (email, trailing)
+}
+
+/// Processa uma linha de texto identificando URLs puras e e-mails avulsos para autolink CommonMark.
+fn autolink_line(line: &str) -> String {
+    let mut out = String::with_capacity(line.len() + 16);
+    let chars: Vec<char> = line.chars().collect();
+    let char_count = chars.len();
+    let mut i = 0;
+
+    while i < char_count {
+        // 1. Inline code: `...`
+        if chars[i] == '`' {
+            let mut tick_count = 0;
+            while i + tick_count < char_count && chars[i + tick_count] == '`' {
+                tick_count += 1;
+            }
+            for _ in 0..tick_count {
+                out.push('`');
+            }
+            i += tick_count;
+            let mut closed = false;
+            let mut j = i;
+            while j < char_count {
+                if chars[j] == '`' {
+                    let mut close_count = 0;
+                    while j + close_count < char_count && chars[j + close_count] == '`' {
+                        close_count += 1;
+                    }
+                    if close_count == tick_count {
+                        out.extend(&chars[i..j]);
+                        for _ in 0..tick_count {
+                            out.push('`');
+                        }
+                        i = j + tick_count;
+                        closed = true;
+                        break;
+                    }
+                    j += close_count;
+                } else {
+                    j += 1;
+                }
+            }
+            if !closed {
+                out.extend(&chars[i..char_count]);
+                i = char_count;
+            }
+            continue;
+        }
+
+        // 2. Autolink existente ou tag HTML: <...>
+        if chars[i] == '<'
+            && let Some(close_idx) = chars[i + 1..].iter().position(|&c| c == '>')
+        {
+            let end = i + 1 + close_idx;
+            out.extend(&chars[i..=end]);
+            i = end + 1;
+            continue;
+        }
+
+        // 3. Destino de link Markdown: ](...)
+        if chars[i] == ']'
+            && i + 1 < char_count
+            && chars[i + 1] == '('
+            && let Some(close_idx) = chars[i + 2..].iter().position(|&c| c == ')')
+        {
+            let end = i + 2 + close_idx;
+            out.extend(&chars[i..=end]);
+            i = end + 1;
+            continue;
+        }
+
+        // 4. URL pura candidata: http:// ou https://
+        let remaining_str: String = chars[i..].iter().collect();
+        if (remaining_str.starts_with("http://") || remaining_str.starts_with("https://"))
+            && (i == 0
+                || !chars[i - 1].is_alphanumeric() && chars[i - 1] != '@' && chars[i - 1] != '/')
+        {
+            let mut end = i;
+            while end < char_count
+                && !chars[end].is_whitespace()
+                && chars[end] != '<'
+                && chars[end] != '>'
+            {
+                end += 1;
+            }
+            let raw_url: String = chars[i..end].iter().collect();
+            let (clean_url, trailing) = trim_url_punctuation(&raw_url);
+            if clean_url.starts_with("http://") && clean_url.len() > 7
+                || clean_url.starts_with("https://") && clean_url.len() > 8
+            {
+                out.push('<');
+                out.push_str(clean_url);
+                out.push('>');
+                out.push_str(trailing);
+                i = end;
+                continue;
+            }
+        }
+
+        // 5. E-mail avulso candidato: usuario@dominio.tld
+        if (i == 0 || !chars[i - 1].is_alphanumeric() && chars[i - 1] != '@' && chars[i - 1] != '.')
+            && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '+' || chars[i] == '-')
+        {
+            let mut end = i;
+            while end < char_count
+                && !chars[end].is_whitespace()
+                && chars[end] != '<'
+                && chars[end] != '>'
+                && chars[end] != '('
+            {
+                end += 1;
+            }
+            let word: String = chars[i..end].iter().collect();
+            if let Some(at_idx) = word.find('@')
+                && at_idx > 0
+            {
+                let local = &word[..at_idx];
+                let raw_domain = &word[at_idx + 1..];
+                let (clean_domain, trailing) = trim_email_punctuation(raw_domain);
+                if local.chars().all(|c| {
+                    c.is_alphanumeric() || c == '.' || c == '_' || c == '%' || c == '+' || c == '-'
+                }) && !local.starts_with('.')
+                    && !local.ends_with('.')
+                    && clean_domain.contains('.')
+                    && !clean_domain.starts_with('.')
+                    && !clean_domain.ends_with('.')
+                    && let Some(dot_idx) = clean_domain.rfind('.')
+                {
+                    let tld = &clean_domain[dot_idx + 1..];
+                    if tld.len() >= 2 && tld.chars().all(|c| c.is_ascii_alphabetic()) {
+                        out.push('<');
+                        out.push_str(local);
+                        out.push('@');
+                        out.push_str(clean_domain);
+                        out.push('>');
+                        out.push_str(trailing);
+                        i = end;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        out.push(chars[i]);
+        i += 1;
+    }
+
+    out
+}
+
+/// Pre-processa o Markdown inserindo delimitadores de autolink (<...>) em URLs puras e e-mails avulsos,
+/// protegendo blocos de código e links já existentes.
+pub fn autolink_raw_markdown(markdown: &str) -> String {
+    let mut result = String::with_capacity(markdown.len() + 64);
+    let mut in_fenced_code = false;
+    let mut fence_char = ' ';
+
+    for line in markdown.split('\n') {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            let f = trimmed.chars().next().unwrap();
+            if in_fenced_code {
+                if f == fence_char {
+                    in_fenced_code = false;
+                }
+            } else {
+                in_fenced_code = true;
+                fence_char = f;
+            }
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
+
+        if in_fenced_code {
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
+
+        let processed_line = autolink_line(line);
+        result.push_str(&processed_line);
+        result.push('\n');
+    }
+
+    if !markdown.ends_with('\n') && result.ends_with('\n') {
+        result.pop();
+    }
+
+    result
+}
+
+/// Converte Markdown ("txt auto") em representação HTML higienizada para visualização gráfica,
+/// habilitando autolink de URLs puras e e-mails avulsos de forma não-intrusiva.
 pub fn parse_markdown_to_html(markdown: &str) -> String {
     // Normaliza quebras de linha CRLF e espaços não-separáveis (\u{00A0}) isolados
     let normalized = markdown.replace("\r\n", "\n").replace('\u{00A0}', " ");
+    let autolinked = autolink_raw_markdown(&normalized);
 
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
     options.insert(Options::ENABLE_FOOTNOTES);
     options.insert(Options::ENABLE_STRIKETHROUGH);
 
-    let parser = Parser::new_ext(&normalized, options).map(|event| match event {
+    let parser = Parser::new_ext(&autolinked, options).map(|event| match event {
         pulldown_cmark::Event::SoftBreak => pulldown_cmark::Event::HardBreak,
         other => other,
     });

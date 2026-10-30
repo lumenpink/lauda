@@ -990,5 +990,31 @@ A fim de manter a loja soberana Pratilera (`banca`) sempre sincronizada com os �
 - [x] Subcomando `sync-daemon` no executável CLI.
 - [x] Cobertura de testes unitários e de integração com aprovação no quality gate.
 
+---
+
+## 33. Autolink de URLs e E-mails Avulsos no Leitor de Notas e Mensagens (Ticket #67)
+
+### 33.1 Motor de Tokenização e Transformação de Autolink
+1. **Reconhecimento de URLs Puras**:
+   - Cadeias iniciando com `http://` ou `https://` são convertidas automaticamente em elementos hiperlink (`<a href="url">url</a>`).
+   - A pontuação final da frase envolvente (como `.`, `,`, `;`, `!`, `?` e `)` não balanceado) é excluída da URL e mantida no fluxo de texto normal.
+2. **Reconhecimento de E-mails Avulsos**:
+   - Endereços de e-mail avulsos (`usuario@dominio.tld`) são identificados e transformados em hiperlinks com o protocolo `mailto:` (`<a href="mailto:email">email</a>`).
+3. **Preservação e Não-Interferência**:
+   - Trechos em blocos de código (fenced code blocks) ou código inline (`code`) não sofrem transformação.
+   - Trechos contidos em links Markdown pré-existentes (`[texto](url)` ou `<url>`) mantêm a estrutura original sem criação de tags de link aninhadas.
+4. **Leitor de Notas de Contato**:
+   - O campo de notas de contato (`c.notes`) é renderizado através do pipeline de Markdown e autolink, viabilizando abertura direta de links e composição rápida para e-mails ali presentes.
+
+### 33.2 Critérios de Aceite Normativos (Ticket #67)
+- [x] Implementação de tokenizador/transformador de autolink no fluxo de eventos de `parse_markdown_to_html`.
+- [x] Conversão automática de URLs `http://` e `https://` sem necessidade de sintaxe `<>` ou `[]()`.
+- [x] Conversão automática de e-mails em links `mailto:`.
+- [x] Descarte correto de pontuação sintática terminal (. , ; ! ? )).
+- [x] Isolamento estrito de blocos de código e links já existentes.
+- [x] Apresentação formatada das notas de contatos com autolink.
+- [x] Testes automatizados cobrindo todos os cenários e aprovação no quality gate.
+
+
 
 

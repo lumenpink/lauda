@@ -178,6 +178,7 @@ pub fn ContactsView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
                             let has_auto = c.has_autocrypt;
                             let fp_opt = c.autocrypt_fingerprint.clone();
                             let formatted_recipient = format_contact_recipient(name_opt.as_deref(), &email);
+                            let rendered_notes = c.notes.as_ref().map(|n| crate::domain::view::parse_markdown_to_html(n));
 
                             rsx! {
                                 div {
@@ -207,6 +208,14 @@ pub fn ContactsView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
                                             }
                                             if let Some(fp) = fp_opt {
                                                 span { style: "font-family: monospace; font-size: 0.7rem; color: #444;", "FP: {fp}" }
+                                            }
+                                        }
+                                        if let Some(ref note_html) = rendered_notes {
+                                            if !note_html.trim().is_empty() {
+                                                div {
+                                                    style: "margin-top: 0.4rem; padding: 0.4rem; background: #fafafa; border-left: 3px solid #2e8b57; font-size: 0.85rem; color: #222;",
+                                                    dangerous_inner_html: "{note_html}",
+                                                }
                                             }
                                         }
                                     }
