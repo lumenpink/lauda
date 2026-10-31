@@ -1025,8 +1025,9 @@ A fim de manter a loja soberana Pratilera (`banca`) sempre sincronizada com os �
    - O agendamento assíncrono em ambientes concorrentes pode atrasar a execução do loop de `accept()` em relação às primeiras chamadas do cliente HTTP, disparando erros espúrios de `Connection refused` (`Network error`).
 2. **Solução Normativa (`wait_for_tcp_ready`)**:
    - Antes de efetuar requisições através do cliente HTTP, o teste deve executar uma sondagem ativa contra o endereço TCP efêmero alocado (`server_addr`).
-   - A sonda tenta estabelecer conexão TCP (`TcpStream::connect`), efetuando encerramento gracioso via `shutdown()` assim que bem-sucedida.
-   - O limite de espera é de 50 tentativas intervaladas por 10ms (teto de 500ms), com resposta instantânea (< 1ms) em condições normais e tolerância a atrasos de escalonamento em ambientes sobrecarregados de CI.
+   - A sonda estabelece a conexão TCP (`TcpStream::connect`), despacha uma requisição HTTP mínima (`GET /auth/login HTTP/1.1`) e aguarda a leitura da resposta de aplicação, garantindo que o ciclo HTTP do Axum já foi escalonado e está ativo antes de liberar o cliente.
+   - O limite de espera é de 50 tentativas intervaladas por 15ms, com resposta instantânea em condições normais e tolerância a atrasos de escalonamento em ambientes de CI.
+   - O cliente de teste também incorpora retentativa resiliente para acomodar oscilações transitórias de agendamento de rede em containers.
 
 ### 34.2 Critérios de Aceite Normativos (Ticket #73)
 - [x] Implementação da rotina assíncrona de sondagem `wait_for_tcp_ready` em `e2e_apk_test.rs`.

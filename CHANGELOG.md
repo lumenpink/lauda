@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **test:** sonda http ativa e retentativa resiliente no teste e2e mobile
 - **test:** adicionar polling de prontidao tcp nos testes e2e (closes #73)
 - **desktop:** integrar icone xdg e atalho desktop apos instalacao (closes #71)
 - **ci:** cd soberano do lauda-server no obizero via ssh autenticado (closes #64)

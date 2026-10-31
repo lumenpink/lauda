@@ -17,12 +17,20 @@ use urupema::domain::RawEmail;
 async fn wait_for_tcp_ready(addr: SocketAddr) {
     for _ in 0..50 {
         if let Ok(mut stream) = TcpStream::connect(addr).await {
-            let _ = stream.shutdown().await;
-            return;
+            let probe = b"GET /auth/login HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+            if stream.write_all(probe).await.is_ok() {
+                use tokio::io::AsyncReadExt;
+                let mut buf = [0u8; 16];
+                if let Ok(n) = stream.read(&mut buf).await
+                    && n > 0
+                {
+                    return;
+                }
+            }
         }
-        tokio::time::sleep(Duration::from_millis(10)).await;
+        tokio::time::sleep(Duration::from_millis(15)).await;
     }
-    panic!("Timeout aguardando prontidão TCP em {addr}");
+    panic!("Timeout aguardando prontidão TCP/HTTP em {addr}");
 }
 
 const TEST_SECRET: &str = "jwt-secret-full-chain-sovereign-mail-123456";

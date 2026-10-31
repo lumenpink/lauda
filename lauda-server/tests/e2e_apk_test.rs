@@ -18,12 +18,20 @@ use tokio::net::{TcpListener, TcpStream};
 async fn wait_for_tcp_ready(addr: SocketAddr) {
     for _ in 0..50 {
         if let Ok(mut stream) = TcpStream::connect(addr).await {
-            let _ = stream.shutdown().await;
-            return;
+            let probe = b"GET /auth/login HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+            if stream.write_all(probe).await.is_ok() {
+                use tokio::io::AsyncReadExt;
+                let mut buf = [0u8; 16];
+                if let Ok(n) = stream.read(&mut buf).await
+                    && n > 0
+                {
+                    return;
+                }
+            }
         }
-        tokio::time::sleep(Duration::from_millis(10)).await;
+        tokio::time::sleep(Duration::from_millis(15)).await;
     }
-    panic!("Timeout aguardando prontidão TCP em {addr}");
+    panic!("Timeout aguardando prontidão TCP/HTTP em {addr}");
 }
 
 const TEST_SECRET: &str = "jwt-secret-apk-e2e-suite-2026";
@@ -357,14 +365,27 @@ async fn test_e2e_apk_mobile_client_live_server_full_loop() {
     // C. Instanciação do Cliente HTTP exatamente como executado no código Rust do APK
     let client = HttpApiClient::new(base_url);
 
-    // D. Passo 1 do Ciclo: Autenticação via /auth/login
-    let login_resp = client
-        .login(&LoginRequest {
-            username: "lumen".to_string(),
-            password: "senha_mobile_2026".to_string(),
-        })
-        .await
-        .expect("Login do cliente mobile deve ser bem-sucedido");
+    // D. Passo 1 do Ciclo: Autenticação via /auth/login (com retentativa resiliente para acomodar carga concorrente do runner)
+    let mut login_resp = None;
+    for _ in 0..10 {
+        match client
+            .login(&LoginRequest {
+                username: "lumen".to_string(),
+                password: "senha_mobile_2026".to_string(),
+            })
+            .await
+        {
+            Ok(resp) => {
+                login_resp = Some(resp);
+                break;
+            }
+            Err(lauda_client::domain::ports::ClientError::Network(_)) => {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+            Err(e) => panic!("Login falhou com erro permanente: {:?}", e),
+        }
+    }
+    let login_resp = login_resp.expect("Login do cliente mobile deve ser bem-sucedido");
 
     assert_eq!(login_resp.username, "lumen");
     let token = &login_resp.token;
