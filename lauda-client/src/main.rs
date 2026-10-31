@@ -30,6 +30,9 @@ fn main() {
         target_arch = "wasm32"
     )))]
     {
+        // Verificação periódica não-bloqueante no startup de comandos CLI ou TUI
+        let _ = lauda_client::update::check_for_updates_startup(None, None);
+
         let args: Vec<String> = std::env::args().collect();
         if args.len() > 1 {
             let cmd = args[1].as_str();
@@ -37,6 +40,7 @@ fn main() {
                 "update" => {
                     let mut channel = None;
                     let mut pin = None;
+                    let mut force = false;
                     let mut save = false;
                     let mut check = false;
                     let mut i = 2;
@@ -54,6 +58,7 @@ fn main() {
                                     i += 1;
                                 }
                             }
+                            "--force" | "-f" => force = true,
                             "--save" => save = true,
                             "--check" => check = true,
                             _ => {}
@@ -68,7 +73,9 @@ fn main() {
                     } else if let Err(e) = lauda_client::update::cmd_update(
                         channel.as_deref(),
                         pin.as_deref(),
+                        force,
                         save,
+                        None,
                         None,
                     ) {
                         eprintln!("Erro ao atualizar: {e}");
@@ -93,23 +100,126 @@ fn main() {
                     return;
                 }
                 "config" => {
-                    if args.len() > 3 && args[2] == "set-channel" {
-                        if let Err(e) = lauda_client::update::save_default_channel(&args[3], None) {
-                            eprintln!("Erro ao salvar canal: {e}");
-                            std::process::exit(1);
+                    if args.len() > 2 {
+                        match args[2].as_str() {
+                            "set-channel" if args.len() > 3 => {
+                                if let Err(e) =
+                                    lauda_client::update::save_default_channel(&args[3], None)
+                                {
+                                    eprintln!("Erro ao salvar canal: {e}");
+                                    std::process::exit(1);
+                                }
+                                println!("✔ Canal padrão do Lauda atualizado para '{}'.", args[3]);
+                                return;
+                            }
+                            "pin" => {
+                                let ver = if args.len() > 3 {
+                                    Some(args[3].as_str())
+                                } else {
+                                    None
+                                };
+                                if let Err(e) = lauda_client::update::set_pin(ver, None) {
+                                    eprintln!("Erro ao fixar versão: {e}");
+                                    std::process::exit(1);
+                                }
+                                let pinned_ver =
+                                    lauda_client::update::get_config_value("pin", None)
+                                        .unwrap_or_default();
+                                println!(
+                                    "✔ Versão do Lauda fixada com sucesso em 'v{}'.",
+                                    pinned_ver
+                                );
+                                return;
+                            }
+                            "unpin" => {
+                                if let Err(e) = lauda_client::update::unpin(None) {
+                                    eprintln!("Erro ao desfixar versão: {e}");
+                                    std::process::exit(1);
+                                }
+                                println!(
+                                    "✔ Trava de versão removida (unpinned). Atualizações habilitadas."
+                                );
+                                return;
+                            }
+                            "set-auto-check" if args.len() > 3 => {
+                                let val: bool = match args[3].to_lowercase().as_str() {
+                                    "true" | "1" | "yes" | "sim" => true,
+                                    "false" | "0" | "no" | "nao" => false,
+                                    other => {
+                                        eprintln!(
+                                            "Valor inválido para auto-check: '{}'. Esperado: true ou false.",
+                                            other
+                                        );
+                                        std::process::exit(1);
+                                    }
+                                };
+                                if let Err(e) = lauda_client::update::set_auto_check(val, None) {
+                                    eprintln!("Erro ao configurar auto-check: {e}");
+                                    std::process::exit(1);
+                                }
+                                println!(
+                                    "✔ Verificação periódica no startup configurada para '{}'.",
+                                    val
+                                );
+                                return;
+                            }
+                            "get" if args.len() > 3 => {
+                                let key = &args[3];
+                                match lauda_client::update::get_config_value(key, None) {
+                                    Some(val) => println!("{val}"),
+                                    None => println!("(não configurado)"),
+                                }
+                                return;
+                            }
+                            "show" => {
+                                let config_path = lauda_client::update::get_default_config_path();
+                                let state_path = lauda_client::update::get_default_state_path();
+                                let active_ch =
+                                    lauda_client::update::resolve_channel(None, None, None);
+                                let cfg = lauda_client::update::load_config(None);
+                                let u = cfg.update.unwrap_or_default();
+                                println!("Arquivo de configuração : {}", config_path.display());
+                                println!("Arquivo de estado (XDG) : {}", state_path.display());
+                                println!("Canal ativo resolvido  : {}", active_ch);
+                                println!(
+                                    "Canal configurado       : {}",
+                                    u.channel.as_deref().unwrap_or("padrão (stable)")
+                                );
+                                println!(
+                                    "Versão pinada           : {}",
+                                    if u.pinned == Some(true) {
+                                        u.pin.as_deref().unwrap_or("sim")
+                                    } else {
+                                        "não"
+                                    }
+                                );
+                                println!(
+                                    "Auto-check no startup   : {}",
+                                    u.auto_check.unwrap_or(true)
+                                );
+                                println!(
+                                    "Intervalo de verificação: {}h",
+                                    u.check_interval_hours.unwrap_or(24)
+                                );
+                                return;
+                            }
+                            _ => {}
                         }
-                        println!("✔ Canal padrão do Lauda atualizado para '{}'.", args[3]);
-                        return;
-                    } else if args.len() > 2 && args[2] == "show" {
-                        let path = lauda_client::update::get_default_config_path();
-                        let active = lauda_client::update::resolve_channel(None, None, None);
-                        println!("Arquivo de configuração : {}", path.display());
-                        println!("Canal ativo resolvido  : {}", active);
-                        return;
-                    } else {
-                        println!("Uso: lauda config set-channel <channel> | lauda config show");
-                        return;
                     }
+                    println!("Uso: lauda config <subcomando>");
+                    println!("  show                      Exibe caminhos e configurações ativas");
+                    println!("  get <chave>               Obtém o valor de uma chave específica");
+                    println!(
+                        "  pin [<versao>]            Fixa versão atual ou informada contra atualizações"
+                    );
+                    println!("  unpin                     Remove fixação de versão");
+                    println!(
+                        "  set-auto-check <bool>     Habilita ou desabilita verificação no startup"
+                    );
+                    println!(
+                        "  set-channel <canal>       Define o canal padrão (stable ou nightly)"
+                    );
+                    return;
                 }
                 "sync-daemon" => {
                     let session = match lauda_client::domain::session::load_session(None) {

@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **build:** otimizar tamanho de binario com profile.release e habilitar linking estatico musl crt-static (closes #53)
 
 ### Features
+- **updater:** adequar configuracao opendesktop xdg e verificacao periodica com pin (closes #49)
 - **render:** habilitar autolink de urls e emails avulsos no leitor de notas (closes #67)
 - **sync:** implementar servico resiliente de sincronizacao em background (closes #72)
 - **search:** busca hibrida por bm25 e ia com interpretacao de linguagem natural (closes #70, #66)

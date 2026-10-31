@@ -1035,6 +1035,67 @@ A fim de manter a loja soberana Pratilera (`banca`) sempre sincronizada com os �
 - [x] Eliminação de falhas intermitentes por `Connection refused` na inicialização de testes E2E.
 - [x] Aprovação completa dos testes e zero warnings no quality gate.
 
+---
+
+## 35. Configuração OpenDesktop XDG e Verificação Periódica com Pin (Ticket #49)
+
+### 35.1 Diretórios Normativos OpenDesktop (XDG Base Directory)
+1. **Configuração de Usuário**:
+   - Resolução: `$XDG_CONFIG_HOME/lauda/config.toml` com fallback estrito para `$HOME/.config/lauda/config.toml` e fallback local `.lauda_config.toml`.
+   - Seção normativa `[update]`:
+     ```toml
+     [update]
+     channel = "stable"            # "stable" | "nightly"
+     pinned = false                # Flag booleana indicando se atualizações estão congeladas
+     pin = "0.4.1"                 # Versão fixada opcional (ex: "0.4.1")
+     auto_check = true             # Ativação da checagem periódica não-bloqueante no startup
+     check_interval_hours = 24     # Intervalo em horas entre checagens remotas ativas (default 24h)
+     ```
+2. **Estado de Runtime (Cache de Verificação)**:
+   - Resolução: `$XDG_STATE_HOME/lauda/update_check.json` com fallback estrito para `$HOME/.local/state/lauda/update_check.json` e fallback local `.lauda_update_check.json`.
+   - Estrutura JSON:
+     ```json
+     {
+       "last_check_timestamp": 1720000000,
+       "latest_remote_version": "0.4.2",
+       "channel": "stable"
+     }
+     ```
+
+### 35.2 Protocolo de Verificação Periódica Não-Bloqueante no Arranque
+1. **Condições de Execução**:
+   - A rotina `check_for_updates_startup` é executada silenciosamente na inicialização da aplicação (CLI e TUI).
+   - Se `auto_check == false` ou se a configuração indicar fixação (`pinned == true` ou `pin.is_some()`), a rotina finaliza imediatamente sem emitir avisos ou realizar tráfego de rede.
+2. **Validação de Cache**:
+   - Se o arquivo de estado em `$XDG_STATE_HOME` registrar uma verificação realizada há menos de `check_interval_hours * 3600` segundos para o mesmo canal, não é realizada nova requisição HTTP.
+   - Caso o cache tenha expirado ou não exista, efetua consulta HTTP leve ao endpoint de versão com timeout curto (<= 2 segundos).
+   - Em caso de falha de conexão, indisponibilidade ou timeout, a rotina não trava e não interrompe a inicialização do programa.
+3. **Notificação Sutil no Stderr**:
+   - Caso a versão remota mais recente seja superior à versão atual do binário e não haja pinagem ativa, exibe uma mensagem discreta em `stderr`:
+     `aviso: nova versão do Lauda disponível: v{current} -> v{remote}. Execute 'lauda update' para atualizar.`
+
+### 35.3 Proteção e Controle de Pinning
+1. **Regras de Atualização (`lauda update`)**:
+   - Quando `pinned == true` ou `pin` estiver configurado, qualquer tentativa de `lauda update` sem a flag `--force` deve ser rejeitada com erro explícito de proteção contra sobrescrita de versão fixada.
+   - O comando `lauda update --pin <versão>` instala e fixa diretamente a versão especificada.
+2. **Subcomandos de Configuração (`lauda config`)**:
+   - `lauda config show`: exibe os caminhos XDG em uso e os valores de todas as opções de configuração ativas.
+   - `lauda config get <chave>`: retorna o valor da chave solicitada (`channel`, `pinned`, `pin`, `auto_check`, `check_interval_hours`).
+   - `lauda config pin [<versão>]`: define `pinned = true` e grava a versão informada (ou a versão atual do binário se omitida).
+   - `lauda config unpin`: desativa a fixação (`pinned = false` e limpa `pin`).
+   - `lauda config set-auto-check <true|false>`: ativa ou desativa a verificação periódica.
+   - `lauda config set-channel <stable|nightly>`: define o canal de distribuição padrão.
+
+### 35.4 Critérios de Aceite Normativos (Ticket #49)
+- [x] Implementação de resolução completa XDG para `$XDG_CONFIG_HOME` e `$XDG_STATE_HOME`.
+- [x] Suporte a todos os campos de `[update]` (`channel`, `pinned`, `pin`, `auto_check`, `check_interval_hours`).
+- [x] Persistência de estado de checagem em `$XDG_STATE_HOME/lauda/update_check.json`.
+- [x] Execução não-bloqueante de `check_for_updates_startup` com aviso em `stderr` apenas quando despinado e versão mais nova identificada.
+- [x] Bloqueio estrito de atualizações via `lauda update` quando pinado, a menos que `--force` seja fornecido.
+- [x] Suporte a todos os subcomandos de `lauda config` (`show`, `get`, `pin`, `unpin`, `set-auto-check`, `set-channel`).
+- [x] Testes de unidade, integração e mutação aprovados com zero warnings no quality gate.
+
+
 
 
 
