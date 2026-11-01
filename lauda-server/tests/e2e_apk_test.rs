@@ -367,6 +367,7 @@ async fn test_e2e_apk_mobile_client_live_server_full_loop() {
 
     // D. Passo 1 do Ciclo: Autenticação via /auth/login (com retentativa resiliente para acomodar carga concorrente do runner)
     let mut login_resp = None;
+    let mut last_err = None;
     for _ in 0..10 {
         match client
             .login(&LoginRequest {
@@ -379,13 +380,19 @@ async fn test_e2e_apk_mobile_client_live_server_full_loop() {
                 login_resp = Some(resp);
                 break;
             }
-            Err(lauda_client::domain::ports::ClientError::Network(_)) => {
+            Err(lauda_client::domain::ports::ClientError::Network(err_msg)) => {
+                last_err = Some(err_msg);
                 tokio::time::sleep(Duration::from_millis(50)).await;
             }
             Err(e) => panic!("Login falhou com erro permanente: {:?}", e),
         }
     }
-    let login_resp = login_resp.expect("Login do cliente mobile deve ser bem-sucedido");
+    let login_resp = login_resp.unwrap_or_else(|| {
+        panic!(
+            "Login do cliente mobile deve ser bem-sucedido após retentativas. Último erro de rede: {:?}",
+            last_err
+        )
+    });
 
     assert_eq!(login_resp.username, "lumen");
     let token = &login_resp.token;
@@ -631,5 +638,19 @@ fn test_ci_workflow_declares_hermetic_no_proxy_environment() {
         test_job_block.contains("NO_PROXY: \"localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in\"")
             || test_job_block.contains("NO_PROXY: localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in"),
         "Job test no ci.yml deve declarar NO_PROXY com loopback e domínios locais"
+    );
+
+    // MUTAÇÃO: Garantir que a omissão de 127.0.0.1 ou dos domínios em um bloco mutado gera rejeição
+    let mutated_block = test_job_block.replace("127.0.0.1", "");
+    assert!(
+        !mutated_block.contains("127.0.0.1"),
+        "Mutante deve simular a remoção de 127.0.0.1"
+    );
+    let is_valid = mutated_block
+        .contains("no_proxy: \"localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in\"")
+        || mutated_block.contains("no_proxy: localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in");
+    assert!(
+        !is_valid,
+        "Bloco mutado sem 127.0.0.1 deve falhar na validação estrita"
     );
 }

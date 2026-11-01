@@ -1120,10 +1120,10 @@ A fim de manter a loja soberana Pratilera (`banca`) sempre sincronizada com os �
    - Adicionalmente, o teste de conformidade de workflow (`test_ci_workflow_has_deploy_apk_job_with_strict_contract` ou teste dedicado) deve auditar a presença obrigatória de `no_proxy`/`NO_PROXY` no manifesto `ci.yml`.
 
 ### 36.3 Critérios de Aceite Normativos (Ticket #74)
-- [ ] O manifesto `.forgejo/workflows/ci.yml` declara `no_proxy` e `NO_PROXY` contendo `localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in` no job de testes.
-- [ ] O laço resiliente em `e2e_apk_test.rs` preserva `last_err` e exibe o diagnóstico no `panic!`.
-- [ ] Teste automatizado validando a integridade das variáveis `no_proxy`/`NO_PROXY` no fluxo de CI.
-- [ ] Aprovação completa dos testes e zero warnings no quality gate.
+- [x] O manifesto `.forgejo/workflows/ci.yml` declara `no_proxy` e `NO_PROXY` contendo `localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in` no job de testes.
+- [x] O laço resiliente em `e2e_apk_test.rs` preserva `last_err` e exibe o diagnóstico no `panic!`.
+- [x] Teste automatizado validando a integridade das variáveis `no_proxy`/`NO_PROXY` no fluxo de CI.
+- [x] Aprovação completa dos testes e zero warnings no quality gate.
 
 
 

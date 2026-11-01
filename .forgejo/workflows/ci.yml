@@ -19,6 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: gambi.2lp.in/lumen/gost-ci-wasm:latest
+    env:
+      no_proxy: "localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in"
+      NO_PROXY: "localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in"
     steps:
       - name: "Checkout repository"
         uses: actions/checkout@v4
@@ -54,6 +57,8 @@ jobs:
     container:
       image: gambi.2lp.in/lumen/gost-ci-wasm:latest
     env:
+      no_proxy: "localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in"
+      NO_PROXY: "localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in"
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
@@ -107,6 +112,8 @@ jobs:
     container:
       image: gambi.2lp.in/lumen/gost-ci-cross:latest
     env:
+      no_proxy: "localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in"
+      NO_PROXY: "localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in"
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       GAMBI_2LP_IN_TOKEN: ${{ secrets.GAMBI_2LP_IN_TOKEN }}
@@ -296,6 +303,9 @@ jobs:
     if: github.ref == 'refs/heads/main'
     container:
       image: gambi.2lp.in/lumen/gost-ci-android:latest
+    env:
+      no_proxy: "localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in"
+      NO_PROXY: "localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in"
     steps:
       - name: "Checkout repository"
         uses: actions/checkout@v4
