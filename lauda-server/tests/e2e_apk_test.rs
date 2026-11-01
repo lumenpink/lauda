@@ -606,3 +606,30 @@ fn test_ci_workflow_avoids_unreachable_container_and_has_stable_hermetic_test_pi
         "ci.yml deve conter job trigger-pratilera para atualizar o catálogo da banca"
     );
 }
+
+#[test]
+fn test_ci_workflow_declares_hermetic_no_proxy_environment() {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let repo_root = manifest_dir.parent().unwrap();
+    let ci_yml = repo_root.join(".forgejo/workflows/ci.yml");
+    let content = std::fs::read_to_string(&ci_yml).expect("Leitura de ci.yml");
+
+    let test_job_block = content
+        .split("test:")
+        .nth(1)
+        .expect("bloco test")
+        .split("\n  deploy-")
+        .next()
+        .unwrap();
+
+    assert!(
+        test_job_block.contains("no_proxy: \"localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in\"")
+            || test_job_block.contains("no_proxy: localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in"),
+        "Job test no ci.yml deve declarar no_proxy com loopback e domínios locais"
+    );
+    assert!(
+        test_job_block.contains("NO_PROXY: \"localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in\"")
+            || test_job_block.contains("NO_PROXY: localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in"),
+        "Job test no ci.yml deve declarar NO_PROXY com loopback e domínios locais"
+    );
+}
