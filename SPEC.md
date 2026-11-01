@@ -1096,6 +1096,36 @@ A fim de manter a loja soberana Pratilera (`banca`) sempre sincronizada com os �
 - [x] Suporte a todos os subcomandos de `lauda config` (`show`, `get`, `pin`, `unpin`, `set-auto-check`, `set-channel`).
 - [x] Testes de unidade, integração e mutação aprovados com zero warnings no quality gate.
 
+---
+
+## 36. Blindagem de Rede Hermética na CI e Diagnóstico Resiliente de E2E (Ticket #74)
+
+### 36.1 Hermetismo de Loopback na Esteira de CI/CD
+1. **Problema**:
+   - Contêineres de runner em ambientes compartilhados podem possuir variáveis globais de proxy HTTP (ex.: `http_proxy` apontando para caches de pacotes de distribuição como o `apt-cacher-ng`).
+   - Requisições emitidas por suítes de teste para serviços efêmeros locais em `127.0.0.1` ou `localhost` podem sofrer interceptação indevida quando o ambiente não declara explicitamente a isenção de proxy para loopback.
+2. **Diretiva Normativa de Workflow (`.forgejo/workflows/ci.yml`)**:
+   - Os jobs de execução de teste (`test`) e de construção de artefatos devem declarar explicitamente no bloco `env` as variáveis:
+     - `no_proxy: "localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in"`
+     - `NO_PROXY: "localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in"`
+   - Esta configuração assegura que bibliotecas de rede como `reqwest`, bem como clientes utilitários do sistema operacional (`curl`, `git`, interpretadores), mantenham a comunicação local e interna direta sem desvios para proxies.
+
+### 36.2 Preservação de Diagnóstico no Laço Resiliente de Login (`e2e_apk_test.rs`)
+1. **Problema**:
+   - Sob cenários de sobrecarga concorrente de CPU no host (ex.: múltiplos núcleos compilando workspaces em paralelo com cotas de CPU restritas), o laço de retentativas resilientes de autenticação via `client.login` descartava a mensagem interna de `ClientError::Network(_)`.
+   - Em caso de esgotamento de todas as tentativas, a asserção final `expect("Login do cliente mobile deve ser bem-sucedido")` gerava uma falha opaca sem revelar a mensagem raiz do erro subjacente.
+2. **Solução Normativa**:
+   - O laço de retentativa deve reter o último erro reportado (`last_err`), propagando-o explicitamente no momento do `panic!` caso o esgotamento ocorra:
+     `panic!("Login do cliente mobile deve ser bem-sucedido: {:?}", last_err)`.
+   - Adicionalmente, o teste de conformidade de workflow (`test_ci_workflow_has_deploy_apk_job_with_strict_contract` ou teste dedicado) deve auditar a presença obrigatória de `no_proxy`/`NO_PROXY` no manifesto `ci.yml`.
+
+### 36.3 Critérios de Aceite Normativos (Ticket #74)
+- [ ] O manifesto `.forgejo/workflows/ci.yml` declara `no_proxy` e `NO_PROXY` contendo `localhost,127.0.0.1,gambi.2lp.in,crates.2lp.in` no job de testes.
+- [ ] O laço resiliente em `e2e_apk_test.rs` preserva `last_err` e exibe o diagnóstico no `panic!`.
+- [ ] Teste automatizado validando a integridade das variáveis `no_proxy`/`NO_PROXY` no fluxo de CI.
+- [ ] Aprovação completa dos testes e zero warnings no quality gate.
+
+
 
 
 
