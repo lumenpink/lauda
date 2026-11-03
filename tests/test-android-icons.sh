@@ -95,6 +95,50 @@ assert im.getpixel((0, 0))[3] == 0, 'Canto não transparente no ícone circular'
     fi
 done
 
+# 3.1. Validar drawables adaptativos em todas as densidades (108dp base)
+declare -A ADAPTIVE_DENSITIES=(
+    ["drawable-mdpi"]=108
+    ["drawable-hdpi"]=162
+    ["drawable-xhdpi"]=216
+    ["drawable-xxhdpi"]=324
+    ["drawable-xxxhdpi"]=432
+)
+
+for folder in "${!ADAPTIVE_DENSITIES[@]}"; do
+    expected_size="${ADAPTIVE_DENSITIES[$folder]}"
+    target_fg="$RES_DIR/$folder/ic_launcher_foreground.png"
+    if [ ! -f "$target_fg" ]; then
+        echo "❌ Falha: Foreground adaptativo $target_fg ausente."
+        FAILED=1
+    else
+        python3 -c "
+from PIL import Image
+im = Image.open('$target_fg')
+assert im.size == ($expected_size, $expected_size), f'Tamanho incorreto em $target_fg: {im.size} != ($expected_size, $expected_size)'
+assert im.mode == 'RGBA', f'Modo não é RGBA em $target_fg: {im.mode}'
+" || FAILED=1
+    fi
+done
+
+# 3.2. Validar expurgamento de drawable-v24 e templates em publish-nightly.sh
+PUBLISH_SCRIPT="$REPO_ROOT/scripts/publish-nightly.sh"
+if [ -f "$PUBLISH_SCRIPT" ]; then
+    if ! grep -q "drawable-v24" "$PUBLISH_SCRIPT"; then
+        echo "❌ Falha: $PUBLISH_SCRIPT deve conter rotina de expurgo de drawable-v24 do Dioxus."
+        FAILED=1
+    fi
+fi
+
+# 3.3. Rejeitar resíduos de template em APK compilado (se presente)
+for apk_cand in "$SITE_DIR/lauda.apk" "$SITE_DIR/lauda-latest.apk" "$REPO_ROOT/dist/apk/lauda.apk"; do
+    if [ -f "$apk_cand" ] && command -v unzip >/dev/null 2>&1; then
+        if unzip -l "$apk_cand" | grep "drawable-v24/ic_launcher_foreground.xml" >/dev/null 2>&1; then
+            echo "❌ Falha: $apk_cand contém template Dioxus residual drawable-v24/ic_launcher_foreground.xml"
+            FAILED=1
+        fi
+    fi
+done
+
 # 4. Validar marcadores de paleta Trash Polka
 if [ -f "$MASTER_PNG" ]; then
     python3 -c "
