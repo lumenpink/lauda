@@ -5,7 +5,7 @@ FROM gambi.2lp.in/lumen/gost-ci-cross:latest AS builder
 
 WORKDIR /usr/src
 
-# Configurar registros soberanos para crates.io e pacotes da gambi no obizero
+# Configurar registros canônicos para crates.io e pacotes da gambi no obizero
 RUN mkdir -p /root/.cargo && \
     printf '[source.crates-io]\nreplace-with = "sovereign-crates"\n\n[registries.sovereign-crates]\nindex = "sparse+https://crates.2lp.in/index/"\n\n[registries.gambi]\nindex = "sparse+https://gambi.2lp.in/api/packages/lumen/cargo/"\n' > /root/.cargo/config.toml
 
@@ -22,7 +22,7 @@ COPY lauda-server ./lauda-server
 RUN cargo build --release --bin lauda-server
 
 # ==============================================================================
-# Estágio de Execução (Debian Slim Minimal Soberano)
+# Estágio de Execução (Debian Slim Minimal)
 # ==============================================================================
 FROM gambi.2lp.in/lumen/mirror-debian:bookworm-slim
 
