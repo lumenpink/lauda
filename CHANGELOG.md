@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **server:** integrar urupema 0.1.1 sanitizado e rotina de reindexacao vetorial (closes #75)
 - **ci:** blindar no_proxy no workflow e diagnostico no e2e (closes #74)
 - **test:** sonda http ativa e retentativa resiliente no teste e2e mobile
 - **test:** adicionar polling de prontidao tcp nos testes e2e (closes #73)

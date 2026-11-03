@@ -215,6 +215,16 @@ impl MaildirBackend {
         self.sqlite_index.as_ref()
     }
 
+    /// Limpa o índice persistido de uma caixa postal, forçando uma reindexação vetorial completa.
+    pub fn reindex_mailbox(&self, mailbox: &str) -> Result<(), BackendError> {
+        if let Some(ref store) = self.sqlite_index {
+            store.clear_mailbox_index(mailbox).map_err(|e| {
+                BackendError::Internal(format!("Erro ao limpar índice para reindexação: {}", e))
+            })?;
+        }
+        Ok(())
+    }
+
     pub fn add_user(&self, username: impl Into<String>, password: impl Into<String>) {
         if let Ok(mut lock) = self.users.write() {
             lock.insert(username.into(), password.into());
@@ -634,10 +644,14 @@ impl MaildirBackend {
 
         let txt_auto = if let Some(ref html) = html_sanitized {
             let clean = Self::clean_comment_tags(html);
-            let md = html2text::from_read(clean.as_bytes(), 10_000);
-            let trimmed = md.trim().to_string();
-            if !trimmed.is_empty() {
-                Some(trimmed)
+            let raw_md = html2text::from_read(clean.as_bytes(), 10_000);
+            let clean_md = urupema::domain::sanitize_markdown_noise(&raw_md);
+            let fallback_to_plain =
+                urupema::domain::is_markdown_empty_or_polluted(&clean_md, txt_original.as_deref());
+            if fallback_to_plain && txt_original.is_some() {
+                txt_original.as_deref().map(Self::clean_comment_tags)
+            } else if !clean_md.trim().is_empty() {
+                Some(clean_md)
             } else {
                 txt_original.as_deref().map(Self::clean_comment_tags)
             }

@@ -26,7 +26,7 @@ rusqlite = { version = "0.33", features = ["bundled"] }
 base64 = "0.22"
 html2text = "0.12"
 lauda-index = { path = "../lauda-index" }
-urupema = { version = "0.1", registry = "gambi" }
+urupema = { version = "0.1.1", registry = "gambi" }
 
 [dev-dependencies]
 base64 = "0.22"
@@ -35,7 +35,7 @@ http-body-util = "0.1"
 lauda-client = { path = "../lauda-client" }
 minijinja = "2"
 tempfile = "3.10"
-urupema = { version = "0.1", registry = "gambi" }
+urupema = { version = "0.1.1", registry = "gambi" }
 
 
 [lints]

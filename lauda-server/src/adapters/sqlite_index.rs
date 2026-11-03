@@ -177,6 +177,21 @@ impl SqliteIndexStore {
         Ok(())
     }
 
+    /// Limpa todos os documentos indexados e termos invertidos da caixa postal informada,
+    /// permitindo uma reindexação completa do zero.
+    pub fn clear_mailbox_index(&self, mailbox: &str) -> Result<(), rusqlite::Error> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM indexed_documents WHERE mailbox = ?1",
+            params![mailbox],
+        )?;
+        conn.execute(
+            "DELETE FROM inverted_index WHERE mailbox = ?1",
+            params![mailbox],
+        )?;
+        Ok(())
+    }
+
     /// Retorna todos os UIDs atualmente presentes no banco para a caixa postal informada.
     pub fn get_indexed_uids(&self, mailbox: &str) -> Result<HashSet<u32>, rusqlite::Error> {
         let conn = self.conn.lock().unwrap();
