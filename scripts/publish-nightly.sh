@@ -137,6 +137,10 @@ fi
 ANDROID_APP_RES="$REPO_ROOT/target/dx/lauda-client/release/android/app/app/src/main/res"
 if [ -d "$REPO_ROOT/lauda-client/android/res" ]; then
     echo "-> Sincronizando ícones e recursos do Lauda em $ANDROID_APP_RES..."
+    # Expurgar templates padrão e qualificadores conflitantes do Dioxus CLI
+    rm -rf "$ANDROID_APP_RES/drawable-v24" 2>/dev/null || true
+    rm -f "$ANDROID_APP_RES"/drawable*/ic_launcher_foreground.xml 2>/dev/null || true
+    rm -f "$ANDROID_APP_RES"/drawable*/\$ic_launcher_foreground* 2>/dev/null || true
     rm -f "$ANDROID_APP_RES"/mipmap-*/*.webp 2>/dev/null || true
     cp -r "$REPO_ROOT/lauda-client/android/res/"* "$ANDROID_APP_RES/"
 fi
@@ -157,7 +161,7 @@ cp "$GEN_APK" "$NIGHTLY_APK_PATH"
 cp "$GEN_APK" "$SITE_DIR/lauda-latest.apk"
 cp "$GEN_APK" "$SITE_DIR/lauda.apk"
 if [ -f "$REPO_ROOT/scripts/sign-release.sh" ]; then
-    echo "-> Assinando APKs soberanamente com in_twolp_release.keystore..."
+    echo "-> Assinando APKs com in_twolp_release.keystore..."
     "$REPO_ROOT/scripts/sign-release.sh" "$NIGHTLY_APK_PATH" || echo "Aviso: Assinatura de nightly falhou."
     "$REPO_ROOT/scripts/sign-release.sh" "$SITE_DIR/lauda-latest.apk" || echo "Aviso: Assinatura de latest falhou."
     "$REPO_ROOT/scripts/sign-release.sh" "$SITE_DIR/lauda.apk" || echo "Aviso: Assinatura de lauda.apk falhou."

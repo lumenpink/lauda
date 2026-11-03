@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Lauda — Script de Assinatura Soberana de APK com Keystore Oficial in.twolp
+# Lauda — Script de Assinatura Canônica de APK com Keystore Oficial in.twolp
 # ==============================================================================
 set -euo pipefail
 
@@ -38,4 +38,4 @@ apksigner sign \
 echo "-> Verificando assinatura do APK..."
 apksigner verify --verbose "$TARGET_APK"
 
-echo "✅ APK assinado e verificado com sucesso pela chave soberana in.twolp!"
+echo "✅ APK assinado e verificado com sucesso pela chave canônica in.twolp!"

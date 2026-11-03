@@ -21,6 +21,14 @@ DENSITIES = {
     "mipmap-xxxhdpi": 192,
 }
 
+ADAPTIVE_DENSITIES = {
+    "drawable-mdpi": 108,
+    "drawable-hdpi": 162,
+    "drawable-xhdpi": 216,
+    "drawable-xxhdpi": 324,
+    "drawable-xxxhdpi": 432,
+}
+
 def render_lauda_icon(size=512, is_round=False):
     scale = 2
     dim = size * scale  # 1024 para 512
@@ -239,12 +247,19 @@ def main():
         ico_round.save(folder_dir / "ic_launcher_round.png", "PNG", optimize=True)
         print(f"✓ Densidade Android gerada: {folder} ({size}x{size})")
         
-    # 4. Ícone Adaptativo Foreground
+    # 4. Ícone Adaptativo Foreground (todas as densidades Android)
     drawable_dir = RES_DIR / "drawable"
     drawable_dir.mkdir(parents=True, exist_ok=True)
-    fg = render_lauda_icon(size=432, is_round=False)
-    fg.save(drawable_dir / "ic_launcher_foreground.png", "PNG", optimize=True)
+    fg_master = render_lauda_icon(size=432, is_round=False)
+    fg_master.save(drawable_dir / "ic_launcher_foreground.png", "PNG", optimize=True)
     print("✓ Adaptive foreground gerado: drawable/ic_launcher_foreground.png (432x432)")
+
+    for folder, size in ADAPTIVE_DENSITIES.items():
+        folder_dir = RES_DIR / folder
+        folder_dir.mkdir(parents=True, exist_ok=True)
+        fg_scaled = render_lauda_icon(size=size, is_round=False)
+        fg_scaled.save(folder_dir / "ic_launcher_foreground.png", "PNG", optimize=True)
+        print(f"✓ Foreground adaptativo gerado: {folder} ({size}x{size})")
     
     # 5. Strings de Recursos (Nome do App no Android)
     values_dir = RES_DIR / "values"

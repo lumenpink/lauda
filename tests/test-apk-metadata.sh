@@ -77,17 +77,17 @@ if command -v aapt >/dev/null 2>&1; then
 fi
 
 if command -v apksigner >/dev/null 2>&1; then
-    echo "-> Verificando assinatura soberana com apksigner..."
+    echo "-> Verificando assinatura canônica com apksigner..."
     CERTS="$(apksigner verify --print-certs "$TARGET_APK")"
     DIGEST="$(echo "$CERTS" | grep -o "Signer #1 certificate SHA-256 digest: [0-9a-fA-F]*" | cut -d' ' -f6 | tr '[:upper:]' '[:lower:]')"
     EXPECTED_DIGEST="7beec8b0a6c7946b04d538543d495a8210ad6cfc1859f42e7180bcfbd38fe582"
 
     echo "   Signer Digest: $DIGEST"
     if [ "$DIGEST" != "$EXPECTED_DIGEST" ]; then
-        echo "ERRO: Certificado de assinatura divergente da chave soberana in.twolp"
+        echo "ERRO: Certificado de assinatura divergente da chave canônica in.twolp"
         exit 1
     fi
-    echo "✅ Assinatura soberana in.twolp validada com sucesso!"
+    echo "✅ Assinatura canônica in.twolp validada com sucesso!"
 fi
 
 echo "-> Validando teste de mutação: rejeição de versão divergente..."
