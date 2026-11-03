@@ -8,7 +8,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SITE_DIR="$REPO_ROOT/site"
-DIST_DIR="$REPO_ROOT/dist"
+DIST_DIR="${DIST_DIR:-$REPO_ROOT/target/dist}"
 
 DO_SYNC_MANIFESTS=true
 DO_BUILD_WEB=false
@@ -133,7 +133,7 @@ if [ "$DO_BUILD_APK" = true ]; then
         echo "-> Compilando Android APK nativo (aarch64)..."
         "$SCRIPT_DIR/publish-nightly.sh"
     else
-        echo "-> Ambiente Android NDK/SDK não disponível diretamente; mantendo APK existente em $SITE_DIR/lauda-latest.apk"
+        echo "-> Ambiente Android NDK/SDK não disponível diretamente; mantendo APK existente em $DIST_DIR/apk/lauda-latest.apk"
     fi
     "$REPO_ROOT/tests/test-apk-metadata.sh"
 fi
@@ -156,9 +156,13 @@ fi
 # 6. Sincronizar com a Pratilera (banca.2lp.in/pratilera)
 if [ "$DO_SYNC_PRATILERA" = true ]; then
     BANCA_PRATILERA="/home/lumen/src/banca/site/pratilera"
-    if [ -d "$BANCA_PRATILERA" ] && [ -f "$SITE_DIR/lauda-latest.apk" ]; then
+    APK_SRC="$DIST_DIR/apk/lauda-latest.apk"
+    if [ ! -f "$APK_SRC" ]; then
+        APK_SRC="$SITE_DIR/lauda-latest.apk"
+    fi
+    if [ -d "$BANCA_PRATILERA" ] && [ -f "$APK_SRC" ]; then
         echo "-> Sincronizando APK com a Pratilera ($BANCA_PRATILERA)..."
-        cp "$SITE_DIR/lauda-latest.apk" "$BANCA_PRATILERA/lauda-latest.apk"
+        cp "$APK_SRC" "$BANCA_PRATILERA/lauda-latest.apk"
         GERADOR_PRATILERA="/home/lumen/src/banca/scripts/gerar-pratilera.py"
         if [ -f "$GERADOR_PRATILERA" ]; then
             python3 "$GERADOR_PRATILERA" || echo "Aviso: gerar-pratilera executado com avisos."

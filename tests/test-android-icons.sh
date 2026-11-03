@@ -130,7 +130,7 @@ if [ -f "$PUBLISH_SCRIPT" ]; then
 fi
 
 # 3.3. Rejeitar resíduos de template em APK compilado (se presente)
-for apk_cand in "$SITE_DIR/lauda.apk" "$SITE_DIR/lauda-latest.apk" "$REPO_ROOT/dist/apk/lauda.apk"; do
+for apk_cand in "$REPO_ROOT/target/dist/apk/lauda.apk" "$REPO_ROOT/target/apk/lauda.apk" "$REPO_ROOT/dist/apk/lauda.apk" "$SITE_DIR/lauda.apk" "$SITE_DIR/lauda-latest.apk"; do
     if [ -f "$apk_cand" ] && command -v unzip >/dev/null 2>&1; then
         if unzip -l "$apk_cand" | grep "drawable-v24/ic_launcher_foreground.xml" >/dev/null 2>&1; then
             echo "❌ Falha: $apk_cand contém template Dioxus residual drawable-v24/ic_launcher_foreground.xml"

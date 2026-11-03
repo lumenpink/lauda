@@ -7,9 +7,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SITE_DIR="$REPO_ROOT/site"
+DIST_APK_DIR="${DIST_APK_DIR:-$REPO_ROOT/target/dist/apk}"
 BUCKET_NAME="lauda-downloads"
 REMOTE_KEY="lauda-nightly.apk"
-NIGHTLY_APK_PATH="$SITE_DIR/lauda-nightly.apk"
+NIGHTLY_APK_PATH="$DIST_APK_DIR/lauda-nightly.apk"
 MANIFEST_PATH="$SITE_DIR/version-nightly.json"
 
 export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk-amd64}"
@@ -157,17 +158,18 @@ if [ ! -f "$GEN_APK" ]; then
     exit 1
 fi
 
+mkdir -p "$DIST_APK_DIR"
 cp "$GEN_APK" "$NIGHTLY_APK_PATH"
-cp "$GEN_APK" "$SITE_DIR/lauda-latest.apk"
-cp "$GEN_APK" "$SITE_DIR/lauda.apk"
+cp "$GEN_APK" "$DIST_APK_DIR/lauda-latest.apk"
+cp "$GEN_APK" "$DIST_APK_DIR/lauda.apk"
 if [ -f "$REPO_ROOT/scripts/sign-release.sh" ]; then
     echo "-> Assinando APKs com in_twolp_release.keystore..."
     "$REPO_ROOT/scripts/sign-release.sh" "$NIGHTLY_APK_PATH" || echo "Aviso: Assinatura de nightly falhou."
-    "$REPO_ROOT/scripts/sign-release.sh" "$SITE_DIR/lauda-latest.apk" || echo "Aviso: Assinatura de latest falhou."
-    "$REPO_ROOT/scripts/sign-release.sh" "$SITE_DIR/lauda.apk" || echo "Aviso: Assinatura de lauda.apk falhou."
+    "$REPO_ROOT/scripts/sign-release.sh" "$DIST_APK_DIR/lauda-latest.apk" || echo "Aviso: Assinatura de latest falhou."
+    "$REPO_ROOT/scripts/sign-release.sh" "$DIST_APK_DIR/lauda.apk" || echo "Aviso: Assinatura de lauda.apk falhou."
 fi
-APK_SIZE="$(du -h "$SITE_DIR/lauda.apk" | cut -f1)"
-echo "✅ APK gerado e assinado em $SITE_DIR/lauda.apk ($APK_SIZE)"
+APK_SIZE="$(du -h "$DIST_APK_DIR/lauda.apk" | cut -f1)"
+echo "✅ APK gerado e assinado em $DIST_APK_DIR/lauda.apk ($APK_SIZE)"
 
 # 7. Sincronizar manifestos de versão canônicos
 echo "-> Atualizando manifestos de versão..."
@@ -221,17 +223,17 @@ if [ -n "${CLOUDFLARE_API_TOKEN:-}" ] || npx wrangler whoami >/dev/null 2>&1; th
         --remote || echo "Aviso: Upload de lauda-nightly.apk para R2 falhou."
 
     npx wrangler r2 object put "$BUCKET_NAME/lauda-latest.apk" \
-        --file="$SITE_DIR/lauda-latest.apk" \
+        --file="$DIST_APK_DIR/lauda-latest.apk" \
         --content-type="application/vnd.android.package-archive" \
         --remote || echo "Aviso: Upload de lauda-latest.apk para R2 falhou."
 
     npx wrangler r2 object put "twolp-bucket/lauda.apk" \
-        --file="$SITE_DIR/lauda.apk" \
+        --file="$DIST_APK_DIR/lauda.apk" \
         --content-type="application/vnd.android.package-archive" \
         --remote || echo "Aviso: Upload de lauda.apk para twolp-bucket falhou."
 
     npx wrangler r2 object put "twolp-bucket/lauda-latest.apk" \
-        --file="$SITE_DIR/lauda.apk" \
+        --file="$DIST_APK_DIR/lauda.apk" \
         --content-type="application/vnd.android.package-archive" \
         --remote || echo "Aviso: Upload de lauda-latest.apk para twolp-bucket falhou."
     echo "✅ Upload dos APKs concluído com sucesso no R2."

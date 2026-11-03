@@ -5,7 +5,14 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TARGET_APK="$REPO_ROOT/site/lauda.apk"
+TARGET_APK="${TARGET_APK:-$REPO_ROOT/target/dist/apk/lauda.apk}"
+if [ ! -f "$TARGET_APK" ] && [ -f "$REPO_ROOT/target/apk/lauda.apk" ]; then
+    TARGET_APK="$REPO_ROOT/target/apk/lauda.apk"
+elif [ ! -f "$TARGET_APK" ] && [ -f "$REPO_ROOT/dist/apk/lauda.apk" ]; then
+    TARGET_APK="$REPO_ROOT/dist/apk/lauda.apk"
+elif [ ! -f "$TARGET_APK" ] && [ -f "$REPO_ROOT/site/lauda.apk" ]; then
+    TARGET_APK="$REPO_ROOT/site/lauda.apk"
+fi
 VERSION_FILE="$REPO_ROOT/VERSION"
 VERSION_JSON="$REPO_ROOT/site/version.json"
 
