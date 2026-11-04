@@ -35,9 +35,9 @@ A trava anterior `is_sendmail_suppressed_for_tests` dependia de heurísticas fr�
 - [x] **Fase 1: Ticket** — Ticket #80 criado no Forgejo e sincronizado.
 - [x] **Fase 2: Branch** — Branch `fix/80-isolar-envio-smtp-e-sanear-dominios-de-teste-para-prevenir-bounces` criada.
 - [x] **Fase 3: Spec** — Documento técnico de especificação redigido.
-- [ ] **Fase 4: Red Test** — Criado teste comprovando a falha/ausência da trava segura por padrão.
-- [ ] **Fase 5: Green Implement** — Implementada a trava opt-in e saneados os e-mails de teste.
-- [ ] **Fase 6: Refactor** — Limpeza de código e garantia de robustez.
-- [ ] **Fase 7: Mutation Test** — Validação com mutantes eliminados.
-- [ ] **Fase 8: Quality Gate** — Verificação rigorosa com clippy, fmt e testes.
+- [x] **Fase 4: Red Test** — Criado teste comprovando a falha/ausência da trava segura por padrão.
+- [x] **Fase 5: Green Implement** — Implementada a trava opt-in e saneados os e-mails de teste.
+- [x] **Fase 6: Refactor** — Limpeza de código e garantia de robustez.
+- [x] **Fase 7: Mutation Test** — Validação com mutantes eliminados.
+- [x] **Fase 8: Quality Gate** — Verificação rigorosa com clippy, fmt e testes.
 - [ ] **Fase 9: Finish & Close** — Atualização do changelog e fechamento canônico.
