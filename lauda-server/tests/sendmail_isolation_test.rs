@@ -85,3 +85,71 @@ async fn test_send_message_delivers_to_ephemeral_mock_smtp() {
         result
     );
 }
+
+#[tokio::test]
+async fn test_send_message_with_cc_and_attachments_to_ephemeral_mock_smtp() {
+    let tmp = tempdir().unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+
+    tokio::spawn(run_mock_smtp_server(listener));
+
+    let backend = MaildirBackend::with_smtp_endpoint(tmp.path(), "127.0.0.1", port);
+
+    let form = ComposeForm {
+        from: "Alícia <alicia@example.org>".to_string(),
+        to: "dest1@example.test, dest2@example.test".to_string(),
+        cc: Some("cc1@example.test".to_string()),
+        subject: "Teste com Anexo e Múltiplos Destinatários".to_string(),
+        body: "Texto com anexo".to_string(),
+        attachments: vec![lauda_types::AttachmentUpload {
+            filename: "doc.txt".to_string(),
+            content_type: "text/plain".to_string(),
+            data_base64: "SGVsbG8gTGF1ZGEh".to_string(),
+        }],
+    };
+
+    let result = backend.send_message("testuser", &form).await;
+    assert!(
+        result.is_ok(),
+        "Envio com múltiplos destinatários deve suceder: {:?}",
+        result
+    );
+}
+
+#[tokio::test]
+async fn test_message_id_domain_isolation() {
+    let tmp = tempdir().unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+
+    tokio::spawn(run_mock_smtp_server(listener));
+
+    let backend = MaildirBackend::with_smtp_endpoint(tmp.path(), "127.0.0.1", port);
+
+    let form = ComposeForm {
+        from: "Usuario Isolado <usuario@empresa-teste.org>".to_string(),
+        to: "destino@empresa-teste.org".to_string(),
+        cc: None,
+        subject: "Checagem de Message-ID".to_string(),
+        body: "Verificando se o domínio não vaza".to_string(),
+        attachments: vec![],
+    };
+
+    backend.send_message("testuser", &form).await.unwrap();
+
+    let sent_cur = tmp.path().join(".Sent").join("cur");
+    let mut files = std::fs::read_dir(sent_cur).unwrap();
+    let entry = files.next().expect("Arquivo deve existir em .Sent").unwrap();
+    let raw = std::fs::read_to_string(entry.path()).unwrap();
+
+    assert!(
+        raw.contains("Message-ID: <"),
+        "Deve conter cabeçalho Message-ID"
+    );
+    assert!(
+        raw.contains("@empresa-teste.org>"),
+        "Message-ID deve usar o domínio do remetente e não vazar @2lp.in: {}",
+        raw
+    );
+}
