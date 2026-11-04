@@ -68,8 +68,60 @@ async fn test_maildir_backend_read_mailboxes_and_messages() {
     );
 }
 
+async fn spawn_mock_smtp() -> (tokio::task::JoinHandle<()>, u16) {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let handle = tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            tokio::spawn(async move {
+                use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+                let (reader, mut writer) = socket.split();
+                let mut reader = BufReader::new(reader);
+                let mut line = String::new();
+                let _ = writer.write_all(b"220 mock.smtp.local ESMTP Mock\r\n").await;
+                while reader.read_line(&mut line).await.unwrap_or(0) > 0 {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("EHLO") || trimmed.starts_with("HELO") {
+                        let _ = writer
+                            .write_all(b"250-mock.smtp.local\r\n250 OK\r\n")
+                            .await;
+                    } else if trimmed.starts_with("MAIL FROM:") {
+                        let _ = writer.write_all(b"250 2.1.0 Sender OK\r\n").await;
+                    } else if trimmed.starts_with("RCPT TO:") {
+                        let _ = writer.write_all(b"250 2.1.5 Recipient OK\r\n").await;
+                    } else if trimmed == "DATA" {
+                        let _ = writer
+                            .write_all(b"354 Start mail input; end with <CRLF>.<CRLF>\r\n")
+                            .await;
+                        let mut data_line = String::new();
+                        while reader.read_line(&mut data_line).await.unwrap_or(0) > 0 {
+                            if data_line.trim() == "." {
+                                break;
+                            }
+                            data_line.clear();
+                        }
+                        let _ = writer
+                            .write_all(b"250 2.0.0 OK: message queued\r\n")
+                            .await;
+                    } else if trimmed == "QUIT" {
+                        let _ = writer.write_all(b"221 2.0.0 Bye\r\n").await;
+                        break;
+                    } else {
+                        let _ = writer
+                            .write_all(b"500 5.5.1 Unrecognized command\r\n")
+                            .await;
+                    }
+                    line.clear();
+                }
+            });
+        }
+    });
+    (handle, port)
+}
+
 #[tokio::test]
 async fn test_hermetic_maildir_lifecycle() {
+    let (_mock_smtp, smtp_port) = spawn_mock_smtp().await;
     let tmp = tempfile::tempdir().unwrap();
     let root = tmp.path();
 
@@ -89,7 +141,7 @@ async fn test_hermetic_maildir_lifecycle() {
         "3 V1790640297 N2 Ga836741ba900bb6a090600002f3acf59\n100 :1728000000.M123P456.test\n";
     std::fs::write(root.join("dovecot-uidlist"), uidlist_content).unwrap();
 
-    let backend = MaildirBackend::new(root);
+    let backend = MaildirBackend::with_smtp_endpoint(root, "127.0.0.1", smtp_port);
     backend.add_user("testuser", "senha123");
 
     // 1. Listar caixas
@@ -177,6 +229,7 @@ async fn test_hermetic_maildir_lifecycle() {
 
 #[tokio::test]
 async fn test_hermetic_maildir_flag_move_and_attachments() {
+    let (_mock_smtp, smtp_port) = spawn_mock_smtp().await;
     let tmp = tempfile::tempdir().unwrap();
     let root = tmp.path();
 
@@ -213,7 +266,7 @@ SGVsbG8gTGF1ZGEh\n\
         "3 V1790640297 N2 Ga836741ba900bb6a090600002f3acf59\n200 :1728000001.M999P888.test\n";
     std::fs::write(root.join("dovecot-uidlist"), uidlist_content).unwrap();
 
-    let backend = MaildirBackend::new(root);
+    let backend = MaildirBackend::with_smtp_endpoint(root, "127.0.0.1", smtp_port);
     backend.add_user("testuser", "senha123");
 
     // 1. Obter detalhes e verificar anexo e CC

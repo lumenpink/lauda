@@ -20,16 +20,8 @@ pub struct MaildirBackend {
     base_dir: PathBuf,
     users: RwLock<HashMap<String, String>>, // username -> password
     sqlite_index: Option<SqliteIndexStore>,
-}
-
-/// Verifica se o ambiente atual é de testes ou CI para suprimir envio real de e-mails
-pub fn is_sendmail_suppressed_for_tests() -> bool {
-    MaildirBackend::is_sendmail_suppressed_for_tests()
-}
-
-/// Verifica se o envio SMTP real para servidor externo/produção está explicitamente habilitado (segurança opt-in)
-pub fn is_smtp_live_dispatch_enabled() -> bool {
-    MaildirBackend::is_smtp_live_dispatch_enabled()
+    smtp_host: String,
+    smtp_port: u16,
 }
 
 /// Extrai o endereço de e-mail limpo de uma string que pode conter nome de exibição (ex: "Lumen <lumen@2lp.in>").
@@ -209,10 +201,35 @@ impl MaildirBackend {
         let dir: PathBuf = base_dir.into();
         let db_path = dir.join(".lauda_index.db");
         let sqlite_index = SqliteIndexStore::open(&db_path).ok();
+        let smtp_host =
+            std::env::var("LAUDA_SMTP_HOST").unwrap_or_else(|_| "mailserver".to_string());
+        let smtp_port: u16 = std::env::var("LAUDA_SMTP_PORT")
+            .ok()
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(25);
         Self {
             base_dir: dir,
             users: RwLock::new(HashMap::new()),
             sqlite_index,
+            smtp_host,
+            smtp_port,
+        }
+    }
+
+    pub fn with_smtp_endpoint(
+        base_dir: impl Into<PathBuf>,
+        smtp_host: impl Into<String>,
+        smtp_port: u16,
+    ) -> Self {
+        let dir: PathBuf = base_dir.into();
+        let db_path = dir.join(".lauda_index.db");
+        let sqlite_index = SqliteIndexStore::open(&db_path).ok();
+        Self {
+            base_dir: dir,
+            users: RwLock::new(HashMap::new()),
+            sqlite_index,
+            smtp_host: smtp_host.into(),
+            smtp_port,
         }
     }
 
@@ -498,59 +515,12 @@ impl MaildirBackend {
         }
     }
 
-    /// Verifica se o ambiente atual é de testes ou CI para suprimir envio real de e-mails
-    pub fn is_sendmail_suppressed_for_tests() -> bool {
-        !Self::is_smtp_live_dispatch_enabled()
-    }
-
-    /// Verifica se o envio SMTP real está habilitado.
-    /// Por padrão estrito de segurança, o despacho real via rede está desabilitado,
-    /// a menos que LAUDA_SMTP_ENABLED seja '1'/'true' ou LAUDA_FORCE_DISPATCH seja '1'.
-    pub fn is_smtp_live_dispatch_enabled() -> bool {
-        if std::env::var("LAUDA_FORCE_DISPATCH").as_deref() == Ok("1") {
-            return true;
-        }
-
-        let enabled = std::env::var("LAUDA_SMTP_ENABLED")
-            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-            .unwrap_or(false);
-
-        if !enabled {
-            return false;
-        }
-
-        // Mesmo com a flag de produção ativa, respeitamos travas explícitas de teste
-        if cfg!(test) {
-            return false;
-        }
-        if std::env::var("LAUDA_TEST_MODE").is_ok()
-            || std::env::var("CI").is_ok()
-            || std::env::var("RUST_TEST").is_ok()
-        {
-            return false;
-        }
-        if let Ok(exe) = std::env::current_exe() {
-            let s = exe.to_string_lossy();
-            if s.contains("/deps/") || s.contains("test") {
-                return false;
-            }
-        }
-
-        true
-    }
-
     pub async fn dispatch_email(
+        &self,
         sender: &str,
         recipients: &[String],
         raw_email: &str,
     ) -> Result<(), String> {
-        if Self::is_sendmail_suppressed_for_tests() {
-            tracing::info!(
-                "lauda-server: modo de teste ativo, despacho real de e-mail suprimido com sucesso"
-            );
-            return Ok(());
-        }
-
         if let Ok(custom_cmd) = std::env::var("LAUDA_SENDMAIL_CMD") {
             let mut child = std::process::Command::new("sh")
                 .arg("-c")
@@ -571,39 +541,7 @@ impl MaildirBackend {
             return Ok(());
         }
 
-        let host = std::env::var("LAUDA_SMTP_HOST").unwrap_or_else(|_| "mailserver".to_string());
-        let port: u16 = std::env::var("LAUDA_SMTP_PORT")
-            .ok()
-            .and_then(|p| p.parse().ok())
-            .unwrap_or(25);
-
-        dispatch_smtp_raw(&host, port, sender, recipients, raw_email).await
-    }
-
-    pub fn dispatch_sendmail(raw_email: &str) -> Result<(), String> {
-        if Self::is_sendmail_suppressed_for_tests() {
-            return Ok(());
-        }
-        if let Ok(custom_cmd) = std::env::var("LAUDA_SENDMAIL_CMD") {
-            let mut child = std::process::Command::new("sh")
-                .arg("-c")
-                .arg(&custom_cmd)
-                .stdin(std::process::Stdio::piped())
-                .spawn()
-                .map_err(|e| format!("Erro ao iniciar comando configurado: {}", e))?;
-            if let Some(mut stdin) = child.stdin.take() {
-                use std::io::Write;
-                stdin
-                    .write_all(raw_email.as_bytes())
-                    .map_err(|e| e.to_string())?;
-            }
-            let status = child.wait().map_err(|e| e.to_string())?;
-            if !status.success() {
-                return Err(format!("Comando retornou erro: {:?}", status.code()));
-            }
-            return Ok(());
-        }
-        Err("dispatch_sendmail síncrono legado indisponível".to_string())
+        dispatch_smtp_raw(&self.smtp_host, self.smtp_port, sender, recipients, raw_email).await
     }
 
     /// Analisa bytes RFC 5322 e constrói a estrutura Message do Lauda.
@@ -948,7 +886,14 @@ impl MailBackend for MaildirBackend {
             .map(|d| d.as_secs())
             .unwrap_or(0);
         let pid = std::process::id();
-        let msg_id = format!("<{}.{}@2lp.in>", timestamp, pid);
+        let sender_domain = form
+            .from
+            .split('@')
+            .nth(1)
+            .map(|d| d.trim_matches(&['>', ' ', '\t', '\r', '\n'][..]))
+            .filter(|d| !d.is_empty())
+            .unwrap_or("lauda.local");
+        let msg_id = format!("<{}.{}@{}>", timestamp, pid, sender_domain);
 
         let cc_header = form
             .cc
@@ -1008,7 +953,7 @@ impl MailBackend for MaildirBackend {
             recipients.extend(extract_recipient_emails(cc));
         }
 
-        if let Err(e) = Self::dispatch_email(&form.from, &recipients, &raw_email).await {
+        if let Err(e) = self.dispatch_email(&form.from, &recipients, &raw_email).await {
             let _ = std::fs::remove_file(&sent_file_path);
             return Err(BackendError::Internal(format!(
                 "Falha ao despachar e-mail: {}",

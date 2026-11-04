@@ -174,14 +174,8 @@ fn test_smtp_dot_stuffing_normalization() {
 #[tokio::test]
 async fn test_send_message_cleans_sent_file_on_dispatch_failure() {
     let tmp = tempdir().unwrap();
-    let backend = MaildirBackend::new(tmp.path());
-
-    // Configura SMTP para porta inválida e força despacho
-    unsafe {
-        std::env::set_var("LAUDA_FORCE_DISPATCH", "1");
-        std::env::set_var("LAUDA_SMTP_HOST", "127.0.0.1");
-        std::env::set_var("LAUDA_SMTP_PORT", "1"); // porta fechada
-    }
+    // Configura SMTP para porta fechada diretamente através do endpoint
+    let backend = MaildirBackend::with_smtp_endpoint(tmp.path(), "127.0.0.1", 1);
 
     let form = ComposeForm {
         from: "lumen@example.test".to_string(),
@@ -193,13 +187,6 @@ async fn test_send_message_cleans_sent_file_on_dispatch_failure() {
     };
 
     let result = backend.send_message("lumen", &form).await;
-
-    // Remove variáveis para não afetar outros testes
-    unsafe {
-        std::env::remove_var("LAUDA_FORCE_DISPATCH");
-        std::env::remove_var("LAUDA_SMTP_HOST");
-        std::env::remove_var("LAUDA_SMTP_PORT");
-    }
 
     assert!(
         result.is_err(),
