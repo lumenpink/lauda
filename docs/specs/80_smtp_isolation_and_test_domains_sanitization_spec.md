@@ -40,4 +40,4 @@ A trava anterior `is_sendmail_suppressed_for_tests` dependia de heurísticas fr�
 - [x] **Fase 6: Refactor** — Limpeza de código e garantia de robustez.
 - [x] **Fase 7: Mutation Test** — Validação com mutantes eliminados.
 - [x] **Fase 8: Quality Gate** — Verificação rigorosa com clippy, fmt e testes.
-- [ ] **Fase 9: Finish & Close** — Atualização do changelog e fechamento canônico.
+- [x] **Fase 9: Finish & Close** — Atualização do changelog e fechamento canônico.
