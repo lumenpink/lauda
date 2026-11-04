@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **server:** isolar despacho smtp por padrão opt-in e sanear dominios de testes para evitar vazamentos (closes #80)
 - **android:** corrigir icones adaptativos e expurgar template dioxus v24 (closes #76)
 - **server:** integrar urupema 0.1.1 sanitizado e rotina de reindexacao vetorial (closes #75)
 - **ci:** blindar no_proxy no workflow e diagnostico no e2e (closes #74)
