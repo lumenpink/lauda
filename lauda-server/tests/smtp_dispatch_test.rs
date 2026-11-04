@@ -82,10 +82,13 @@ async fn test_smtp_dispatch_success() {
 
     tokio::spawn(run_mock_smtp_server(listener, false));
 
-    let recipients = vec!["dest@2lp.in".to_string(), "cc@2lp.in".to_string()];
-    let raw = "From: lumen@2lp.in\r\nTo: dest@2lp.in\r\nSubject: Test\r\n\r\nCorpo da mensagem";
+    let recipients = vec![
+        "dest@example.test".to_string(),
+        "cc@example.test".to_string(),
+    ];
+    let raw = "From: lumen@example.test\r\nTo: dest@example.test\r\nSubject: Test\r\n\r\nCorpo da mensagem";
 
-    let res = dispatch_smtp_raw("127.0.0.1", port, "lumen@2lp.in", &recipients, raw).await;
+    let res = dispatch_smtp_raw("127.0.0.1", port, "lumen@example.test", &recipients, raw).await;
     assert!(
         res.is_ok(),
         "Despacho SMTP deve suceder com mock ativo: {:?}",
@@ -95,11 +98,11 @@ async fn test_smtp_dispatch_success() {
 
 #[tokio::test]
 async fn test_smtp_dispatch_connection_refused() {
-    let recipients = vec!["dest@2lp.in".to_string()];
-    let raw = "From: lumen@2lp.in\r\nTo: dest@2lp.in\r\nSubject: Test\r\n\r\nCorpo";
+    let recipients = vec!["dest@example.test".to_string()];
+    let raw = "From: lumen@example.test\r\nTo: dest@example.test\r\nSubject: Test\r\n\r\nCorpo";
 
     // Porta improvável de estar em uso
-    let res = dispatch_smtp_raw("127.0.0.1", 1, "lumen@2lp.in", &recipients, raw).await;
+    let res = dispatch_smtp_raw("127.0.0.1", 1, "lumen@example.test", &recipients, raw).await;
     assert!(
         res.is_err(),
         "Despacho SMTP deve falhar quando servidor estiver offline"
@@ -140,9 +143,17 @@ fn test_email_parsing_helpers() {
     assert_eq!(extract_clean_email(""), "");
     assert_eq!(extract_clean_email("   "), "");
 
-    let recs =
-        extract_recipient_emails("lumen@2lp.in, Destinatário <dest@2lp.in>, copy@2lp.in, ,  ");
-    assert_eq!(recs, vec!["lumen@2lp.in", "dest@2lp.in", "copy@2lp.in"]);
+    let recs = extract_recipient_emails(
+        "lumen@example.test, Destinatário <dest@example.test>, copy@example.test, ,  ",
+    );
+    assert_eq!(
+        recs,
+        vec![
+            "lumen@example.test",
+            "dest@example.test",
+            "copy@example.test"
+        ]
+    );
 }
 
 #[test]
@@ -173,8 +184,8 @@ async fn test_send_message_cleans_sent_file_on_dispatch_failure() {
     }
 
     let form = ComposeForm {
-        from: "lumen@2lp.in".to_string(),
-        to: "dest@2lp.in".to_string(),
+        from: "lumen@example.test".to_string(),
+        to: "dest@example.test".to_string(),
         cc: None,
         subject: "Falha intencional".to_string(),
         body: "Teste de limpeza".to_string(),

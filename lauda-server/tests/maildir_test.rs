@@ -130,8 +130,8 @@ async fn test_hermetic_maildir_lifecycle() {
 
     // 5. Enviar mensagem
     let compose = lauda_types::ComposeForm {
-        from: "testuser@2lp.in".to_string(),
-        to: "dest@2lp.in".to_string(),
+        from: "testuser@example.test".to_string(),
+        to: "dest@example.test".to_string(),
         cc: None,
         subject: "Resposta de Teste".to_string(),
         body: "Texto enviado.".to_string(),
@@ -269,9 +269,9 @@ SGVsbG8gTGF1ZGEh\n\
 
     // 6. Enviar mensagem com anexo e CC
     let compose_with_att = lauda_types::ComposeForm {
-        from: "testuser@2lp.in".to_string(),
-        to: "socio@empresa.com".to_string(),
-        cc: Some("diretoria@2lp.in".to_string()),
+        from: "testuser@example.test".to_string(),
+        to: "socio@example.org".to_string(),
+        cc: Some("diretoria@example.test".to_string()),
         subject: "Contrato Assinado".to_string(),
         body: "Segue em anexo o contrato em PDF.".to_string(),
         attachments: vec![lauda_types::AttachmentUpload {

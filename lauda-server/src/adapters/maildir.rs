@@ -27,6 +27,11 @@ pub fn is_sendmail_suppressed_for_tests() -> bool {
     MaildirBackend::is_sendmail_suppressed_for_tests()
 }
 
+/// Verifica se o envio SMTP real para servidor externo/produção está explicitamente habilitado (segurança opt-in)
+pub fn is_smtp_live_dispatch_enabled() -> bool {
+    MaildirBackend::is_smtp_live_dispatch_enabled()
+}
+
 /// Extrai o endereço de e-mail limpo de uma string que pode conter nome de exibição (ex: "Lumen <lumen@2lp.in>").
 pub fn extract_clean_email(raw: &str) -> String {
     let trimmed = raw.trim();
@@ -495,25 +500,43 @@ impl MaildirBackend {
 
     /// Verifica se o ambiente atual é de testes ou CI para suprimir envio real de e-mails
     pub fn is_sendmail_suppressed_for_tests() -> bool {
-        if std::env::var("LAUDA_FORCE_DISPATCH").is_ok() {
+        !Self::is_smtp_live_dispatch_enabled()
+    }
+
+    /// Verifica se o envio SMTP real está habilitado.
+    /// Por padrão estrito de segurança, o despacho real via rede está desabilitado,
+    /// a menos que LAUDA_SMTP_ENABLED seja '1'/'true' ou LAUDA_FORCE_DISPATCH seja '1'.
+    pub fn is_smtp_live_dispatch_enabled() -> bool {
+        if std::env::var("LAUDA_FORCE_DISPATCH").as_deref() == Ok("1") {
+            return true;
+        }
+
+        let enabled = std::env::var("LAUDA_SMTP_ENABLED")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+
+        if !enabled {
             return false;
         }
+
+        // Mesmo com a flag de produção ativa, respeitamos travas explícitas de teste
         if cfg!(test) {
-            return true;
+            return false;
         }
         if std::env::var("LAUDA_TEST_MODE").is_ok()
             || std::env::var("CI").is_ok()
             || std::env::var("RUST_TEST").is_ok()
         {
-            return true;
+            return false;
         }
         if let Ok(exe) = std::env::current_exe() {
             let s = exe.to_string_lossy();
             if s.contains("/deps/") || s.contains("test") {
-                return true;
+                return false;
             }
         }
-        false
+
+        true
     }
 
     pub async fn dispatch_email(
