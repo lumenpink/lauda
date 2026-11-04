@@ -33,5 +33,5 @@ A responsabilidade de isolar o tráfego pertence exclusivamente à esteira e su�
 - [x] **Fase 5: Green Implement** — Removida a supressão artificial e implementado endpoint explícito.
 - [x] **Fase 6: Refactor** — Limpeza e padronização dos testes.
 - [x] **Fase 7: Mutation Test** — Cobertura de mutantes no endpoint SMTP.
-- [ ] **Fase 8: Quality Gate** — Verificação rigorosa com clippy, fmt e Gosplan check.
-- [ ] **Fase 9: Finish & Close** — Atualização do changelog e fechamento canônico.
+- [x] **Fase 8: Quality Gate** — Verificação rigorosa com clippy, fmt e Gosplan check.
+- [x] **Fase 9: Finish & Close** — Atualização do changelog e fechamento canônico.

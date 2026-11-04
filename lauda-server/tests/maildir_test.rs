@@ -78,13 +78,13 @@ async fn spawn_mock_smtp() -> (tokio::task::JoinHandle<()>, u16) {
                 let (reader, mut writer) = socket.split();
                 let mut reader = BufReader::new(reader);
                 let mut line = String::new();
-                let _ = writer.write_all(b"220 mock.smtp.local ESMTP Mock\r\n").await;
+                let _ = writer
+                    .write_all(b"220 mock.smtp.local ESMTP Mock\r\n")
+                    .await;
                 while reader.read_line(&mut line).await.unwrap_or(0) > 0 {
                     let trimmed = line.trim();
                     if trimmed.starts_with("EHLO") || trimmed.starts_with("HELO") {
-                        let _ = writer
-                            .write_all(b"250-mock.smtp.local\r\n250 OK\r\n")
-                            .await;
+                        let _ = writer.write_all(b"250-mock.smtp.local\r\n250 OK\r\n").await;
                     } else if trimmed.starts_with("MAIL FROM:") {
                         let _ = writer.write_all(b"250 2.1.0 Sender OK\r\n").await;
                     } else if trimmed.starts_with("RCPT TO:") {
@@ -100,9 +100,7 @@ async fn spawn_mock_smtp() -> (tokio::task::JoinHandle<()>, u16) {
                             }
                             data_line.clear();
                         }
-                        let _ = writer
-                            .write_all(b"250 2.0.0 OK: message queued\r\n")
-                            .await;
+                        let _ = writer.write_all(b"250 2.0.0 OK: message queued\r\n").await;
                     } else if trimmed == "QUIT" {
                         let _ = writer.write_all(b"221 2.0.0 Bye\r\n").await;
                         break;

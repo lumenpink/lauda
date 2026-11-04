@@ -541,7 +541,14 @@ impl MaildirBackend {
             return Ok(());
         }
 
-        dispatch_smtp_raw(&self.smtp_host, self.smtp_port, sender, recipients, raw_email).await
+        dispatch_smtp_raw(
+            &self.smtp_host,
+            self.smtp_port,
+            sender,
+            recipients,
+            raw_email,
+        )
+        .await
     }
 
     /// Analisa bytes RFC 5322 e constrói a estrutura Message do Lauda.
@@ -953,7 +960,10 @@ impl MailBackend for MaildirBackend {
             recipients.extend(extract_recipient_emails(cc));
         }
 
-        if let Err(e) = self.dispatch_email(&form.from, &recipients, &raw_email).await {
+        if let Err(e) = self
+            .dispatch_email(&form.from, &recipients, &raw_email)
+            .await
+        {
             let _ = std::fs::remove_file(&sent_file_path);
             return Err(BackendError::Internal(format!(
                 "Falha ao despachar e-mail: {}",

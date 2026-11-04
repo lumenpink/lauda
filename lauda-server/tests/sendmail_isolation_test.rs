@@ -27,7 +27,10 @@ async fn run_mock_smtp_server(listener: TcpListener) {
                 } else if trimmed.starts_with("MAIL FROM:") {
                     writer.write_all(b"250 2.1.0 Sender OK\r\n").await.unwrap();
                 } else if trimmed.starts_with("RCPT TO:") {
-                    writer.write_all(b"250 2.1.5 Recipient OK\r\n").await.unwrap();
+                    writer
+                        .write_all(b"250 2.1.5 Recipient OK\r\n")
+                        .await
+                        .unwrap();
                 } else if trimmed == "DATA" {
                     writer
                         .write_all(b"354 Start mail input; end with <CRLF>.<CRLF>\r\n")
@@ -140,7 +143,10 @@ async fn test_message_id_domain_isolation() {
 
     let sent_cur = tmp.path().join(".Sent").join("cur");
     let mut files = std::fs::read_dir(sent_cur).unwrap();
-    let entry = files.next().expect("Arquivo deve existir em .Sent").unwrap();
+    let entry = files
+        .next()
+        .expect("Arquivo deve existir em .Sent")
+        .unwrap();
     let raw = std::fs::read_to_string(entry.path()).unwrap();
 
     assert!(

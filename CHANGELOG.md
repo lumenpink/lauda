@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ci:** cd canônico do lauda-server no obizero via ssh autenticado (closes #64)
 
 ### Changed
+- **server:** remover supressao artificial e adotar smtp efemero nos testes (closes #81)
 - **ops:** atualizar imagem docker e reindexar base vetorial em producao (closes #79)
 - **gost:** isolar geracao de apks em dist e podar readme (closes #77)
 - **updater:** explicitar atualizacao manual e descontinuar auto-update (closes #55)
