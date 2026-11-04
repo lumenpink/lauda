@@ -29,9 +29,9 @@ A responsabilidade de isolar o tráfego pertence exclusivamente à esteira e su�
 - [x] **Fase 1: Ticket** — Ticket #81 aberto no Forgejo e mapeado.
 - [x] **Fase 2: Branch** — Branch `refactor/81-remover-supressao-artificial-e-adotar-smtp-efemero-nos-testes` criada.
 - [x] **Fase 3: Spec** — Especificação técnica redigida.
-- [ ] **Fase 4: Red Test** — Criado teste comprovando a nova interface `with_smtp_endpoint` e envio real ao mock.
-- [ ] **Fase 5: Green Implement** — Removida a supressão artificial e implementado endpoint explícito.
-- [ ] **Fase 6: Refactor** — Limpeza e padronização dos testes.
-- [ ] **Fase 7: Mutation Test** — Cobertura de mutantes no endpoint SMTP.
+- [x] **Fase 4: Red Test** — Criado teste comprovando a nova interface `with_smtp_endpoint` e envio real ao mock.
+- [x] **Fase 5: Green Implement** — Removida a supressão artificial e implementado endpoint explícito.
+- [x] **Fase 6: Refactor** — Limpeza e padronização dos testes.
+- [x] **Fase 7: Mutation Test** — Cobertura de mutantes no endpoint SMTP.
 - [ ] **Fase 8: Quality Gate** — Verificação rigorosa com clippy, fmt e Gosplan check.
 - [ ] **Fase 9: Finish & Close** — Atualização do changelog e fechamento canônico.
