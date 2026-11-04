@@ -1,7 +1,7 @@
 # Especificação Técnica — Remoção de Supressão Artificial e Adoção de SMTP Efêmero em Testes (#81)
 
 - **ID do Ticket:** #81
-- **Status:** Em Progresso (Fase 3: Spec)
+- **Status:** Concluído (Fase 9: Finish & Close)
 - **Autora:** Lumen
 - **Alinhamento:** GOST 1.5.0
 
