@@ -57,7 +57,19 @@ check_not_present "$WORKFLOW" '\./scripts/package-all\.sh --apk \|\| true' "Exec
 check_not_present "$PACKAGE_SCRIPT" 'publish-nightly\.sh"\s*\|\|\s*echo' "Execucao estrita de publish-nightly.sh sem mascaramento || echo"
 check_present "$WORKFLOW" 'Nenhum APK Android encontrado para upload no Cloudflare R2' "Fail-fast no upload R2 quando APK estiver ausente"
 
-# 6. [MUTAÇÃO] Sensibilidade da validação a regressões
+# 6. Resolução de caminhos target/dist/apk e assinatura segura (#82)
+SPEC_82="${ROOT_DIR}/docs/specs/82_corrigir_localizacao_de_apks_e_assinatura_no_deploy_android.md"
+if [ ! -f "$SPEC_82" ]; then
+    echo "  [FAIL] Especificação $SPEC_82 ausente!"
+    FAILED=1
+else
+    echo "  [PASS] Especificação $SPEC_82 presente."
+fi
+check_present "$WORKFLOW" 'target/dist/apk' "Suporte a artefatos em target/dist/apk no job deploy-apk (#82)"
+check_not_present "$WORKFLOW" '\[ -f site/lauda-latest\.apk \] && \./scripts/sign-release\.sh' "Ausencia de encadeamento fragil [ -f site/lauda-latest.apk ] && (#82)"
+check_present "$WORKFLOW" 'target/dist/apk/lauda.*\.apk' "Busca de APK em target/dist/apk para upload Cloudflare R2 (#82)"
+
+# 7. [MUTAÇÃO] Sensibilidade da validação a regressões
 echo "-> [MUTAÇÃO] Testando sensibilidade do teste contra mutantes..."
 TEMP_WORKFLOW=$(mktemp)
 cp "$WORKFLOW" "$TEMP_WORKFLOW"
