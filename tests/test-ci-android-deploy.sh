@@ -100,6 +100,24 @@ if grep -q "Nenhum APK Android encontrado para upload no Cloudflare R2" "$TEMP_W
 else
     echo "  [PASS] Mutação 3: sensibilidade à omissão do fail-fast R2 validada."
 fi
+
+# Mutação 4: Reintrodução de encadeamento frágil
+sed -i 's/for apk in .*/[ -f site\/lauda-latest.apk ] \&\& .\/scripts\/sign-release.sh site\/lauda-latest.apk/' "$TEMP_WORKFLOW"
+if ! grep -q '\[ -f site/lauda-latest\.apk \] && \./scripts/sign-release\.sh' "$TEMP_WORKFLOW"; then
+    echo "  [FAIL] Mutação 4 falhou: injeção de encadeamento frágil não ocorreu!"
+    FAILED=1
+else
+    echo "  [PASS] Mutação 4: sensibilidade ao encadeamento frágil validada."
+fi
+
+# Mutação 5: Omissão de target/dist/apk no job deploy-apk
+sed -i 's|target/dist/apk|legacy/caminho/ausente|g' "$TEMP_WORKFLOW"
+if grep -q 'target/dist/apk' "$TEMP_WORKFLOW"; then
+    echo "  [FAIL] Mutação 5 falhou: omissão de target/dist/apk não foi simulada!"
+    FAILED=1
+else
+    echo "  [PASS] Mutação 5: sensibilidade à ausência de target/dist/apk validada."
+fi
 rm -f "$TEMP_WORKFLOW"
 
 if [ "$FAILED" -ne 0 ]; then
