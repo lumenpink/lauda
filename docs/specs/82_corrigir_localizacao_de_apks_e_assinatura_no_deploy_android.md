@@ -1,7 +1,7 @@
 # Especificação Técnica — Correção da Localização de APKs e Assinatura no Deploy Android (#82)
 
 - **ID do Ticket:** #82
-- **Status:** Em Progresso (Fase 3: Spec)
+- **Status:** Concluído (Fase 8: Quality Gate)
 - **Autora:** Lumen
 - **Alinhamento:** GOST 1.5.0
 - **Data:** 2026-11-06
@@ -46,9 +46,9 @@ Na etapa de upload para o Cloudflare R2:
 - [x] **Fase 1: Ticket** — Ticket #82 criado no Forgejo.
 - [x] **Fase 2: Branch** — Branch `fix/82-corrigir-localizacao-de-apks-e-assinatura-no-deploy-android` criada.
 - [x] **Fase 3: Spec** — Especificação técnica redigida.
-- [ ] **Fase 4: Red Test** — Testes de auditoria em `tests/test-ci-android-deploy.sh` falhando pela ausência do suporte a `target/dist/apk`.
-- [ ] **Fase 5: Green Implement** — Workflow corrigido e testes passando.
-- [ ] **Fase 6: Refactor** — Limpeza e padronização idiomática do workflow.
-- [ ] **Fase 7: Mutation Test** — Cobertura completa de mutantes.
-- [ ] **Fase 8: Quality Gate** — Validação com fmt, clippy, testes e cccp check strict.
-- [ ] **Fase 9: Finish & Close** — Fechamento do ticket e integração à base.
+- [x] **Fase 4: Red Test** — Testes de auditoria em `tests/test-ci-android-deploy.sh` falhando pela ausência do suporte a `target/dist/apk`.
+- [x] **Fase 5: Green Implement** — Workflow corrigido e testes passando.
+- [x] **Fase 6: Refactor** — Limpeza e padronização idiomática do workflow.
+- [x] **Fase 7: Mutation Test** — Cobertura completa de mutantes.
+- [x] **Fase 8: Quality Gate** — Validação com fmt, clippy, testes e cccp check strict.
+- [x] **Fase 9: Finish & Close** — Fechamento do ticket e integração à base.
