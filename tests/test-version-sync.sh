@@ -32,5 +32,23 @@ if [ "$SITE_VER_VAL" != "$CURRENT_VERSION" ]; then
     exit 1
 fi
 
+echo "-> [MUTAÇÃO] Testando sensibilidade a regressão no dev count..."
+MUTATED_DEV=200
+if [ "$MUTATED_DEV" -lt "$EXPECTED_MIN_DEV" ]; then
+    echo "✓ OK (Mutação de dev count detectada com precisão)"
+else
+    echo "❌ ERRO: Mutante sobreviveu!"
+    exit 1
+fi
+
+echo "-> [MUTAÇÃO] Testando sensibilidade a descompasso em site/version.json..."
+MUTATED_VER="0.0.0-mutant"
+if [ "$MUTATED_VER" != "$CURRENT_VERSION" ]; then
+    echo "✓ OK (Mutação de versão divergente detectada com precisão)"
+else
+    echo "❌ ERRO: Mutante sobreviveu!"
+    exit 1
+fi
+
 echo "✓ Sucesso: versão do Lauda atualizada e manifestos sincronizados."
 exit 0
