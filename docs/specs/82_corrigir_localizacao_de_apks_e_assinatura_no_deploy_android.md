@@ -1,7 +1,7 @@
 # Especificação Técnica — Correção da Localização de APKs e Assinatura no Deploy Android (#82)
 
 - **ID do Ticket:** #82
-- **Status:** Concluído (Fase 8: Quality Gate)
+- **Status:** Concluído (Fase 9: Finish & Close)
 - **Autora:** Lumen
 - **Alinhamento:** GOST 1.5.0
 - **Data:** 2026-11-06
