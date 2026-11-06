@@ -313,12 +313,15 @@ jobs:
       - name: "Sync Version Manifests"
         run: ./scripts/sync-version-manifests.sh
 
-      - name: "Package Android APK & Sign Soberano"
+      - name: "Package Android APK & Sign"
         run: |
           ./scripts/package-all.sh --apk
           if [ -f scripts/sign-release.sh ]; then
-            [ -f site/lauda.apk ] && ./scripts/sign-release.sh site/lauda.apk
-            [ -f site/lauda-latest.apk ] && ./scripts/sign-release.sh site/lauda-latest.apk
+            for apk in target/dist/apk/lauda.apk target/dist/apk/lauda-latest.apk site/lauda.apk site/lauda-latest.apk; do
+              if [ -f "$apk" ]; then
+                ./scripts/sign-release.sh "$apk" || true
+              fi
+            done
           fi
 
       - name: "Sync with Pratilera"
@@ -354,12 +357,17 @@ jobs:
           }
 
           if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
-            if [ -f site/lauda.apk ]; then
-              upload_r2_with_retry "twolp-bucket/lauda.apk" "site/lauda.apk"
-              upload_r2_with_retry "twolp-bucket/lauda-latest.apk" "site/lauda.apk"
-            elif [ -f site/lauda-latest.apk ]; then
-              upload_r2_with_retry "twolp-bucket/lauda.apk" "site/lauda-latest.apk"
-              upload_r2_with_retry "twolp-bucket/lauda-latest.apk" "site/lauda-latest.apk"
+            APK_FOUND=""
+            for candidate in target/dist/apk/lauda.apk target/dist/apk/lauda-latest.apk site/lauda.apk site/lauda-latest.apk; do
+              if [ -f "$candidate" ]; then
+                APK_FOUND="$candidate"
+                break
+              fi
+            done
+
+            if [ -n "$APK_FOUND" ]; then
+              upload_r2_with_retry "twolp-bucket/lauda.apk" "$APK_FOUND"
+              upload_r2_with_retry "twolp-bucket/lauda-latest.apk" "$APK_FOUND"
             else
               echo "❌ ERRO: Nenhum APK Android encontrado para upload no Cloudflare R2!" >&2
               exit 1
