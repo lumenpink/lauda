@@ -179,8 +179,8 @@ async fn login_handler(
         _ => 8760, // 1 ano (365 dias) para clientes nativos (APK / Desktop)
     };
 
-    let (token, expires_at) =
-        create_token(&payload.username, &state.jwt_secret, expiry_hours).map_err(|_| {
+    let (token, expires_at) = create_token(&payload.username, &state.jwt_secret, expiry_hours)
+        .map_err(|_| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Falha ao gerar token JWT",
