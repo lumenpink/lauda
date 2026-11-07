@@ -75,12 +75,7 @@ async fn test_spa_static_files_and_fallback_serving() {
     // 2.2. GET /app/ -> Deve retornar index.html sob prefixo /app
     let res = app
         .clone()
-        .oneshot(
-            Request::builder()
-                .uri("/app/")
-                .body(Body::empty())
-                .unwrap(),
-        )
+        .oneshot(Request::builder().uri("/app/").body(Body::empty()).unwrap())
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::OK);
