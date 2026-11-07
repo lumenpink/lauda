@@ -19,7 +19,10 @@ impl HttpApiClient {
     pub fn new(base_url: impl Into<String>) -> Self {
         #[cfg(not(target_arch = "wasm32"))]
         let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(15))
+            .timeout(std::time::Duration::from_secs(30))
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .tcp_keepalive(Some(std::time::Duration::from_secs(30)))
+            .pool_idle_timeout(Some(std::time::Duration::from_secs(15)))
             .build()
             .unwrap_or_default();
         #[cfg(target_arch = "wasm32")]
@@ -134,13 +137,23 @@ impl MailApiClient for HttpApiClient {
     ) -> Result<Message, ClientError> {
         let url = format!("{}/messages/{}?box={}", self.base_url, uid, mailbox);
         let headers = Self::auth_headers(token)?;
-        let resp = self
-            .client
-            .get(&url)
-            .headers(headers)
-            .send()
-            .await
-            .map_err(|e| ClientError::Network(e.to_string()))?;
+
+        let mut attempts = 0;
+        let resp = loop {
+            attempts += 1;
+            match self.client.get(&url).headers(headers.clone()).send().await {
+                Ok(r) => break r,
+                Err(e) => {
+                    if attempts >= 3 {
+                        return Err(ClientError::Network(e.to_string()));
+                    }
+                    crate::domain::time::async_sleep(std::time::Duration::from_millis(
+                        attempts * 150,
+                    ))
+                    .await;
+                }
+            }
+        };
 
         match resp.status() {
             StatusCode::OK => {

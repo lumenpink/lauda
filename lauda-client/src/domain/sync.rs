@@ -470,7 +470,10 @@ pub async fn sync_all_cycle<C: MailApiClient + ?Sized>(
         .ok()
         .flatten()
         .unwrap_or_default();
-    let remote_envelopes = client.list_messages(token, mailbox, None, None).await?;
+    // Prioriza a janela imediata rápida de abertura (100 mais recentes) evitando estouro de payload em caixas densas
+    let remote_envelopes = client
+        .list_messages(token, mailbox, Some(100), Some(0))
+        .await?;
     let new_unreads = detect_new_unread_messages(&remote_envelopes, &cached_envelopes);
     result.new_unread_messages = new_unreads.len();
 
