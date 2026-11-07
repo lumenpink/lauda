@@ -45,9 +45,15 @@ pub fn LoginView(
 
         spawn(async move {
             let client = HttpApiClient::new(server.clone());
+            let client_type = if cfg!(target_arch = "wasm32") {
+                Some("web".to_string())
+            } else {
+                Some("app".to_string())
+            };
             let req = LoginRequest {
                 username: user.clone(),
                 password: pass,
+                client_type,
             };
 
             match client.login(&req).await {

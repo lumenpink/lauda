@@ -55,10 +55,11 @@ async fn test_login_success_and_protected_flow() {
     let backend = setup_test_backend();
     let app = app_router(backend.clone(), TEST_SECRET);
 
-    // 1. Login com sucesso
+    // 1. Login com sucesso (padrão app -> longa duração ~1 ano / 8760h)
     let login_body = serde_json::to_string(&LoginRequest {
         username: "lumen".to_string(),
         password: "senha123".to_string(),
+        client_type: None,
     })
     .unwrap();
 
@@ -76,6 +77,37 @@ async fn test_login_success_and_protected_flow() {
     let token_resp: TokenResponse = serde_json::from_slice(&body_bytes).unwrap();
     assert_eq!(token_resp.username, "lumen");
     assert!(!token_resp.token.is_empty());
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    // App nativo deve ter validade estendida de ~1 ano (>= 300 dias)
+    assert!(
+        token_resp.expires_at > now + 300 * 86400,
+        "Token de app deve durar cerca de 1 ano"
+    );
+
+    // 1.1. Login com client_type: "web" deve expirar em 12 horas
+    let web_login_body = serde_json::to_string(&LoginRequest {
+        username: "lumen".to_string(),
+        password: "senha123".to_string(),
+        client_type: Some("web".to_string()),
+    })
+    .unwrap();
+    let web_req = Request::builder()
+        .method("POST")
+        .uri("/auth/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(web_login_body))
+        .unwrap();
+    let web_response = app.clone().oneshot(web_req).await.unwrap();
+    assert_eq!(web_response.status(), StatusCode::OK);
+    let web_body = web_response.into_body().collect().await.unwrap().to_bytes();
+    let web_token_resp: TokenResponse = serde_json::from_slice(&web_body).unwrap();
+    assert!(
+        web_token_resp.expires_at <= now + 13 * 3600,
+        "Token de web deve expirar em até 12 horas"
+    );
 
     let token = token_resp.token;
 
@@ -211,6 +243,7 @@ async fn test_unauthorized_access() {
     let login_body = serde_json::to_string(&LoginRequest {
         username: "lumen".to_string(),
         password: "senha_errada".to_string(),
+        client_type: None,
     })
     .unwrap();
 
@@ -288,6 +321,7 @@ async fn test_mua_flag_move_and_attachment_endpoints() {
     let login_body = serde_json::to_string(&LoginRequest {
         username: "lumen".to_string(),
         password: "senha123".to_string(),
+        client_type: None,
     })
     .unwrap();
     let req = Request::builder()
@@ -517,6 +551,7 @@ async fn test_sieve_rules_endpoints() {
     let login_body = serde_json::to_string(&LoginRequest {
         username: "lumen".to_string(),
         password: "senha123".to_string(),
+        client_type: None,
     })
     .unwrap();
 
