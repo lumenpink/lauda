@@ -4,7 +4,7 @@ use lauda_types::{MailboxInfo, Message, MessageEnvelope, message::SignatureStatu
 use crate::adapters::HttpApiClient;
 use crate::domain::cache::{LocalMessageCache, get_default_cache_dir};
 use crate::domain::ports::MailApiClient;
-use crate::domain::session::{SessionConfig, clear_session};
+use crate::domain::session::SessionConfig;
 use crate::domain::sync::{ActionType, ActionsQueue};
 use crate::domain::time::current_unix_timestamp;
 use crate::ui::state::Screen;
@@ -126,8 +126,11 @@ pub fn InboxView(
     };
 
     let handle_logout = move |_| {
-        let _ = clear_session(None);
-        session.set(SessionConfig::default());
+        let current_session = session.read().clone();
+        let cache_dir = get_default_cache_dir();
+        let clean_session =
+            crate::domain::session::logout_and_wipe(&current_session, None, &cache_dir);
+        session.set(clean_session);
         mailboxes.set(Vec::new());
         messages.set(Vec::new());
         active_message.set(None);

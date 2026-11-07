@@ -35,11 +35,11 @@ pub fn App() -> Element {
     };
 
     let mut screen = use_signal(|| initial_screen);
-    let session = use_signal(|| initial_session);
+    let mut session = use_signal(|| initial_session);
     let mut mailboxes = use_signal(Vec::<MailboxInfo>::new);
     let current_mailbox = use_signal(|| "INBOX".to_string());
     let mut messages = use_signal(Vec::<MessageEnvelope>::new);
-    let active_message = use_signal(|| None::<Message>);
+    let mut active_message = use_signal(|| None::<Message>);
     let mut current_view_mode = use_signal(|| ViewMode::TxtAuto);
 
     let mut update_notice = use_signal(|| None::<crate::domain::update::UpdateManifest>);
@@ -218,6 +218,21 @@ pub fn App() -> Element {
                             #[cfg(not(target_arch = "wasm32"))]
                             let _ = cache.save_mailboxes(&boxes);
                             mailboxes.set(boxes);
+                        }
+                        Err(crate::domain::ports::ClientError::AuthFailed) => {
+                            // Token expirado ou inválido: encerra sessão e volta para tela de Login
+                            let current_session = session.read().clone();
+                            let clean_session = crate::domain::session::logout_and_wipe(
+                                &current_session,
+                                None,
+                                &cache_dir,
+                            );
+                            session.set(clean_session);
+                            mailboxes.set(Vec::new());
+                            messages.set(Vec::new());
+                            active_message.set(None);
+                            screen.set(Screen::Login);
+                            break;
                         }
                         Err(_) => {
                             is_online.set(false);

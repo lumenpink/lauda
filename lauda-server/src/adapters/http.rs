@@ -174,8 +174,13 @@ async fn login_handler(
         .await
         .map_err(|_| (StatusCode::UNAUTHORIZED, "Credenciais inválidas"))?;
 
+    let expiry_hours = match payload.client_type.as_deref() {
+        Some("web") => 12,
+        _ => 8760, // 1 ano (365 dias) para clientes nativos (APK / Desktop)
+    };
+
     let (token, expires_at) =
-        create_token(&payload.username, &state.jwt_secret, 72).map_err(|_| {
+        create_token(&payload.username, &state.jwt_secret, expiry_hours).map_err(|_| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Falha ao gerar token JWT",

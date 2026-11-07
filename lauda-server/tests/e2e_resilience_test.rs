@@ -186,6 +186,7 @@ async fn test_lauda_jwt_tampering_and_unauthorized_attacks() {
         .login(&LoginRequest {
             username: "lumen".to_string(),
             password: "senha_autentica".to_string(),
+            client_type: None,
         })
         .await
         .unwrap()

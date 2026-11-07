@@ -7,6 +7,7 @@ fn test_login_request_roundtrip() {
     let req = LoginRequest {
         username: "lumen".to_string(),
         password: "secret_password".to_string(),
+        client_type: Some("app".to_string()),
     };
     let json = serde_json::to_string(&req).unwrap();
     let decoded: LoginRequest = serde_json::from_str(&json).unwrap();

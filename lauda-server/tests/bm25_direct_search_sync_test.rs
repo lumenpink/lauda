@@ -250,6 +250,7 @@ async fn test_search_api_returns_sync_status_headers_and_payload() {
     let login_body = serde_json::to_string(&LoginRequest {
         username: "lumen".to_string(),
         password: "senha123".to_string(),
+        client_type: None,
     })
     .unwrap();
 

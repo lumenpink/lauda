@@ -90,6 +90,7 @@ async fn test_server_search_endpoint() {
     let login_body = serde_json::to_string(&LoginRequest {
         username: "lumen".to_string(),
         password: "senha123".to_string(),
+        client_type: None,
     })
     .unwrap();
 
@@ -157,6 +158,7 @@ async fn test_search_edge_cases_and_unauthorized() {
     let login_body = serde_json::to_string(&LoginRequest {
         username: "lumen".to_string(),
         password: "senha123".to_string(),
+        client_type: None,
     })
     .unwrap();
 
@@ -210,6 +212,7 @@ async fn test_mailbox_index_slice_endpoint() {
     let login_body = serde_json::to_string(&LoginRequest {
         username: "lumen".to_string(),
         password: "senha123".to_string(),
+        client_type: None,
     })
     .unwrap();
 

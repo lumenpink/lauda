@@ -98,6 +98,7 @@ async fn test_full_integrated_mail_chain_with_in_memory_backend() {
     let bad_login = LoginRequest {
         username: "lumen".to_string(),
         password: "senha_incorreta".to_string(),
+        client_type: None,
     };
     let err = client
         .login(&bad_login)
@@ -112,6 +113,7 @@ async fn test_full_integrated_mail_chain_with_in_memory_backend() {
     let good_login = LoginRequest {
         username: "lumen".to_string(),
         password: "senha_super_secreta_99".to_string(),
+        client_type: None,
     };
     let token_resp = client.login(&good_login).await.expect("Login bem sucedido");
     let token = token_resp.token;
@@ -290,6 +292,7 @@ Content-Type: text/html; charset=utf-8\r\n\
         .login(&LoginRequest {
             username: "bob".to_string(),
             password: "bob_senha_forte_2026".to_string(),
+            client_type: None,
         })
         .await
         .unwrap()

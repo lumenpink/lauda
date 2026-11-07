@@ -373,6 +373,7 @@ async fn test_e2e_apk_mobile_client_live_server_full_loop() {
             .login(&LoginRequest {
                 username: "lumen".to_string(),
                 password: "senha_mobile_2026".to_string(),
+                client_type: None,
             })
             .await
         {

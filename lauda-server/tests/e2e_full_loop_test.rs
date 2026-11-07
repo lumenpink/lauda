@@ -125,6 +125,7 @@ Content-Type: text/html; charset=utf-8\r\n\
             serde_json::to_string(&LoginRequest {
                 username: "lumen".to_string(),
                 password: "senha_forte_123".to_string(),
+                client_type: None,
             })
             .unwrap(),
         ))

@@ -202,6 +202,49 @@ pub fn clear_session(path: Option<&Path>) -> Result<(), std::io::Error> {
     }
 }
 
+/// Executa logout completo com wipe de cache local (SQLite, Índices, Storage)
+/// mas mantendo na memória e regravando localmente apenas a URL do servidor e o usuário
+/// para conveniência no próximo login.
+pub fn logout_and_wipe(
+    current: &SessionConfig,
+    session_path: Option<&Path>,
+    cache_dir: &Path,
+) -> SessionConfig {
+    let preserved = SessionConfig {
+        server_url: current.server_url.clone(),
+        username: current.username.clone(),
+        token: None,
+    };
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = session_path;
+        let _ = cache_dir;
+        if let Some(window) = web_sys::window()
+            && let Ok(Some(storage)) = window.local_storage()
+        {
+            let _ = storage.clear();
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        // 1. Remove arquivo de sessão
+        let _ = clear_session(session_path);
+
+        // 2. Wipe do diretório de cache/dados locais (SQLite, outbox, índices)
+        if cache_dir.exists() {
+            let _ = std::fs::remove_dir_all(cache_dir);
+            let _ = std::fs::create_dir_all(cache_dir);
+        }
+    }
+
+    // 3. Regrava apenas a configuração limpa com servidor e usuário preservados
+    let _ = save_session(&preserved, session_path);
+
+    preserved
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -226,6 +269,36 @@ mod tests {
 
         clear_session(Some(&session_file)).expect("clear session");
         assert_eq!(load_session(Some(&session_file)), None);
+    }
+
+    #[test]
+    fn test_logout_and_wipe_preserves_server_and_username_while_erasing_token_and_cache() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let session_file = temp.path().join("session.json");
+        let cache_dir = temp.path().join("cache");
+        std::fs::create_dir_all(&cache_dir).unwrap();
+        std::fs::write(cache_dir.join("test_db.sqlite"), "mock-cache").unwrap();
+
+        let initial = SessionConfig {
+            server_url: "https://lauda.lohn.in".to_string(),
+            username: "lumen".to_string(),
+            token: Some("secret-token-active".to_string()),
+        };
+        save_session(&initial, Some(&session_file)).unwrap();
+
+        let clean = logout_and_wipe(&initial, Some(&session_file), &cache_dir);
+
+        // Deve retornar a configuração limpa
+        assert_eq!(clean.server_url, "https://lauda.lohn.in");
+        assert_eq!(clean.username, "lumen");
+        assert!(clean.token.is_none());
+
+        // Deve persistir a configuração limpa em disco
+        let loaded = load_session(Some(&session_file)).expect("load clean session");
+        assert_eq!(loaded, clean);
+
+        // Arquivo antigo de cache deve ter sido limpo
+        assert!(!cache_dir.join("test_db.sqlite").exists());
     }
 
     #[test]

@@ -92,6 +92,7 @@ async fn test_in_memory_api_client() {
         .login(&LoginRequest {
             username: "lumen".to_string(),
             password: "secret".to_string(),
+            client_type: None,
         })
         .await
         .unwrap();
