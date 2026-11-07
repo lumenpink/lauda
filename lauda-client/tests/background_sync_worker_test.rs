@@ -413,3 +413,61 @@ fn test_detect_new_unread_messages_strict_invariants() {
         "Não deve notificar mensagens já conhecidas ou já lidas"
     );
 }
+
+#[tokio::test]
+async fn test_sync_all_cycle_limits_envelope_fetch_window_for_responsiveness() {
+    let temp = tempdir().expect("tempdir");
+    let cache_dir = temp.path();
+    let client = Arc::new(InMemoryApiClient::new());
+    let now_unix = 1793376000;
+
+    // Simula uma caixa densa com 150 mensagens
+    for uid in 1..=150 {
+        client.add_message(
+            "INBOX",
+            Message {
+                envelope: MessageEnvelope {
+                    uid,
+                    subject: format!("Mensagem Densidade {}", uid),
+                    sender: "remetente@exemplo.com".to_string(),
+                    date: "2026-10-30T12:00:00Z".to_string(),
+                    is_read: true,
+                    is_flagged: false,
+                    cc: None,
+                    has_attachments: false,
+                    crypto_meta: None,
+                },
+                txt_auto: Some("Corpo".to_string()),
+                txt_original: Some("Corpo".to_string()),
+                html_sanitized: None,
+                attachments: vec![],
+            },
+        );
+    }
+
+    let config = SyncWorkerConfig {
+        poll_interval_secs: 60,
+        min_backoff_secs: 5,
+        max_backoff_secs: 300,
+        retention_days: 90,
+        prefetch_concurrency: 5,
+        notify_on_new: false,
+    };
+
+    let summary = sync_all_cycle(
+        client.as_ref(),
+        "mock-token",
+        "INBOX",
+        cache_dir,
+        &config,
+        now_unix,
+    )
+    .await
+    .expect("sync_all_cycle");
+
+    // Deve ter priorizado e baixado a janela inicial rápida (100 mensagens) em vez de um lote sem limite
+    assert_eq!(
+        summary.messages_prefetched, 100,
+        "Deve priorizar exatamente as 100 mensagens da janela de abertura rápida"
+    );
+}
