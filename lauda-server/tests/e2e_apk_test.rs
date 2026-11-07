@@ -273,6 +273,10 @@ fn test_e2e_apk_distribution_manifest_and_obtainium() {
         json_version.starts_with(base_version_file),
         "Versão em version.json ({json_version}) deve ser compatível com VERSION base ({base_version_file})"
     );
+    assert_eq!(
+        json_version, version_file_content,
+        "Versão em site/version.json deve ser estritamente idêntica à declarada em VERSION"
+    );
 
     let apk_url = manifest["apk_url"]
         .as_str()
