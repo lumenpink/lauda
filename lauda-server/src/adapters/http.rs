@@ -548,7 +548,9 @@ fn build_router(state: AppState) -> Router {
         let index_file = web_path.join("index.html");
         let serve_dir = tower_http::services::ServeDir::new(web_path)
             .fallback(tower_http::services::ServeFile::new(index_file));
-        router = router.fallback_service(serve_dir);
+        router = router
+            .nest_service("/app", serve_dir.clone())
+            .fallback_service(serve_dir);
     }
 
     router
