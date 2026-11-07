@@ -57,6 +57,51 @@ async fn test_spa_static_files_and_fallback_serving() {
     let body = res.into_body().collect().await.unwrap().to_bytes();
     assert!(String::from_utf8_lossy(&body).contains("console.log('lauda');"));
 
+    // 2.1. GET /app/assets/app.js -> Deve retornar arquivo estático sob prefixo /app
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/app/assets/app.js")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body = res.into_body().collect().await.unwrap().to_bytes();
+    assert!(String::from_utf8_lossy(&body).contains("console.log('lauda');"));
+
+    // 2.2. GET /app/ -> Deve retornar index.html sob prefixo /app
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/app/")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body = res.into_body().collect().await.unwrap().to_bytes();
+    assert!(String::from_utf8_lossy(&body).contains("LAUDA SPA"));
+
+    // 2.3. GET /app/inbox -> Deve fazer fallback para index.html sob prefixo /app
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/app/inbox")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body = res.into_body().collect().await.unwrap().to_bytes();
+    assert!(String::from_utf8_lossy(&body).contains("LAUDA SPA"));
+
     // 3. GET /inbox/view (rota SPA desconhecida no backend) -> Deve retornar index.html como fallback
     let res = app
         .clone()
