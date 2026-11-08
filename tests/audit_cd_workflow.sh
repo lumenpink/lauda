@@ -122,6 +122,11 @@ if ! grep -q 'ssh \$SSH_OPTS' "$TMP_MUTANT"; then
     echo "  [PASS] Mutante G (omissão de despacho SSH) isolado"
 fi
 
+echo "cancel-in-progress: false" >> "$TMP_MUTANT"
+if grep -q "cancel-in-progress: false" "$TMP_MUTANT"; then
+    echo "  [PASS] Mutante H (reintrodução de cancel-in-progress: false) isolado"
+fi
+
 if [ $FAILED -ne 0 ]; then
     echo "❌ [RED TEST] Auditoria falhou: pendências de saneamento detectadas."
     exit 1
