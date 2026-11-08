@@ -2,7 +2,7 @@
 ## Habilitar `cancel-in-progress: true` no Workflow de CI
 
 - **Ticket:** #89
-- **Branch:** `ci/89-habilitar-cancel-in-progress-no-workflow-de-ci`
+- **Branch:** `fix/89-habilitar-cancel-in-progress-no-workflow-de-ci`
 - **Data:** 2026-11-08
 
 ---
