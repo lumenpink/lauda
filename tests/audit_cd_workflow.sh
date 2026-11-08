@@ -78,7 +78,11 @@ check_present "$WORKFLOW" 'GAMBI_2LP_IN_TOKEN' "Presença de GAMBI_2LP_IN_TOKEN 
 check_present "$DOCKERFILE" 'gambi.2lp.in/lumen/gost-ci-cross' "Uso de gost-ci-cross soberano no Dockerfile" || FAILED=1
 check_present "$DOCKERFILE" 'gambi.2lp.in/lumen/mirror-debian' "Uso de mirror-debian soberano no Dockerfile" || FAILED=1
 
-# 10. Testes de mutação
+# 10. Concorrência com cancel-in-progress (#89)
+check_present "$WORKFLOW" 'cancel-in-progress: true' "Presença de cancel-in-progress: true no ci.yml" || FAILED=1
+check_not_present "$WORKFLOW" 'cancel-in-progress: false' "Ausência de cancel-in-progress: false no ci.yml" || FAILED=1
+
+# 11. Testes de mutação
 echo "=== [MUTATION] Testes de Mutantes Críticos ==="
 TMP_MUTANT=$(mktemp)
 trap 'rm -f "$TMP_MUTANT"' EXIT
