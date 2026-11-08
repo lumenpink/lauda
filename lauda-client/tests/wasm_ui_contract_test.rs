@@ -1,5 +1,5 @@
 use lauda_client::domain::cache::get_default_cache_dir;
-use lauda_client::domain::session::{logout_and_wipe, SessionConfig};
+use lauda_client::domain::session::{SessionConfig, logout_and_wipe};
 use std::path::Path;
 
 #[test]
