@@ -139,7 +139,6 @@ pub fn App() -> Element {
         let sess = session.read().clone();
         if let Some(token) = sess.token {
             spawn(async move {
-                #[cfg(not(target_arch = "wasm32"))]
                 let cache_dir = crate::domain::cache::get_default_cache_dir();
                 #[cfg(not(target_arch = "wasm32"))]
                 let cache = crate::domain::cache::LocalMessageCache::new(&cache_dir);

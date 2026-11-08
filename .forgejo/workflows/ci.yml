@@ -70,7 +70,7 @@ jobs:
 
       - name: "Build Dioxus Web Client (Release)"
         run: |
-          dx build -p lauda-client --platform web --release
+          dx build -p lauda-client --platform web --release --offline
           rm -rf site/app/assets/*
           cp -r target/dx/lauda-client/release/web/public/assets/* site/app/assets/
           JS_NAME=$(ls site/app/assets | grep '^lauda-client-.*\.js$' | head -n 1)
