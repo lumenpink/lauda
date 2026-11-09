@@ -2,7 +2,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Redirecionamento soberano de APKs para o Cloudflare R2 dedicado (bucket.2lp.in) com zero custo de worker
+    // Redirecionamento autônomo de APKs para o Cloudflare R2 dedicado (bucket.2lp.in) com zero custo de worker
     if (url.pathname.endsWith(".apk")) {
       const isNightly = url.pathname.includes("nightly");
       const targetApk = isNightly ? "lauda-nightly.apk" : "lauda.apk";
@@ -12,6 +12,12 @@ export default {
     // Normalizar /app sem barra para /app/
     if (url.pathname === "/app") {
       return Response.redirect(new URL("/app/", request.url).toString(), 301);
+    }
+
+    // Redirecionamento resiliente de assets do web app caso solicitados sem o prefixo /app
+    if (url.pathname.startsWith("/assets/lauda-client")) {
+      const appAssetUrl = new URL("/app" + url.pathname, request.url);
+      return env.ASSETS.fetch(new Request(appAssetUrl, request));
     }
 
     // Se for sub-rota client-side sob /app/* sem extensão, fazer fallback para /app/

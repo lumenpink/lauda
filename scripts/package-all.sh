@@ -86,12 +86,11 @@ fi
 # 2. Compilar WebAssembly WebApp (Dioxus Web)
 if [ "$DO_BUILD_WEB" = true ]; then
     echo "-> Compilando Dioxus WebAssembly (release)..."
-    dx build -p lauda-client --platform web --release
+    dx build -p lauda-client --platform web --release --base-path /app/
 
     mkdir -p "$SITE_DIR/app/assets"
     rm -rf "$SITE_DIR/app/assets/"*
     cp -r "$REPO_ROOT/target/dx/lauda-client/release/web/public/assets/"* "$SITE_DIR/app/assets/"
-    cp "$REPO_ROOT/target/dx/lauda-client/release/web/public/index.html" "$SITE_DIR/app/index.html"
 
     JS_NAME="$(ls "$SITE_DIR/app/assets" | grep '^lauda-client-.*\.js$' | head -n 1)"
     WASM_NAME="$(ls "$SITE_DIR/app/assets" | grep '^lauda-client_bg-.*\.wasm$' | head -n 1)"
@@ -100,9 +99,6 @@ if [ "$DO_BUILD_WEB" = true ]; then
     sed -i -E "s|/app/assets/lauda-client_bg-[^\"']+\.wasm|/app/assets/${WASM_NAME}|g" "$SITE_DIR/app/index.html"
     sed -i -E "s|/assets/lauda-client-[^\"']+\.js|/app/assets/${JS_NAME}|g" "$SITE_DIR/app/index.html"
     sed -i -E "s|/assets/lauda-client_bg-[^\"']+\.wasm|/app/assets/${WASM_NAME}|g" "$SITE_DIR/app/index.html"
-
-    # Atualizar index.html na raiz do site para redirecionamento ou app
-    cp "$SITE_DIR/app/index.html" "$SITE_DIR/index.html"
     echo "✓ WebApp Dioxus Web compilado: ${JS_NAME} / ${WASM_NAME}"
 fi
 
