@@ -30,6 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let m = Arc::new(lauda_server::adapters::MaildirBackend::new(path));
         m.add_user("lumen", "senha123");
         m.add_user("hi@lumen.pink", "senha123");
+        m.clone().start_continuous_indexer(15);
         m
     } else {
         tracing::info!("lauda-server: inicializando InMemoryMailBackend de demonstração");

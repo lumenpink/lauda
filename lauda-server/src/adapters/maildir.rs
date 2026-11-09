@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, RwLock};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use lauda_types::{
@@ -22,6 +24,7 @@ pub struct MaildirBackend {
     sqlite_index: Option<SqliteIndexStore>,
     smtp_host: String,
     smtp_port: u16,
+    indexing_active: Arc<AtomicBool>,
 }
 
 /// Extrai o endereço de e-mail limpo de uma string que pode conter nome de exibição (ex: "Lumen <lumen@2lp.in>").
@@ -213,6 +216,7 @@ impl MaildirBackend {
             sqlite_index,
             smtp_host,
             smtp_port,
+            indexing_active: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -230,6 +234,7 @@ impl MaildirBackend {
             sqlite_index,
             smtp_host: smtp_host.into(),
             smtp_port,
+            indexing_active: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -245,6 +250,64 @@ impl MaildirBackend {
             })?;
         }
         Ok(())
+    }
+
+    /// Dispara o indexador contínuo em segundo plano para manter a base vetorial SQLite
+    /// estritamente sincronizada com os e-mails na pasta Maildir em tempo real.
+    pub fn start_continuous_indexer(self: Arc<Self>, interval_secs: u64) {
+        if self.sqlite_index.is_none() {
+            return;
+        }
+
+        let is_running = self.indexing_active.clone();
+        if is_running.swap(true, Ordering::SeqCst) {
+            // Já existe um indexador contínuo em execução para este backend
+            return;
+        }
+
+        tokio::spawn(async move {
+            let interval = Duration::from_secs(interval_secs.max(1));
+            tracing::info!(
+                "Indexador contínuo de segundo plano iniciado (intervalo de {}s)",
+                interval_secs
+            );
+
+            loop {
+                let mailboxes = vec!["INBOX".to_string()];
+                for mailbox in &mailboxes {
+                    if let Ok(dir) = self.resolve_mailbox_dir(mailbox) {
+                        let (_, uid_to_prefix) = self.load_uid_maps(&dir);
+                        let active_uids: HashSet<u32> = uid_to_prefix.keys().copied().collect();
+
+                        if let Some(ref store) = self.sqlite_index {
+                            if let Ok(reconcile) = store.reconcile_mailbox(mailbox, &active_uids) {
+                                // 1. Expurgo de mensagens excluídas
+                                for del_uid in reconcile.to_remove {
+                                    let _ = store.remove_document(mailbox, del_uid);
+                                }
+
+                                // 2. Indexação em lotes com prioridade decrescente
+                                let provider = lauda_index::SimpleCpuEmbeddingProvider;
+                                for chunk in reconcile.to_index.chunks(25) {
+                                    for &uid in chunk {
+                                        if let Some(msg) = Self::read_message_static(&dir, uid) {
+                                            let mut temp_index = lauda_index::MessageIndex::new();
+                                            temp_index.index_message_semantic(mailbox, &msg, &provider);
+                                            if let Some(doc) = temp_index.documents().get(&uid) {
+                                                let _ = store.save_document(mailbox, doc, 0);
+                                            }
+                                        }
+                                    }
+                                    tokio::time::sleep(Duration::from_millis(15)).await;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                tokio::time::sleep(interval).await;
+            }
+        });
     }
 
     pub fn add_user(&self, username: impl Into<String>, password: impl Into<String>) {
@@ -1044,6 +1107,11 @@ impl MailBackend for MaildirBackend {
             std::fs::rename(&file_path, &target_path)
                 .map_err(|e| BackendError::Internal(e.to_string()))?;
         }
+
+        if let Some(ref store) = self.sqlite_index {
+            let _ = store.remove_document(mailbox, uid);
+        }
+
         Ok(())
     }
 
@@ -1115,6 +1183,11 @@ impl MailBackend for MaildirBackend {
         let target_path = target_dir.join(&filename);
         std::fs::rename(&file_path, &target_path)
             .map_err(|e| BackendError::Internal(e.to_string()))?;
+
+        if let Some(ref store) = self.sqlite_index {
+            let _ = store.remove_document(src_box, uid);
+        }
+
         Ok(())
     }
 

@@ -218,7 +218,7 @@ impl SqliteIndexStore {
                 to_index.push(uid);
             }
         }
-        to_index.sort();
+        to_index.sort_by(|a, b| b.cmp(a));
 
         let mut to_remove = Vec::new();
         for &uid in &current_indexed {

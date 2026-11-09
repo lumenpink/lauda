@@ -41,7 +41,7 @@ async fn test_maildir_continuous_indexer_syncs_automatically() {
     fs::create_dir_all(&cur_dir).expect("criar pasta cur");
 
     // Criar dovecot-uidlist com dois e-mails
-    let uidlist_content = "3 V1234567890 N1 G0\n101 :101.mail.test:2,S\n102 :102.mail.test:2,S\n";
+    let uidlist_content = "3 V1234567890 N1 G0\n101 :101.mail.test\n102 :102.mail.test\n";
     fs::write(base_dir.join("dovecot-uidlist"), uidlist_content).expect("escrever uidlist");
 
     // Criar os arquivos de e-mail
@@ -85,7 +85,7 @@ async fn test_maildir_delete_message_removes_from_sqlite_index_immediately() {
     let cur_dir = base_dir.join("cur");
     fs::create_dir_all(&cur_dir).expect("criar pasta cur");
 
-    let uidlist_content = "3 V1234567890 N1 G0\n301 :301.mail.test:2,S\n";
+    let uidlist_content = "3 V1234567890 N1 G0\n301 :301.mail.test\n";
     fs::write(base_dir.join("dovecot-uidlist"), uidlist_content).expect("escrever uidlist");
 
     let raw_msg_301 = "From: deletar@2lp.in\r\nTo: hi@lumen.pink\r\nSubject: Mensagem Para Deletar\r\nDate: Mon, 9 Nov 2026 12:00:00 -0300\r\n\r\nTexto de teste para exclusao.";
