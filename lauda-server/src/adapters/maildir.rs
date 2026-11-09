@@ -292,7 +292,8 @@ impl MaildirBackend {
                                     for &uid in chunk {
                                         if let Some(msg) = Self::read_message_static(&dir, uid) {
                                             let mut temp_index = lauda_index::MessageIndex::new();
-                                            temp_index.index_message_semantic(mailbox, &msg, &provider);
+                                            temp_index
+                                                .index_message_semantic(mailbox, &msg, &provider);
                                             if let Some(doc) = temp_index.documents().get(&uid) {
                                                 let _ = store.save_document(mailbox, doc, 0);
                                             }
