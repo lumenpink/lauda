@@ -122,3 +122,81 @@ async fn test_maildir_delete_message_removes_from_sqlite_index_immediately() {
         "A mensagem excluída DEVE ser removida imediatamente da base vetorial do SQLite"
     );
 }
+
+#[tokio::test]
+async fn test_continuous_indexer_idempotent_multiple_calls() {
+    let temp = tempdir().expect("tempdir");
+    let base_dir = temp.path().join("maildir");
+    let cur_dir = base_dir.join("cur");
+    fs::create_dir_all(&cur_dir).expect("criar pasta cur");
+
+    let uidlist_content = "3 V1234567890 N1 G0\n401 :401.mail.test\n";
+    fs::write(base_dir.join("dovecot-uidlist"), uidlist_content).expect("escrever uidlist");
+
+    let raw_msg_401 = "From: teste401@2lp.in\r\nTo: hi@lumen.pink\r\nSubject: Teste 401\r\nDate: Mon, 9 Nov 2026 12:00:00 -0300\r\n\r\nTexto 401";
+    fs::write(cur_dir.join("401.mail.test:2,S"), raw_msg_401).expect("write msg 401");
+
+    let backend = Arc::new(MaildirBackend::new(&base_dir));
+
+    // Múltiplas chamadas devem ser idempotentes e seguras concorrentemente
+    backend.clone().start_continuous_indexer(1);
+    backend.clone().start_continuous_indexer(1);
+    backend.clone().start_continuous_indexer(1);
+
+    let store = backend.sqlite_index().expect("sqlite_index");
+    let mut indexed = false;
+    for _ in 0..40 {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        if let Ok(uids) = store.get_indexed_uids("INBOX") {
+            if uids.contains(&401) {
+                indexed = true;
+                break;
+            }
+        }
+    }
+    assert!(indexed, "Mesmo com múltiplos disparos, a mensagem deve ser indexada sem conflitos");
+}
+
+#[tokio::test]
+async fn test_maildir_move_message_removes_from_source_sqlite_index_immediately() {
+    let temp = tempdir().expect("tempdir");
+    let base_dir = temp.path().join("maildir");
+    let cur_dir = base_dir.join("cur");
+    fs::create_dir_all(&cur_dir).expect("criar pasta cur");
+
+    let uidlist_content = "3 V1234567890 N1 G0\n501 :501.mail.test\n";
+    fs::write(base_dir.join("dovecot-uidlist"), uidlist_content).expect("escrever uidlist");
+
+    let raw_msg_501 = "From: mover@2lp.in\r\nTo: hi@lumen.pink\r\nSubject: Mover Mensagem\r\nDate: Mon, 9 Nov 2026 12:00:00 -0300\r\n\r\nTexto para movimentacao";
+    fs::write(cur_dir.join("501.mail.test:2,S"), raw_msg_501).expect("write msg 501");
+
+    let backend = Arc::new(MaildirBackend::new(&base_dir));
+    let store = backend.sqlite_index().expect("sqlite_index");
+
+    backend.clone().start_continuous_indexer(1);
+
+    let mut indexed = false;
+    for _ in 0..40 {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        if let Ok(uids) = store.get_indexed_uids("INBOX") {
+            if uids.contains(&501) {
+                indexed = true;
+                break;
+            }
+        }
+    }
+    assert!(indexed, "Mensagem 501 deve ser indexada antes de mover");
+
+    // Mover de INBOX para Sent
+    backend
+        .move_message("lumen", "INBOX", "Sent", 501)
+        .await
+        .expect("mover mensagem");
+
+    // Verificar se foi removida imediatamente de INBOX no SQLite
+    let uids_after_move = store.get_indexed_uids("INBOX").expect("uids");
+    assert!(
+        !uids_after_move.contains(&501),
+        "Ao mover mensagem de uma caixa, o índice da caixa de origem DEVE ser purgado imediatamente"
+    );
+}
