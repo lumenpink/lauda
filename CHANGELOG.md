@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **ci:** adicionar base-path /app/ e fallback resiliente no deploy web (closes #90)
 - **ci:** resolver caminhos de apk e assinatura segura no deploy android (closes #82)
 - **server:** isolar despacho smtp por padrão opt-in e sanear dominios de testes para evitar vazamentos (closes #80)
 - **android:** corrigir icones adaptativos e expurgar template dioxus v24 (closes #76)

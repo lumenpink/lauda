@@ -130,6 +130,11 @@ if grep -q "cancel-in-progress: false" "$TMP_MUTANT"; then
     echo "  [PASS] Mutante H (reintrodução de cancel-in-progress: false) isolado"
 fi
 
+grep -v -- "--base-path /app/" "$WORKFLOW" > "$TMP_MUTANT"
+if ! grep -q -- "--base-path /app/" "$TMP_MUTANT"; then
+    echo "  [PASS] Mutante I (omissão de --base-path /app/) isolado"
+fi
+
 if [ $FAILED -ne 0 ]; then
     echo "❌ [RED TEST] Auditoria falhou: pendências de saneamento detectadas."
     exit 1
