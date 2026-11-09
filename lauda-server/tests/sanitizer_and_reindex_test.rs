@@ -117,3 +117,62 @@ fn test_sqlite_index_clear_mailbox_and_reindex_reconciliation() {
         "UID 501 deve ser marcado para reindexacao completa"
     );
 }
+
+#[tokio::test]
+async fn test_maildir_sanitizes_table_borders_and_hyphen_noise() {
+    let tmp = tempdir().unwrap();
+    let root = tmp.path();
+
+    std::fs::create_dir_all(root.join("cur")).unwrap();
+    std::fs::create_dir_all(root.join("new")).unwrap();
+
+    let msg_filename = "1728000002.M456P789.test:2,S";
+    let eml_content = concat!(
+        "From: marketing@exemplo.org\n",
+        "To: lumen@2lp.in\n",
+        "Subject: Ofertas da Loja\n",
+        "Date: Mon, 05 Oct 2026 12:00:00 +0000\n",
+        "MIME-Version: 1.0\n",
+        "Content-Type: text/html; charset=utf-8\n",
+        "\n",
+        "<html><body>\n",
+        "<table border=\"1\"><tr><td>Produto Alfa</td><td>R$ 99</td></tr></table>\n",
+        "<hr/>\n",
+        "<hr/>\n",
+        "<hr/>\n",
+        "<p>Linha com tracos repetitivos --------------------</p>\n",
+        "<p>Fim da mensagem.</p>\n",
+        "</body></html>\n"
+    );
+
+    std::fs::write(root.join("cur").join(msg_filename), eml_content).unwrap();
+    let uidlist = "3 V1728000000 N100 Gabcdef\n101 :1728000002.M456P789.test\n";
+    std::fs::write(root.join("dovecot-uidlist"), uidlist).unwrap();
+
+    let backend = MaildirBackend::new(root);
+    backend.add_user("lumen", "senha123");
+
+    let msg = backend
+        .get_message("lumen", "INBOX", 101)
+        .await
+        .expect("Mensagem deve ser lida");
+
+    let txt_auto = msg.txt_auto.expect("txt_auto deve ser gerado do HTML");
+
+    // 1. Não deve conter caracteres de desenho de grade/tabela (─, │, ┬, ┴, etc.)
+    assert!(
+        !txt_auto.contains('─') && !txt_auto.contains('│') && !txt_auto.contains('┬') && !txt_auto.contains('┴'),
+        "txt_auto nao deve conter bordas ASCII/Unicode de grade de tabela: {txt_auto}"
+    );
+
+    // 2. Não deve conter múltiplos divisores horizontais consecutivos nem sequências ruidosas de hifens
+    assert!(
+        !txt_auto.contains("---\n\n---") && !txt_auto.contains("--------------------"),
+        "txt_auto nao deve conter divisores repetitivos: {txt_auto}"
+    );
+
+    // 3. Conteúdo semântico deve ser preservado
+    assert!(txt_auto.contains("Produto Alfa"));
+    assert!(txt_auto.contains("R$ 99"));
+    assert!(txt_auto.contains("Fim da mensagem."));
+}
