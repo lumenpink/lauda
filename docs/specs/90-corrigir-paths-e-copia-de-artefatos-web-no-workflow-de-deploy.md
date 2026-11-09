@@ -4,6 +4,7 @@
 - **Ticket:** #90
 - **Branch:** `fix/90-corrigir-paths-e-copia-de-artefatos-web-no-workflow-de-deploy`
 - **Data:** 2026-11-08
+- **Status:** CONCLUDED
 
 ---
 
