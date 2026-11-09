@@ -64,11 +64,13 @@ async fn test_maildir_continuous_indexer_syncs_automatically() {
     let mut synced = false;
     for _ in 0..40 {
         tokio::time::sleep(Duration::from_millis(50)).await;
-        if let Ok(uids) = store.get_indexed_uids("INBOX") {
-            if uids.len() == 2 && uids.contains(&101) && uids.contains(&102) {
-                synced = true;
-                break;
-            }
+        if let Ok(uids) = store.get_indexed_uids("INBOX")
+            && uids.len() == 2
+            && uids.contains(&101)
+            && uids.contains(&102)
+        {
+            synced = true;
+            break;
         }
     }
 
@@ -100,11 +102,11 @@ async fn test_maildir_delete_message_removes_from_sqlite_index_immediately() {
     let mut indexed = false;
     for _ in 0..40 {
         tokio::time::sleep(Duration::from_millis(50)).await;
-        if let Ok(uids) = store.get_indexed_uids("INBOX") {
-            if uids.contains(&301) {
-                indexed = true;
-                break;
-            }
+        if let Ok(uids) = store.get_indexed_uids("INBOX")
+            && uids.contains(&301)
+        {
+            indexed = true;
+            break;
         }
     }
     assert!(indexed, "Mensagem 301 deve ter sido indexada");
@@ -147,14 +149,17 @@ async fn test_continuous_indexer_idempotent_multiple_calls() {
     let mut indexed = false;
     for _ in 0..40 {
         tokio::time::sleep(Duration::from_millis(50)).await;
-        if let Ok(uids) = store.get_indexed_uids("INBOX") {
-            if uids.contains(&401) {
-                indexed = true;
-                break;
-            }
+        if let Ok(uids) = store.get_indexed_uids("INBOX")
+            && uids.contains(&401)
+        {
+            indexed = true;
+            break;
         }
     }
-    assert!(indexed, "Mesmo com múltiplos disparos, a mensagem deve ser indexada sem conflitos");
+    assert!(
+        indexed,
+        "Mesmo com múltiplos disparos, a mensagem deve ser indexada sem conflitos"
+    );
 }
 
 #[tokio::test]
@@ -178,11 +183,11 @@ async fn test_maildir_move_message_removes_from_source_sqlite_index_immediately(
     let mut indexed = false;
     for _ in 0..40 {
         tokio::time::sleep(Duration::from_millis(50)).await;
-        if let Ok(uids) = store.get_indexed_uids("INBOX") {
-            if uids.contains(&501) {
-                indexed = true;
-                break;
-            }
+        if let Ok(uids) = store.get_indexed_uids("INBOX")
+            && uids.contains(&501)
+        {
+            indexed = true;
+            break;
         }
     }
     assert!(indexed, "Mensagem 501 deve ser indexada antes de mover");

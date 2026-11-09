@@ -279,28 +279,27 @@ impl MaildirBackend {
                         let (_, uid_to_prefix) = self.load_uid_maps(&dir);
                         let active_uids: HashSet<u32> = uid_to_prefix.keys().copied().collect();
 
-                        if let Some(ref store) = self.sqlite_index {
-                            if let Ok(reconcile) = store.reconcile_mailbox(mailbox, &active_uids) {
-                                // 1. Expurgo de mensagens excluídas
-                                for del_uid in reconcile.to_remove {
-                                    let _ = store.remove_document(mailbox, del_uid);
-                                }
+                        if let Some(ref store) = self.sqlite_index
+                            && let Ok(reconcile) = store.reconcile_mailbox(mailbox, &active_uids)
+                        {
+                            // 1. Expurgo de mensagens excluídas
+                            for del_uid in reconcile.to_remove {
+                                let _ = store.remove_document(mailbox, del_uid);
+                            }
 
-                                // 2. Indexação em lotes com prioridade decrescente
-                                let provider = lauda_index::SimpleCpuEmbeddingProvider;
-                                for chunk in reconcile.to_index.chunks(25) {
-                                    for &uid in chunk {
-                                        if let Some(msg) = Self::read_message_static(&dir, uid) {
-                                            let mut temp_index = lauda_index::MessageIndex::new();
-                                            temp_index
-                                                .index_message_semantic(mailbox, &msg, &provider);
-                                            if let Some(doc) = temp_index.documents().get(&uid) {
-                                                let _ = store.save_document(mailbox, doc, 0);
-                                            }
+                            // 2. Indexação em lotes com prioridade decrescente
+                            let provider = lauda_index::SimpleCpuEmbeddingProvider;
+                            for chunk in reconcile.to_index.chunks(25) {
+                                for &uid in chunk {
+                                    if let Some(msg) = Self::read_message_static(&dir, uid) {
+                                        let mut temp_index = lauda_index::MessageIndex::new();
+                                        temp_index.index_message_semantic(mailbox, &msg, &provider);
+                                        if let Some(doc) = temp_index.documents().get(&uid) {
+                                            let _ = store.save_document(mailbox, doc, 0);
                                         }
                                     }
-                                    tokio::time::sleep(Duration::from_millis(15)).await;
                                 }
+                                tokio::time::sleep(Duration::from_millis(15)).await;
                             }
                         }
                     }

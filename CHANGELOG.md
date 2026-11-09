@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **build:** otimizar tamanho de binario com profile.release e habilitar linking estatico musl crt-static (closes #53)
 
 ### Features
+- **server:** indexador continuo em background e prioridade reversa (closes #95)
 - **compose:** autocompletar e identidades configuraveis no campo de (closes #94)
 - **compose:** ocultar cc e cco sob demanda e fluxo desimpedido via tab (closes #93)
 - **updater:** adequar configuracao opendesktop xdg e verificacao periodica com pin (closes #49)
