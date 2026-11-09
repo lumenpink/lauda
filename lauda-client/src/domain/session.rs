@@ -25,6 +25,7 @@ pub fn prepare_post_login_state(
             server_url,
             username,
             token: Some(token),
+            identities: Vec::new(),
         },
         initial_mailbox: "INBOX".to_string(),
         target_screen: Screen::Inbox,
@@ -39,6 +40,42 @@ pub struct SessionConfig {
     pub server_url: String,
     pub username: String,
     pub token: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub identities: Vec<String>,
+}
+
+impl SessionConfig {
+    /// Retorna as identidades configuradas ou, se vazia, a identidade padrão derivada do username.
+    pub fn get_or_default_identities(&self) -> Vec<String> {
+        if self.identities.is_empty() {
+            let default_id = if self.username.contains('@') {
+                self.username.clone()
+            } else {
+                format!("{}@2lp.in", self.username)
+            };
+            vec![default_id]
+        } else {
+            self.identities.clone()
+        }
+    }
+
+    /// Adiciona uma identidade à lista, inserindo no topo e evitando duplicatas (case-insensitive).
+    pub fn add_identity(&mut self, identity: &str) {
+        let trimmed = identity.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        self.identities
+            .retain(|id| !id.eq_ignore_ascii_case(trimmed));
+        self.identities.insert(0, trimmed.to_string());
+    }
+
+    /// Remove uma identidade da lista (case-insensitive).
+    pub fn remove_identity(&mut self, identity: &str) {
+        let trimmed = identity.trim();
+        self.identities
+            .retain(|id| !id.eq_ignore_ascii_case(trimmed));
+    }
 }
 
 /// Obtém a URL padrão do servidor Lauda baseando-se no ambiente de execução.
@@ -78,6 +115,7 @@ impl Default for SessionConfig {
             server_url: detect_default_server_url(),
             username: "lumen".to_string(),
             token: None,
+            identities: Vec::new(),
         }
     }
 }
@@ -214,6 +252,7 @@ pub fn logout_and_wipe(
         server_url: current.server_url.clone(),
         username: current.username.clone(),
         token: None,
+        identities: current.identities.clone(),
     };
 
     #[cfg(target_arch = "wasm32")]
@@ -260,6 +299,7 @@ mod tests {
             server_url: "http://127.0.0.1:3000".to_string(),
             username: "lumen".to_string(),
             token: Some("secret-token-123".to_string()),
+            identities: Vec::new(),
         };
 
         save_session(&config, Some(&session_file)).expect("save session");
@@ -283,6 +323,7 @@ mod tests {
             server_url: "https://lauda.lohn.in".to_string(),
             username: "lumen".to_string(),
             token: Some("secret-token-active".to_string()),
+            identities: Vec::new(),
         };
         save_session(&initial, Some(&session_file)).unwrap();
 

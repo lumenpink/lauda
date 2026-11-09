@@ -18,13 +18,21 @@ pub fn ComposeView(
     messages: Signal<Vec<MessageEnvelope>>,
 ) -> Element {
     let sess = session.read().clone();
-    let sender_address = if sess.username.contains('@') {
-        sess.username.clone()
-    } else {
-        format!("{}@2lp.in", sess.username)
-    };
+    let initial_from = session
+        .read()
+        .identities
+        .first()
+        .cloned()
+        .unwrap_or_else(|| {
+            if sess.username.contains('@') {
+                sess.username.clone()
+            } else {
+                format!("{}@2lp.in", sess.username)
+            }
+        });
 
-    let mut from_input = use_signal(|| sender_address);
+    let mut from_input = use_signal(|| initial_from);
+    let mut show_from_dropdown = use_signal(|| false);
     let mut to_input = use_signal(|| reply_to.unwrap_or_default());
     let mut cc_input = use_signal(|| reply_cc.clone().unwrap_or_default());
     let mut bcc_input = use_signal(String::new);
@@ -65,6 +73,12 @@ pub fn ComposeView(
         if subject.is_empty() {
             error_msg.set(Some("Assunto é obrigatório.".to_string()));
             return;
+        }
+
+        if !from.is_empty() {
+            session.write().add_identity(&from);
+            let sess_path = crate::domain::session::get_default_session_path();
+            let _ = crate::domain::session::save_session(&session.read(), Some(&sess_path));
         }
 
         let sess_snapshot = session.read().clone();
@@ -174,11 +188,103 @@ pub fn ComposeView(
             div {
                 style: "display: flex; flex-direction: column; gap: 0.8rem;",
                 div {
-                    label { style: "display: block; font-weight: bold; font-size: 0.8rem; margin-bottom: 0.2rem;", "DE:" }
+                    style: "position: relative;",
+                    div {
+                        style: "display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;",
+                        label { style: "font-weight: bold; font-size: 0.8rem;", "DE:" }
+                        if *show_from_dropdown.read() {
+                            button {
+                                r#type: "button",
+                                tabindex: "-1",
+                                style: "background: none; border: none; color: #888; font-size: 0.75rem; cursor: pointer; text-decoration: underline;",
+                                onclick: move |_| show_from_dropdown.set(false),
+                                "FECHAR LISTA ✕"
+                            }
+                        }
+                    }
                     input {
-                        style: "width: 100%; box-sizing: border-box; padding: 0.5rem; border: 1px solid #0a0a0a; font-family: monospace;",
+                        id: "compose-from-input",
+                        style: "width: 100%; box-sizing: border-box; padding: 0.5rem; border: 1px solid #0a0a0a; font-family: monospace; background: #fff;",
                         value: "{from_input}",
-                        oninput: move |evt| from_input.set(evt.value()),
+                        oninput: move |evt| {
+                            from_input.set(evt.value());
+                            show_from_dropdown.set(true);
+                        },
+                        onfocus: move |_| {
+                            show_from_dropdown.set(true);
+                            let _ = dioxus::document::eval("document.getElementById('compose-from-input')?.select()");
+                        },
+                        onclick: move |_| {
+                            show_from_dropdown.set(true);
+                        },
+                        placeholder: "Nome <email@dominio.com> ou email@dominio.com",
+                    }
+                    if *show_from_dropdown.read() {
+                        {
+                            let pool = session.read().get_or_default_identities();
+                            let filtered = crate::domain::view::filter_identities(&pool, &from_input.read());
+                            let cur_val = from_input.read().trim().to_string();
+                            let already_saved = pool.iter().any(|id| id.eq_ignore_ascii_case(&cur_val));
+
+                            rsx! {
+                                div {
+                                    style: "border: 2px solid #0a0a0a; background: #fff; box-shadow: 4px 4px 0 #0a0a0a; display: flex; flex-direction: column; margin-top: 0.2rem; max-height: 200px; overflow-y: auto; z-index: 20;",
+                                    for id in filtered {
+                                        {
+                                            let id_val = id.clone();
+                                            let id_for_click = id.clone();
+                                            let id_to_remove = id.clone();
+                                            let (name, email) = crate::domain::view::parse_identity(&id_val);
+                                            let email_display = format!("<{email}>");
+                                            rsx! {
+                                                div {
+                                                    key: "{id_val}",
+                                                    style: "border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; background: #fff;",
+                                                    button {
+                                                        r#type: "button",
+                                                        style: "background: none; border: none; text-align: left; cursor: pointer; display: flex; gap: 0.5rem; align-items: center; flex: 1; padding: 0;",
+                                                        onclick: move |_| {
+                                                            from_input.set(id_for_click.clone());
+                                                            show_from_dropdown.set(false);
+                                                        },
+                                                        if let Some(ref n) = name {
+                                                            span { style: "font-weight: bold; color: #0a0a0a; font-size: 0.85rem;", "{n}" }
+                                                        }
+                                                        span { style: "font-family: monospace; color: #555; font-size: 0.8rem;", "{email_display}" }
+                                                    }
+                                                    button {
+                                                        r#type: "button",
+                                                        tabindex: "-1",
+                                                        style: "background: none; border: none; color: #999; font-size: 0.75rem; cursor: pointer; padding: 0.2rem 0.4rem;",
+                                                        onclick: move |_| {
+                                                            session.write().remove_identity(&id_to_remove);
+                                                            let sess_path = crate::domain::session::get_default_session_path();
+                                                            let _ = crate::domain::session::save_session(&session.read(), Some(&sess_path));
+                                                        },
+                                                        title: "Remover identidade",
+                                                        "✕"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if !already_saved && !cur_val.is_empty() && (cur_val.contains('@') || cur_val.contains('<')) {
+                                        button {
+                                            r#type: "button",
+                                            tabindex: "-1",
+                                            style: "background: #f0fdf4; border: none; border-top: 1px dashed #0a0a0a; padding: 0.5rem 0.8rem; text-align: left; cursor: pointer; color: #166534; font-weight: bold; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem;",
+                                            onclick: move |_| {
+                                                session.write().add_identity(&cur_val);
+                                                let sess_path = crate::domain::session::get_default_session_path();
+                                                let _ = crate::domain::session::save_session(&session.read(), Some(&sess_path));
+                                                show_from_dropdown.set(false);
+                                            },
+                                            "➕ Cadastrar '{cur_val}' como identidade"
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 div {

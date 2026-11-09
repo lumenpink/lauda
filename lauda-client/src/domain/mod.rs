@@ -29,6 +29,7 @@ pub use sync::{
 pub use time::{async_sleep, current_unix_timestamp};
 pub use update::{UpdateManifest, UpdateStatus, check_update, fetch_remote_manifest};
 pub use view::{
-    MIN_SEARCH_QUERY_LEN, ViewMode, fast_filter_envelopes, filter_aliases, format_search_hint,
-    is_search_active, parse_markdown_to_html, should_show_search_hint,
+    MIN_SEARCH_QUERY_LEN, ViewMode, fast_filter_envelopes, filter_aliases, filter_identities,
+    format_search_hint, is_search_active, parse_identity, parse_markdown_to_html,
+    should_show_search_hint,
 };

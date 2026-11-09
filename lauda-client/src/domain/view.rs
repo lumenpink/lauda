@@ -292,6 +292,38 @@ pub fn filter_aliases(aliases: &[String], query: &str) -> Vec<String> {
         .collect()
 }
 
+/// Extrai o nome de exibição e o e-mail a partir de uma identidade textual (formato RFC 5322 ou simples).
+pub fn parse_identity(raw: &str) -> (Option<String>, String) {
+    let trimmed = raw.trim();
+    if let Some(start) = trimmed.find('<')
+        && let Some(end) = trimmed[start..].find('>')
+    {
+        let email = trimmed[start + 1..start + end].trim().to_string();
+        let name_part = trimmed[..start].trim().trim_matches('"').trim();
+        let name = if name_part.is_empty() {
+            None
+        } else {
+            Some(name_part.to_string())
+        };
+        return (name, email);
+    }
+    (None, trimmed.to_string())
+}
+
+/// Filtra uma lista de identidades de remetente a partir de uma busca (por nome ou e-mail).
+pub fn filter_identities(identities: &[String], query: &str) -> Vec<String> {
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return identities.to_vec();
+    }
+
+    identities
+        .iter()
+        .filter(|id| id.to_lowercase().contains(&q))
+        .cloned()
+        .collect()
+}
+
 /// Remove marcadores de comentários HTML (ex: <!--papeli:sig:...--> ou <!-- ... -->)
 /// presentes no texto puro de e-mails, preservando o conteúdo textual e quebras de linha.
 pub fn clean_comment_tags(text: &str) -> String {

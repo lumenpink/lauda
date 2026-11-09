@@ -39,7 +39,8 @@ fn test_session_config_identities_lifecycle() {
 #[test]
 fn test_session_config_identities_backward_compatibility() {
     // Payload JSON legado sem o campo identities
-    let legacy_json = r#"{"server_url":"https://lauda.example.com","username":"lumen","token":null}"#;
+    let legacy_json =
+        r#"{"server_url":"https://lauda.example.com","username":"lumen","token":null}"#;
     let decoded: SessionConfig = serde_json::from_str(legacy_json).unwrap();
     assert!(decoded.identities.is_empty());
     assert_eq!(decoded.get_or_default_identities(), vec!["lumen@2lp.in"]);
@@ -83,4 +84,35 @@ fn test_parse_and_filter_identities() {
 
     let matches_empty = filter_identities(&pool, "");
     assert_eq!(matches_empty.len(), 3);
+}
+
+#[test]
+fn test_compose_from_field_contract() {
+    let source = include_str!("../src/ui/compose_view.rs");
+
+    // Valida que o input do campo DE possui id compose-from-input
+    assert!(
+        source.contains("id: \"compose-from-input\""),
+        "ComposeView deve conter id compose-from-input para seleção"
+    );
+
+    // Valida que ao focar o campo DE, dispara select() via js/eval
+    assert!(
+        source.contains("document.getElementById('compose-from-input')?.select()"),
+        "ComposeView deve chamar select() ao focar no campo DE"
+    );
+
+    // Valida que existe dropdown com filtro e cadastro de identidades
+    assert!(
+        source.contains("filter_identities"),
+        "ComposeView deve filtrar identidades no dropdown"
+    );
+    assert!(
+        source.contains("add_identity"),
+        "ComposeView deve permitir adicionar novas identidades ao enviar ou clicar no botão"
+    );
+    assert!(
+        source.contains("remove_identity"),
+        "ComposeView deve permitir remover identidades salvas"
+    );
 }

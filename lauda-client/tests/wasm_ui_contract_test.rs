@@ -11,6 +11,7 @@ fn test_default_cache_dir_usable_for_logout_and_wipe() {
         server_url: "https://lauda.example.com".to_string(),
         username: "testuser".to_string(),
         token: Some("secret-token".to_string()),
+        identities: Vec::new(),
     };
 
     let cleaned = logout_and_wipe(&session, None, &cache_dir);
