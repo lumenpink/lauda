@@ -82,7 +82,10 @@ check_present "$DOCKERFILE" 'gambi.2lp.in/lumen/mirror-debian' "Uso de mirror-de
 check_present "$WORKFLOW" 'cancel-in-progress: true' "Presença de cancel-in-progress: true no ci.yml" || FAILED=1
 check_not_present "$WORKFLOW" 'cancel-in-progress: false' "Ausência de cancel-in-progress: false no ci.yml" || FAILED=1
 
-# 11. Testes de mutação
+# 11. Base-path /app/ no build Dioxus Web (#90)
+check_present "$WORKFLOW" '--base-path /app/' "Presença de --base-path /app/ no build web do ci.yml" || FAILED=1
+
+# 12. Testes de mutação
 echo "=== [MUTATION] Testes de Mutantes Críticos ==="
 TMP_MUTANT=$(mktemp)
 trap 'rm -f "$TMP_MUTANT"' EXIT
