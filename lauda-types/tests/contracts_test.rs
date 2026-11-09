@@ -91,6 +91,7 @@ fn test_compose_form_roundtrip() {
         from: "lumen@2lp.in".to_string(),
         to: "destinatario@exemplo.org".to_string(),
         cc: Some("copia@exemplo.org".to_string()),
+        bcc: None,
         subject: "Nova Mensagem".to_string(),
         body: "Texto digitado no smolclient.".to_string(),
         attachments: vec![lauda_types::AttachmentUpload {
@@ -102,6 +103,29 @@ fn test_compose_form_roundtrip() {
     let json = serde_json::to_string(&form).unwrap();
     let decoded: ComposeForm = serde_json::from_str(&json).unwrap();
     assert_eq!(form, decoded);
+}
+
+#[test]
+fn test_compose_form_with_bcc_roundtrip_and_backward_compatibility() {
+    let form = ComposeForm {
+        from: "lumen@2lp.in".to_string(),
+        to: "destinatario@exemplo.org".to_string(),
+        cc: Some("copia@exemplo.org".to_string()),
+        bcc: Some("copia_oculta@exemplo.org".to_string()),
+        subject: "Nova Mensagem com CCO".to_string(),
+        body: "Texto com copia oculta.".to_string(),
+        attachments: vec![],
+    };
+    let json = serde_json::to_string(&form).unwrap();
+    assert!(json.contains("\"bcc\":\"copia_oculta@exemplo.org\""));
+    let decoded: ComposeForm = serde_json::from_str(&json).unwrap();
+    assert_eq!(form, decoded);
+    assert_eq!(decoded.bcc, Some("copia_oculta@exemplo.org".to_string()));
+
+    // Compatibilidade com payloads legados sem o campo bcc
+    let legacy_json = r#"{"from":"a@b.com","to":"c@d.com","subject":"oi","body":"ola"}"#;
+    let legacy_decoded: ComposeForm = serde_json::from_str(legacy_json).unwrap();
+    assert_eq!(legacy_decoded.bcc, None);
 }
 
 #[test]
