@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **client:** atualizar assercao de build offline no teste de contrato (closes #92)
 - **server:** atualizar urupema 0.1.2 para expurgar bordas e tracos (closes #91)
 - **ci:** adicionar base-path /app/ e fallback resiliente no deploy web (closes #90)
 - **ci:** resolver caminhos de apk e assinatura segura no deploy android (closes #82)

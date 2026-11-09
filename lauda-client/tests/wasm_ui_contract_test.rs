@@ -27,8 +27,17 @@ fn test_ci_workflow_has_dx_offline_flag() {
         .join(".forgejo/workflows/ci.yml");
 
     let content = std::fs::read_to_string(ci_path).expect("ci.yml deve existir");
+    let dx_line = content
+        .lines()
+        .find(|line| line.contains("dx build -p lauda-client --platform web"))
+        .expect("Linha com dx build para lauda-client web deve existir no ci.yml");
+
     assert!(
-        content.contains("dx build -p lauda-client --platform web --release --offline"),
-        "Workflow ci.yml deve conter a flag --offline para o comando dx build"
+        dx_line.contains("--offline"),
+        "Comando dx build no ci.yml deve conter a flag --offline: {dx_line}"
+    );
+    assert!(
+        dx_line.contains("--base-path /app/"),
+        "Comando dx build no ci.yml deve conter a flag --base-path /app/: {dx_line}"
     );
 }
