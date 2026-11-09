@@ -149,6 +149,7 @@ async fn test_in_memory_api_client() {
                 from: "lumen@2lp.in".to_string(),
                 to: "dest@test.com".to_string(),
                 cc: None,
+                bcc: None,
                 subject: "Envio".to_string(),
                 body: "Corpo".to_string(),
                 attachments: vec![],

@@ -167,6 +167,7 @@ async fn test_login_success_and_protected_flow() {
         from: "lumen@2lp.in".to_string(),
         to: "amigo@exemplo.org".to_string(),
         cc: None,
+        bcc: None,
         subject: "Olá do Smolclient".to_string(),
         body: "Testando envio via lauda-server.".to_string(),
         attachments: vec![],

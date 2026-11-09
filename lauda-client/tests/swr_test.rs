@@ -47,6 +47,7 @@ async fn test_swr_and_offline_sync_reconciliation() {
         from: "lumen@2lp.in".to_string(),
         to: "dest@example.com".to_string(),
         cc: None,
+        bcc: None,
         subject: "Assunto Outbox".to_string(),
         body: "Texto outbox".to_string(),
         attachments: vec![],

@@ -76,6 +76,7 @@ async fn test_send_message_delivers_to_ephemeral_mock_smtp() {
         from: "sender@example.test".to_string(),
         to: "recipient@example.test".to_string(),
         cc: None,
+        bcc: None,
         subject: "Teste Ephemeral SMTP".to_string(),
         body: "Corpo do e-mail entregue com sucesso.".to_string(),
         attachments: vec![],
@@ -103,6 +104,7 @@ async fn test_send_message_with_cc_and_attachments_to_ephemeral_mock_smtp() {
         from: "Alícia <alicia@example.org>".to_string(),
         to: "dest1@example.test, dest2@example.test".to_string(),
         cc: Some("cc1@example.test".to_string()),
+        bcc: None,
         subject: "Teste com Anexo e Múltiplos Destinatários".to_string(),
         body: "Texto com anexo".to_string(),
         attachments: vec![lauda_types::AttachmentUpload {
@@ -134,6 +136,7 @@ async fn test_message_id_domain_isolation() {
         from: "Usuario Isolado <usuario@empresa-teste.org>".to_string(),
         to: "destino@empresa-teste.org".to_string(),
         cc: None,
+        bcc: None,
         subject: "Checagem de Message-ID".to_string(),
         body: "Verificando se o domínio não vaza".to_string(),
         attachments: vec![],
@@ -157,5 +160,33 @@ async fn test_message_id_domain_isolation() {
         raw.contains("@empresa-teste.org>"),
         "Message-ID deve usar o domínio do remetente e não vazar @2lp.in: {}",
         raw
+    );
+}
+
+#[tokio::test]
+async fn test_send_message_with_bcc_dispatches_to_smtp() {
+    let tmp = tempdir().unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+
+    tokio::spawn(run_mock_smtp_server(listener));
+
+    let backend = MaildirBackend::with_smtp_endpoint(tmp.path(), "127.0.0.1", port);
+
+    let form = ComposeForm {
+        from: "lumen@example.test".to_string(),
+        to: "dest@example.test".to_string(),
+        cc: Some("copia@example.test".to_string()),
+        bcc: Some("copia.oculta@example.test".to_string()),
+        subject: "Teste com BCC".to_string(),
+        body: "Mensagem contendo cópia oculta".to_string(),
+        attachments: vec![],
+    };
+
+    let result = backend.send_message("testuser", &form).await;
+    assert!(
+        result.is_ok(),
+        "Envio com BCC deve suceder contra SMTP: {:?}",
+        result
     );
 }

@@ -174,6 +174,7 @@ Content-Type: text/html; charset=utf-8\r\n\
         from: "lumen@2lp.in".to_string(),
         to: sender.to_string(),
         cc: None,
+        bcc: None,
         subject: "Re: Comunicado com Tracker e XSS".to_string(),
         body: "Recebido e visualizado com sucesso no modo txt auto seguro.".to_string(),
         attachments: vec![],

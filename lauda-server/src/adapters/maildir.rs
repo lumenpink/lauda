@@ -962,6 +962,9 @@ impl MailBackend for MaildirBackend {
         if let Some(ref cc) = form.cc {
             recipients.extend(extract_recipient_emails(cc));
         }
+        if let Some(ref bcc) = form.bcc {
+            recipients.extend(extract_recipient_emails(bcc));
+        }
 
         if let Err(e) = self
             .dispatch_email(&form.from, &recipients, &raw_email)

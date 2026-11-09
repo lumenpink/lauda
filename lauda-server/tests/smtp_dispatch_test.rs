@@ -181,6 +181,7 @@ async fn test_send_message_cleans_sent_file_on_dispatch_failure() {
         from: "lumen@example.test".to_string(),
         to: "dest@example.test".to_string(),
         cc: None,
+        bcc: None,
         subject: "Falha intencional".to_string(),
         body: "Teste de limpeza".to_string(),
         attachments: vec![],

@@ -176,6 +176,7 @@ async fn test_full_integrated_mail_chain_with_in_memory_backend() {
         from: "lumen@2lp.in".to_string(),
         to: "diretoria@2lp.in".to_string(),
         cc: None,
+        bcc: None,
         subject: "Re: Relatorio Financeiro e Comunicado".to_string(),
         body: "Confirmado recebimento via Lauda smolclient.".to_string(),
         attachments: vec![],

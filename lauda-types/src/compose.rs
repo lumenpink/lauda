@@ -19,8 +19,11 @@ pub struct ComposeForm {
     /// Destinatário principal.
     pub to: String,
     /// Cópia carbono (opcional).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cc: Option<String>,
+    /// Cópia carbono oculta (opcional).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bcc: Option<String>,
     /// Assunto da mensagem.
     pub subject: String,
     /// Corpo da mensagem em fonte monoespaçada.

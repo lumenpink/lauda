@@ -183,6 +183,7 @@ async fn test_hermetic_maildir_lifecycle() {
         from: "testuser@example.test".to_string(),
         to: "dest@example.test".to_string(),
         cc: None,
+        bcc: None,
         subject: "Resposta de Teste".to_string(),
         body: "Texto enviado.".to_string(),
         attachments: vec![],
@@ -323,6 +324,7 @@ SGVsbG8gTGF1ZGEh\n\
         from: "testuser@example.test".to_string(),
         to: "socio@example.org".to_string(),
         cc: Some("diretoria@example.test".to_string()),
+        bcc: None,
         subject: "Contrato Assinado".to_string(),
         body: "Segue em anexo o contrato em PDF.".to_string(),
         attachments: vec![lauda_types::AttachmentUpload {

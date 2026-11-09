@@ -26,7 +26,10 @@ pub fn ComposeView(
 
     let mut from_input = use_signal(|| sender_address);
     let mut to_input = use_signal(|| reply_to.unwrap_or_default());
-    let mut cc_input = use_signal(|| reply_cc.unwrap_or_default());
+    let mut cc_input = use_signal(|| reply_cc.clone().unwrap_or_default());
+    let mut bcc_input = use_signal(String::new);
+    let has_reply_cc = reply_cc.as_ref().is_some_and(|c| !c.trim().is_empty());
+    let mut show_cc_bcc = use_signal(|| has_reply_cc);
     let mut subject_input = use_signal(|| reply_subject.unwrap_or_default());
     let mut body_input = use_signal(|| initial_body.unwrap_or_default());
     let mut attached_files = use_signal(Vec::<lauda_types::AttachmentUpload>::new);
@@ -44,6 +47,12 @@ pub fn ComposeView(
             None
         } else {
             Some(cc_val)
+        };
+        let bcc_val = bcc_input.read().trim().to_string();
+        let bcc = if bcc_val.is_empty() {
+            None
+        } else {
+            Some(bcc_val)
         };
         let body = body_input.read().clone();
         let attachments = attached_files.read().clone();
@@ -64,6 +73,7 @@ pub fn ComposeView(
                 from,
                 to,
                 cc,
+                bcc,
                 subject,
                 body,
                 attachments,
@@ -231,12 +241,48 @@ pub fn ComposeView(
                         }
                     }
                 }
-                div {
-                    label { style: "display: block; font-weight: bold; font-size: 0.8rem; margin-bottom: 0.2rem;", "CC (OPCIONAL):" }
-                    input {
-                        style: "width: 100%; box-sizing: border-box; padding: 0.5rem; border: 1px solid #0a0a0a; font-family: monospace;",
-                        value: "{cc_input}",
-                        oninput: move |evt| cc_input.set(evt.value()),
+                if !*show_cc_bcc.read() {
+                    div {
+                        style: "display: flex; justify-content: flex-end; margin-top: -0.4rem;",
+                        button {
+                            r#type: "button",
+                            tabindex: "-1",
+                            style: "background: none; border: none; color: #555; font-size: 0.8rem; font-weight: bold; cursor: pointer; padding: 0.2rem 0; text-decoration: underline;",
+                            onclick: move |_| show_cc_bcc.set(true),
+                            "+ CÓPIA (CC / CCO)"
+                        }
+                    }
+                } else {
+                    div {
+                        style: "display: flex; flex-direction: column; gap: 0.8rem; background: #faf9f6; padding: 0.8rem; border: 1px dashed #0a0a0a;",
+                        div {
+                            div {
+                                style: "display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;",
+                                label { style: "font-weight: bold; font-size: 0.8rem;", "CÓPIA (CC):" }
+                                button {
+                                    r#type: "button",
+                                    tabindex: "-1",
+                                    style: "background: none; border: none; color: #888; font-size: 0.75rem; cursor: pointer; text-decoration: underline;",
+                                    onclick: move |_| show_cc_bcc.set(false),
+                                    "OCULTAR CÓPIAS ✕"
+                                }
+                            }
+                            input {
+                                style: "width: 100%; box-sizing: border-box; padding: 0.5rem; border: 1px solid #0a0a0a; font-family: monospace; background: #fff;",
+                                value: "{cc_input}",
+                                oninput: move |evt| cc_input.set(evt.value()),
+                                placeholder: "copia@dominio.com",
+                            }
+                        }
+                        div {
+                            label { style: "display: block; font-weight: bold; font-size: 0.8rem; margin-bottom: 0.2rem;", "CÓPIA OCULTA (CCO):" }
+                            input {
+                                style: "width: 100%; box-sizing: border-box; padding: 0.5rem; border: 1px solid #0a0a0a; font-family: monospace; background: #fff;",
+                                value: "{bcc_input}",
+                                oninput: move |evt| bcc_input.set(evt.value()),
+                                placeholder: "copia.oculta@dominio.com",
+                            }
+                        }
                     }
                 }
                 div {
