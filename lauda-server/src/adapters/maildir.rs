@@ -612,7 +612,10 @@ impl MaildirBackend {
 
         let txt_auto = if let Some(ref html) = html_sanitized {
             let clean = Self::clean_comment_tags(html);
-            let raw_md = html2text::from_read(clean.as_bytes(), 10_000);
+            let raw_md = html2text::config::plain()
+                .no_table_borders()
+                .string_from_read(clean.as_bytes(), 10_000)
+                .unwrap_or_else(|_| html2text::from_read(clean.as_bytes(), 10_000));
             let clean_md = urupema::domain::sanitize_markdown_noise(&raw_md);
             let fallback_to_plain =
                 urupema::domain::is_markdown_empty_or_polluted(&clean_md, txt_original.as_deref());

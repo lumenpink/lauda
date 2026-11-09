@@ -31,3 +31,9 @@ Mensagens de e-mail de marketing e newsletters (ex.: Shein, Reddit, Pinterest, T
 - **Fase 7 (Style & Changelog):** Formatação com `cargo fmt`, clippy e registro em `CHANGELOG.md`.
 - **Fase 8 (Quality Gate):** Checagem rigorosa com `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e `cccp check --strict`.
 - **Fase 9 (Finish):** Fechamento e merge canônico via CCCP.
+
+---
+
+### 4. Status
+- **Status:** CONCLUÍDO (CONCLUDED)
+- **Validação:** Testes em `lauda-server/tests/sanitizer_and_reindex_test.rs` aprovados com `urupema` 0.1.2 e sem caracteres de borda.

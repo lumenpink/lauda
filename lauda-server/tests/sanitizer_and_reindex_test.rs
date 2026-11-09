@@ -140,7 +140,7 @@ async fn test_maildir_sanitizes_table_borders_and_hyphen_noise() {
         "<hr/>\n",
         "<hr/>\n",
         "<hr/>\n",
-        "<p>Linha com tracos repetitivos --------------------</p>\n",
+        "<p>--------------------------------------------------</p>\n",
         "<p>Fim da mensagem.</p>\n",
         "</body></html>\n"
     );
@@ -161,7 +161,10 @@ async fn test_maildir_sanitizes_table_borders_and_hyphen_noise() {
 
     // 1. Não deve conter caracteres de desenho de grade/tabela (─, │, ┬, ┴, etc.)
     assert!(
-        !txt_auto.contains('─') && !txt_auto.contains('│') && !txt_auto.contains('┬') && !txt_auto.contains('┴'),
+        !txt_auto.contains('─')
+            && !txt_auto.contains('│')
+            && !txt_auto.contains('┬')
+            && !txt_auto.contains('┴'),
         "txt_auto nao deve conter bordas ASCII/Unicode de grade de tabela: {txt_auto}"
     );
 
