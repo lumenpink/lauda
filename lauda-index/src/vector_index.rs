@@ -4,7 +4,11 @@ use std::collections::{BinaryHeap, HashMap};
 /// Produto escalar entre dois vetores normalizados (similaridade de cosseno acelerada por SIMD).
 #[inline]
 pub fn dot_product(a: &[f32], b: &[f32]) -> f32 {
-    debug_assert_eq!(a.len(), b.len(), "Vetores devem possuir dimensões idênticas");
+    debug_assert_eq!(
+        a.len(),
+        b.len(),
+        "Vetores devem possuir dimensões idênticas"
+    );
     a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
 }
 
@@ -49,7 +53,10 @@ pub struct FlatVectorIndex {
 impl FlatVectorIndex {
     /// Inicializa um índice vetorial vazio para vetores de dimensão `dim` (ex.: 384).
     pub fn new(dim: usize) -> Self {
-        assert!(dim > 0, "A dimensão vetorial deve ser estritamente positiva");
+        assert!(
+            dim > 0,
+            "A dimensão vetorial deve ser estritamente positiva"
+        );
         Self {
             dim,
             uids: Vec::new(),
@@ -177,7 +184,8 @@ pub fn reciprocal_rank_fusion(
     semantic_ranked: &[u32],
     k_const: f32,
 ) -> Vec<(u32, f32)> {
-    let mut scores: HashMap<u32, f32> = HashMap::with_capacity(lexical_ranked.len() + semantic_ranked.len());
+    let mut scores: HashMap<u32, f32> =
+        HashMap::with_capacity(lexical_ranked.len() + semantic_ranked.len());
 
     for (rank, &uid) in lexical_ranked.iter().enumerate() {
         let entry = scores.entry(uid).or_insert(0.0);
