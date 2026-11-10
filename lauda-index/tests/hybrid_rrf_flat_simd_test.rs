@@ -72,3 +72,71 @@ fn test_reciprocal_rank_fusion_logic() {
     // UID 400 que só esteve no semântico (sinônimo) deve estar presente na lista fundida
     assert!(fused.iter().any(|(uid, _)| *uid == 400));
 }
+
+#[test]
+fn test_mutation_flat_vector_index_boundaries() {
+    let mut index = FlatVectorIndex::new(3);
+
+    // 1. Busca em índice vazio
+    assert!(index.search_knn(&[1.0, 0.0, 0.0], 10).is_empty());
+
+    // 2. Busca com k = 0
+    index.insert(1, &[1.0, 0.0, 0.0]);
+    assert!(index.search_knn(&[1.0, 0.0, 0.0], 0).is_empty());
+
+    // 3. Consulta com dimensão divergente da dimensão do índice (deve retornar vazio sem pânico)
+    assert!(index.search_knn(&[1.0, 0.0], 5).is_empty());
+    assert!(index.search_knn(&[1.0, 0.0, 0.0, 0.0], 5).is_empty());
+
+    // 4. Remoção de UID inexistente
+    assert!(!index.remove(9999));
+    assert_eq!(index.len(), 1);
+
+    // 5. Inserções em massa e remoções cruzadas com swap_remove
+    for uid in 2..=100 {
+        index.insert(uid, &[uid as f32, 1.0, 0.0]);
+    }
+    assert_eq!(index.len(), 100);
+
+    // Remove do meio e pontas
+    assert!(index.remove(50));
+    assert!(index.remove(1));
+    assert!(index.remove(100));
+    assert_eq!(index.len(), 97);
+
+    // O índice 99 deve continuar encontrável
+    let res = index.search_knn(&[99.0, 1.0, 0.0], 1);
+    assert_eq!(res.len(), 1);
+    assert_eq!(res[0].0, 99);
+
+    // Limpeza total
+    index.clear();
+    assert_eq!(index.len(), 0);
+    assert!(index.is_empty());
+}
+
+#[test]
+fn test_mutation_rrf_extremes() {
+    // 1. Ambas vazias
+    assert!(reciprocal_rank_fusion(&[], &[], 60.0).is_empty());
+
+    // 2. Apenas léxico
+    let lexical_only = reciprocal_rank_fusion(&[10, 20], &[], 60.0);
+    assert_eq!(lexical_only.len(), 2);
+    assert_eq!(lexical_only[0].0, 10);
+    assert_eq!(lexical_only[1].0, 20);
+
+    // 3. Apenas semântico
+    let semantic_only = reciprocal_rank_fusion(&[], &[30, 40], 60.0);
+    assert_eq!(semantic_only.len(), 2);
+    assert_eq!(semantic_only[0].0, 30);
+    assert_eq!(semantic_only[1].0, 40);
+
+    // 4. Desempate determinístico (quando pontuações são idênticas, UID maior desempata)
+    // uid 50 no rank 0 do canal A; uid 60 no rank 0 do canal B
+    let tie = reciprocal_rank_fusion(&[50], &[60], 60.0);
+    assert_eq!(tie.len(), 2);
+    assert_eq!(tie[0].1, tie[1].1);
+    assert_eq!(tie[0].0, 60); // Maior UID vem primeiro
+    assert_eq!(tie[1].0, 50);
+}
