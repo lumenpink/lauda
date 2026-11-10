@@ -5,6 +5,7 @@ use std::path::Path;
 use crate::parser::{Query, QueryClause, parse_query};
 use crate::scorer::{cosine_similarity, levenshtein_distance, score_bm25};
 use crate::tokenizer::{normalize, tokenize};
+use crate::vector_index::reciprocal_rank_fusion;
 use lauda_types::Message;
 use urupema::domain::{HeaderMeta, SegmentKind, SegmentationConfig, segment_email};
 
@@ -601,6 +602,40 @@ impl MessageIndex {
                 .partial_cmp(&a.score)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
+        results
+    }
+
+    /// Executa busca híbrida unificada utilizando RRF (Reciprocal Rank Fusion)
+    /// combinando os rankings independentes do BM25 e da busca semântica vetorial.
+    pub fn search_hybrid_rrf(
+        &self,
+        query_str: &str,
+        provider: &dyn EmbeddingProvider,
+        k_const: f32,
+    ) -> Vec<SearchResult> {
+        let query = parse_query(query_str);
+        let lexical_uids = self.execute_query(&query);
+
+        let sem_results = self.search_semantic(query_str, provider);
+        let semantic_uids: Vec<u32> = sem_results.iter().map(|r| r.uid).collect();
+        let mut sem_meta: HashMap<u32, (f64, Option<SegmentKind>)> = HashMap::new();
+        for r in sem_results {
+            sem_meta.insert(r.uid, (r.semantic_score, r.matched_segment));
+        }
+
+        let fused = reciprocal_rank_fusion(&lexical_uids, &semantic_uids, k_const);
+
+        let mut results = Vec::with_capacity(fused.len());
+        for (uid, rrf_score) in fused {
+            let (sem_score, matched_seg) = sem_meta.get(&uid).cloned().unwrap_or((0.0, None));
+            results.push(SearchResult {
+                uid,
+                score: rrf_score as f64,
+                bm25_score: 0.0,
+                semantic_score: sem_score,
+                matched_segment: matched_seg,
+            });
+        }
         results
     }
 

@@ -159,7 +159,7 @@ pub fn InboxView(
                 let local_envelopes: Vec<MessageEnvelope> =
                     if let Ok(Some(local_index)) = cache.load_index_slice(&box_name) {
                         let provider = lauda_index::SimpleCpuEmbeddingProvider;
-                        let ranked = local_index.search_hybrid(&q, &provider, 0.4);
+                        let ranked = local_index.search_hybrid_rrf(&q, &provider, 60.0);
                         let docs = local_index.documents();
                         ranked
                             .into_iter()

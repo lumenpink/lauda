@@ -504,6 +504,14 @@ pub async fn sync_all_cycle<C: MailApiClient + ?Sized>(
         result.messages_purged = purged;
     }
 
+    // 5. Sincronização da fatia de documentos pré-indexados (vetores/FTS dos 90 dias)
+    if let Ok(docs) = client
+        .fetch_index_slice(token, mailbox, config.retention_days)
+        .await
+    {
+        let _ = message_cache.save_index_slice(mailbox, &docs);
+    }
+
     // 5. Reconciliação incremental de contatos
     #[cfg(not(target_arch = "wasm32"))]
     if let Ok(contacts_cache) = crate::domain::contacts_cache::LocalContactsCache::open(cache_dir) {
