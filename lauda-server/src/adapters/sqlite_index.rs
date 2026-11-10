@@ -1,9 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use chrono::{DateTime, Utc};
-use lauda_index::{EmbeddingProvider, IndexedDoc, MessageIndex};
+use lauda_index::{EmbeddingProvider, FlatVectorIndex, IndexedDoc, MessageIndex};
 use lauda_types::{MailboxSyncStatus, MessageEnvelope};
 use rusqlite::{Connection, params};
 use urupema::domain::SegmentKind;
@@ -56,21 +56,103 @@ pub fn decode_segment_embeddings(blob: &[u8]) -> Vec<(SegmentKind, Vec<f32>)> {
     embeddings
 }
 
-/// Adaptador de persistência SQLite para o índice híbrido (BM25 + Vetores Urupema).
+/// Extrai o vetor representativo dos segmentos utilizando Max-Pooling ponderado
+/// (Header e Body possuem peso pleno; Signature e QuotedThread são atenuados).
+pub fn extract_representative_vector(embeddings: &[(SegmentKind, Vec<f32>)]) -> Option<Vec<f32>> {
+    if embeddings.is_empty() {
+        return None;
+    }
+    let dim = embeddings[0].1.len();
+    let mut pooled = vec![0.0f32; dim];
+
+    for (kind, vec) in embeddings {
+        if vec.len() != dim {
+            continue;
+        }
+        let weight = match kind {
+            SegmentKind::Header => 1.0f32,
+            SegmentKind::Body => 1.0f32,
+            SegmentKind::Signature => 0.2f32,
+            SegmentKind::QuotedThread => 0.1f32,
+        };
+        for i in 0..dim {
+            let val = vec[i] * weight;
+            if val > pooled[i] {
+                pooled[i] = val;
+            }
+        }
+    }
+
+    // Normalização Euclidiana (L2)
+    let norm: f32 = pooled.iter().map(|v| v * v).sum::<f32>().sqrt();
+    if norm > 0.0 {
+        for v in &mut pooled {
+            *v /= norm;
+        }
+    }
+
+    Some(pooled)
+}
+
+/// Adaptador de persistência SQLite para o índice híbrido (BM25 + Vetores Urupema com FlatVectorIndex em RAM).
 #[derive(Clone)]
 pub struct SqliteIndexStore {
     conn: Arc<Mutex<Connection>>,
+    vector_indexes: Arc<RwLock<HashMap<String, FlatVectorIndex>>>,
 }
 
 impl SqliteIndexStore {
-    /// Abre ou cria o banco SQLite de índice no caminho especificado.
+    /// Abre ou cria o banco SQLite de índice no caminho especificado e carrega os vetores em RAM.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, rusqlite::Error> {
         let conn = Connection::open(path)?;
+        let vector_indexes = Arc::new(RwLock::new(HashMap::new()));
+        Self::preload_vector_indexes(&conn, &vector_indexes);
+
         let store = Self {
             conn: Arc::new(Mutex::new(conn)),
+            vector_indexes,
         };
         store.init_schema()?;
         Ok(store)
+    }
+
+    /// Carrega previamente todos os vetores indexados em lote para a matriz contígua em RAM.
+    fn preload_vector_indexes(
+        conn: &Connection,
+        vector_indexes: &Arc<RwLock<HashMap<String, FlatVectorIndex>>>,
+    ) {
+        let mut stmt = match conn.prepare(
+            "SELECT mailbox, uid, embeddings_blob FROM indexed_documents WHERE embeddings_blob IS NOT NULL",
+        ) {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+
+        let rows = match stmt.query_map([], |row| {
+            let mailbox: String = row.get(0)?;
+            let uid: u32 = row.get(1)?;
+            let blob: Vec<u8> = row.get(2)?;
+            Ok((mailbox, uid, blob))
+        }) {
+            Ok(r) => r,
+            Err(_) => return,
+        };
+
+        let mut lock = vector_indexes.write().unwrap();
+        for r in rows.flatten() {
+            let (mailbox, uid, blob) = r;
+            if blob.is_empty() {
+                continue;
+            }
+            let segments = decode_segment_embeddings(&blob);
+            if let Some(rep_vec) = extract_representative_vector(&segments)
+                && rep_vec.len() == 384
+            {
+                lock.entry(mailbox)
+                    .or_insert_with(|| FlatVectorIndex::new(384))
+                    .insert(uid, &rep_vec);
+            }
+        }
     }
 
     /// Inicializa as tabelas no modo WAL para alto desempenho e concorrência.
@@ -160,10 +242,21 @@ impl SqliteIndexStore {
             stmt.execute(params![term, mailbox, doc.uid, tf])?;
         }
 
+        // Atualiza o índice vetorial em RAM
+        if let Some(rep_vec) = extract_representative_vector(&doc.segment_embeddings)
+            && rep_vec.len() == 384
+        {
+            let mut indexes = self.vector_indexes.write().unwrap();
+            indexes
+                .entry(mailbox.to_string())
+                .or_insert_with(|| FlatVectorIndex::new(384))
+                .insert(doc.uid, &rep_vec);
+        }
+
         Ok(())
     }
 
-    /// Remove um documento indexado do SQLite.
+    /// Remove um documento indexado do SQLite e do índice vetorial em RAM.
     pub fn remove_document(&self, mailbox: &str, uid: u32) -> Result<(), rusqlite::Error> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
@@ -174,6 +267,12 @@ impl SqliteIndexStore {
             "DELETE FROM inverted_index WHERE mailbox = ?1 AND uid = ?2",
             params![mailbox, uid],
         )?;
+
+        let mut indexes = self.vector_indexes.write().unwrap();
+        if let Some(idx) = indexes.get_mut(mailbox) {
+            idx.remove(uid);
+        }
+
         Ok(())
     }
 
@@ -189,6 +288,12 @@ impl SqliteIndexStore {
             "DELETE FROM inverted_index WHERE mailbox = ?1",
             params![mailbox],
         )?;
+
+        let mut indexes = self.vector_indexes.write().unwrap();
+        if let Some(idx) = indexes.get_mut(mailbox) {
+            idx.clear();
+        }
+
         Ok(())
     }
 
@@ -402,8 +507,8 @@ impl SqliteIndexStore {
         Ok(envelopes)
     }
 
-    /// Executa busca híbrida combinando BM25 textual relacional e similaridade vetorial (cosseno)
-    /// sobre os embeddings de segmentos persistidos em SQLite.
+    /// Executa busca híbrida unificada combinando BM25 textual relacional e proximidade
+    /// semântica via FlatVectorIndex em RAM através de fusão harmônica RRF (Reciprocal Rank Fusion).
     pub fn search_hybrid(
         &self,
         mailbox: &str,
@@ -416,10 +521,20 @@ impl SqliteIndexStore {
 
         let conn = self.conn.lock().unwrap();
 
-        // 1. Coleta pontuações BM25
-        let tokens = lauda_index::tokenize(query);
-        let mut bm25_scores: HashMap<u32, f64> = HashMap::new();
-        let mut max_bm25 = 0.0f64;
+        // 1. Canal Léxico: Top 50 UIDs via índice invertido relacional (BM25)
+        // Filtra stop words comuns para evitar ruído falso de preposições no índice invertido
+        let raw_tokens = lauda_index::tokenize(query);
+        let meaningful_tokens: Vec<String> = raw_tokens
+            .iter()
+            .filter(|t| !lauda_index::is_stop_word(t))
+            .cloned()
+            .collect();
+        let tokens = if meaningful_tokens.is_empty() {
+            raw_tokens
+        } else {
+            meaningful_tokens
+        };
+        let mut lexical_uids: Vec<u32> = Vec::new();
 
         if !tokens.is_empty() {
             let placeholders = tokens
@@ -430,11 +545,13 @@ impl SqliteIndexStore {
                 .join(", ");
 
             let sql_bm25 = format!(
-                "SELECT d.uid, SUM(i.tf) AS score
+                "SELECT d.uid
                  FROM inverted_index i
                  JOIN indexed_documents d ON d.mailbox = i.mailbox AND d.uid = i.uid
                  WHERE i.mailbox = ?1 AND i.term IN ({})
-                 GROUP BY d.uid",
+                 GROUP BY d.uid
+                 ORDER BY SUM(i.tf) DESC, d.uid DESC
+                 LIMIT 50",
                 placeholders
             );
 
@@ -446,29 +563,93 @@ impl SqliteIndexStore {
 
             if let Ok(mut stmt) = conn.prepare(&sql_bm25)
                 && let Ok(rows) = stmt.query_map(rusqlite::params_from_iter(params.iter()), |row| {
-                    let uid: u32 = row.get(0)?;
-                    let score: f64 = row.get(1)?;
-                    Ok((uid, score))
+                    row.get::<_, u32>(0)
                 })
             {
-                for r in rows.flatten() {
-                    if r.1 > max_bm25 {
-                        max_bm25 = r.1;
-                    }
-                    bm25_scores.insert(r.0, r.1);
-                }
+                lexical_uids = rows.flatten().collect();
             }
         }
 
-        // 2. Coleta vetorial e envelopes candidatos
-        let mut stmt = conn.prepare(
-            "SELECT uid, subject, sender, date, is_read, is_flagged, has_attachments, embeddings_blob
-             FROM indexed_documents WHERE mailbox = ?1",
-        )?;
+        // 2. Canal Semântico: Top 50 UIDs via FlatVectorIndex contíguo em RAM (SIMD)
+        let semantic_uids: Vec<u32> = {
+            let indexes = self.vector_indexes.read().unwrap();
+            if let Some(idx) = indexes.get(mailbox) {
+                idx.search_knn(&query_vec, 50)
+                    .into_iter()
+                    .map(|(uid, _score)| uid)
+                    .collect()
+            } else {
+                Vec::new()
+            }
+        };
 
-        let mut candidates = Vec::new();
+        // 3. Fusão RRF harmônica dos dois canais independentes
+        let fused = lauda_index::reciprocal_rank_fusion(&lexical_uids, &semantic_uids, 60.0);
 
-        let rows = stmt.query_map(params![mailbox], |row| {
+        if fused.is_empty() {
+            if tokens.is_empty() && parsed.clauses.is_empty() {
+                // Query em branco: retorna mensagens mais recentes
+                let mut stmt = conn.prepare(
+                    "SELECT uid, subject, sender, date, is_read, is_flagged, has_attachments
+                     FROM indexed_documents WHERE mailbox = ?1 ORDER BY uid DESC LIMIT ?2",
+                )?;
+                let rows = stmt.query_map(params![mailbox, limit as i64], |row| {
+                    let uid: u32 = row.get(0)?;
+                    let subject: String = row.get(1)?;
+                    let sender: String = row.get(2)?;
+                    let date: String = row.get(3)?;
+                    let is_read: bool = row.get::<_, i64>(4)? != 0;
+                    let is_flagged: bool = row.get::<_, i64>(5)? != 0;
+                    let has_attachments: bool = row.get::<_, i64>(6)? != 0;
+                    Ok(MessageEnvelope {
+                        uid,
+                        subject,
+                        sender,
+                        date,
+                        cc: None,
+                        has_attachments,
+                        is_read,
+                        is_flagged,
+                        crypto_meta: None,
+                    })
+                })?;
+                return Ok(rows.flatten().collect());
+            }
+            return Ok(Vec::new());
+        }
+
+        // Seleciona os UIDs finalistas para carregar metadados pontuais
+        let candidate_uids: Vec<u32> = fused
+            .iter()
+            .map(|(uid, _)| *uid)
+            .take(std::cmp::max(limit, 50))
+            .collect();
+
+        // 4. Carrega metadados pontuais apenas dos finalistas sem scan de tabela
+        let uid_placeholders = candidate_uids
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 2))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let sql_docs = format!(
+            "SELECT uid, subject, sender, date, is_read, is_flagged, has_attachments
+             FROM indexed_documents
+             WHERE mailbox = ?1 AND uid IN ({})",
+            uid_placeholders
+        );
+
+        let mut doc_params: Vec<rusqlite::types::Value> =
+            Vec::with_capacity(candidate_uids.len() + 1);
+        doc_params.push(mailbox.to_string().into());
+        for u in &candidate_uids {
+            doc_params.push((*u as i64).into());
+        }
+
+        let mut envelopes_by_uid: HashMap<u32, MessageEnvelope> = HashMap::new();
+        let mut stmt = conn.prepare(&sql_docs)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(doc_params.iter()), |row| {
             let uid: u32 = row.get(0)?;
             let subject: String = row.get(1)?;
             let sender: String = row.get(2)?;
@@ -476,8 +657,8 @@ impl SqliteIndexStore {
             let is_read: bool = row.get::<_, i64>(4)? != 0;
             let is_flagged: bool = row.get::<_, i64>(5)? != 0;
             let has_attachments: bool = row.get::<_, i64>(6)? != 0;
-            let embeddings_blob: Vec<u8> = row.get(7)?;
             Ok((
+                uid,
                 MessageEnvelope {
                     uid,
                     subject,
@@ -489,85 +670,55 @@ impl SqliteIndexStore {
                     is_flagged,
                     crypto_meta: None,
                 },
-                embeddings_blob,
             ))
         })?;
 
-        for r in rows {
-            let (env, blob) = r?;
+        for r in rows.flatten() {
+            envelopes_by_uid.insert(r.0, r.1);
+        }
 
-            // Verifica filtros estruturais da query
-            let mut matches_filters = true;
-            for clause in &parsed.clauses {
-                match clause {
-                    lauda_index::QueryClause::From(author) => {
-                        let author_norm = lauda_index::normalize(author);
-                        let sender_norm = lauda_index::normalize(&env.sender);
-                        if !sender_norm.contains(&author_norm) {
+        // 5. Aplica filtros estruturais de Query e preserva a ordem exata do RRF
+        let mut final_results = Vec::new();
+        for (uid, _) in fused {
+            if let Some(env) = envelopes_by_uid.remove(&uid) {
+                let mut matches_filters = true;
+                for clause in &parsed.clauses {
+                    match clause {
+                        lauda_index::QueryClause::From(author) => {
+                            let author_norm = lauda_index::normalize(author);
+                            let sender_norm = lauda_index::normalize(&env.sender);
+                            if !sender_norm.contains(&author_norm) {
+                                matches_filters = false;
+                                break;
+                            }
+                        }
+                        lauda_index::QueryClause::HasAttachment if !env.has_attachments => {
                             matches_filters = false;
                             break;
                         }
+                        lauda_index::QueryClause::IsRead(read) if env.is_read != *read => {
+                            matches_filters = false;
+                            break;
+                        }
+                        lauda_index::QueryClause::IsFlagged(flagged)
+                            if env.is_flagged != *flagged =>
+                        {
+                            matches_filters = false;
+                            break;
+                        }
+                        _ => {}
                     }
-                    lauda_index::QueryClause::HasAttachment if !env.has_attachments => {
-                        matches_filters = false;
-                        break;
-                    }
-                    lauda_index::QueryClause::IsRead(read) if env.is_read != *read => {
-                        matches_filters = false;
-                        break;
-                    }
-                    lauda_index::QueryClause::IsFlagged(flagged) if env.is_flagged != *flagged => {
-                        matches_filters = false;
-                        break;
-                    }
-                    _ => {}
                 }
-            }
-            if !matches_filters {
-                continue;
-            }
-
-            // Similaridade de cosseno sobre os segmentos persistidos
-            let segment_embeddings = decode_segment_embeddings(&blob);
-            let mut max_sim = 0.0f32;
-            for (_kind, emb) in &segment_embeddings {
-                let sim = lauda_index::cosine_similarity(&query_vec, emb);
-                if sim > max_sim {
-                    max_sim = sim;
+                if matches_filters {
+                    final_results.push(env);
+                    if final_results.len() >= limit {
+                        break;
+                    }
                 }
-            }
-
-            let raw_bm25 = bm25_scores.get(&env.uid).copied().unwrap_or(0.0);
-            let norm_bm25 = if max_bm25 > 0.0 {
-                raw_bm25 / max_bm25
-            } else {
-                0.0
-            };
-
-            let semantic_score = if max_sim >= 0.15 { max_sim as f64 } else { 0.0 };
-
-            let alpha = 0.4;
-            let combined_score = alpha * norm_bm25 + (1.0 - alpha) * semantic_score;
-
-            if combined_score > 0.0 || (tokens.is_empty() && parsed.clauses.is_empty()) {
-                candidates.push((env, combined_score));
             }
         }
 
-        // Ordenar por score decrescente e por UID decrescente
-        candidates.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| b.0.uid.cmp(&a.0.uid))
-        });
-
-        let results: Vec<MessageEnvelope> = candidates
-            .into_iter()
-            .take(limit)
-            .map(|(env, _score)| env)
-            .collect();
-
-        Ok(results)
+        Ok(final_results)
     }
 
     /// Retorna a fatia de mensagens indexadas dos últimos N dias para sincronização offline dos clientes.

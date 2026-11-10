@@ -29,12 +29,12 @@ pub struct Query {
     pub clauses: Vec<QueryClause>,
 }
 
-const STOP_WORDS: &[&str] = &[
+pub const STOP_WORDS: &[&str] = &[
     "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas", "um", "uma", "uns", "umas",
     "o", "a", "os", "as", "e", "ou", "por", "para", "com", "sobre",
 ];
 
-fn is_stop_word(w: &str) -> bool {
+pub fn is_stop_word(w: &str) -> bool {
     let lower = w.to_lowercase();
     STOP_WORDS.contains(&lower.as_str())
 }
