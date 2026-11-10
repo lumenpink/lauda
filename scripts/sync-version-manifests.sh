@@ -18,9 +18,15 @@ fi
 
 # Fallback resiliente se VERSION não contiver o commit atual ou se cccp não estiver presente
 CURRENT_VERSION_VAL="$(cat "$REPO_ROOT/VERSION" 2>/dev/null | tr -d '[:space:]' || true)"
-if [ -z "$CURRENT_VERSION_VAL" ] || [[ "$CURRENT_VERSION_VAL" != *"$GIT_HASH"* ]]; then
-    DEV_COUNT="$(git -C "$REPO_ROOT" rev-list --count HEAD 2>/dev/null || echo "1")"
-    BASE_SEMVER="0.5.0"
+TAG_AT_HEAD="$(git -C "$REPO_ROOT" tag --points-at HEAD 2>/dev/null | head -n 1 || true)"
+
+if [ -n "$TAG_AT_HEAD" ]; then
+    CLEAN_TAG="${TAG_AT_HEAD#v}"
+    echo "$CLEAN_TAG" > "$REPO_ROOT/VERSION"
+elif [ -z "$CURRENT_VERSION_VAL" ] || [[ "$CURRENT_VERSION_VAL" != *"$GIT_HASH"* ]]; then
+    LAST_TAG="$(git -C "$REPO_ROOT" describe --tags --abbrev=0 2>/dev/null || echo "v0.4.0")"
+    DEV_COUNT="$(git -C "$REPO_ROOT" rev-list "${LAST_TAG}..HEAD" --count 2>/dev/null || echo "1")"
+    BASE_SEMVER="0.5.1"
     NEW_DEV_VER="${BASE_SEMVER}-dev.${DEV_COUNT}+${DATE_TAG}.${GIT_HASH}"
     echo "$NEW_DEV_VER" > "$REPO_ROOT/VERSION"
 fi
@@ -39,7 +45,7 @@ cat <<EOF > "$SITE_DIR/version.json"
   "min_compatible_version": "0.1.0",
   "apk_url": "https://bucket.2lp.in/lauda.apk",
   "package_id": "in.twolp.lauda",
-  "release_notes": "Build contínua do Lauda Smolclient (commit $GIT_HASH).",
+  "release_notes": "Build do Lauda Smolclient ($CANONICAL_VERSION).",
   "published_at": "$PUBLISHED_AT"
 }
 EOF
@@ -51,7 +57,7 @@ cat <<EOF > "$SITE_DIR/version-nightly.json"
   "min_compatible_version": "0.1.0",
   "apk_url": "https://lauda.2lp.in/lauda-nightly.apk",
   "package_id": "in.twolp.lauda",
-  "release_notes": "Build contínua do Lauda Smolclient (commit $GIT_HASH).",
+  "release_notes": "Build do Lauda Smolclient ($CANONICAL_VERSION).",
   "published_at": "$PUBLISHED_AT"
 }
 EOF

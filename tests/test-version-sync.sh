@@ -18,9 +18,9 @@ echo "-> Executando scripts/sync-version-manifests.sh..."
 CURRENT_VERSION="$(cat "$VERSION_FILE" | tr -d '[:space:]')"
 echo "Versão canônica após sincronização: $CURRENT_VERSION"
 
-# Verifica se a versão contém o hash do commit atual
-if [[ "$CURRENT_VERSION" != *"$GIT_HASH"* ]]; then
-    echo "❌ ERRO: VERSION ($CURRENT_VERSION) não contém o hash do commit HEAD ($GIT_HASH)."
+# Verifica se a versão contém o hash do commit atual caso seja canal de desenvolvimento (-dev)
+if [[ "$CURRENT_VERSION" == *"-dev."* ]] && [[ "$CURRENT_VERSION" != *"$GIT_HASH"* ]]; then
+    echo "❌ ERRO: Versão de desenvolvimento ($CURRENT_VERSION) não contém o hash do commit HEAD ($GIT_HASH)."
     exit 1
 fi
 
