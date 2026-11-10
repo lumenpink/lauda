@@ -145,7 +145,11 @@ jobs:
             echo "version=${TAG_VER}" >> $GITHUB_OUTPUT
             echo "channel=stable" >> $GITHUB_OUTPUT
           else
-            NIGHTLY_VER="${RAW_VER}-dev.${DATE_TAG}.${COMMIT_HASH}"
+            if [[ "$RAW_VER" == *"-dev."* ]]; then
+              NIGHTLY_VER="${RAW_VER}"
+            else
+              NIGHTLY_VER="${RAW_VER}-dev.${DATE_TAG}.${COMMIT_HASH}"
+            fi
             echo "is_stable=false" >> $GITHUB_OUTPUT
             echo "version=${NIGHTLY_VER}" >> $GITHUB_OUTPUT
             echo "channel=nightly" >> $GITHUB_OUTPUT
