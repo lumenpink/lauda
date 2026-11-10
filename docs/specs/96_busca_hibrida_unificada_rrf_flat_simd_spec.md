@@ -2,7 +2,7 @@
 
 **ID do Ticket:** #96  
 **Norma:** GOST 1.4.0 (DD-TDD)  
-**Status:** Especificado (Fase 3: Doc/Spec)  
+**Status:** Concluído (Fase 9: Finish & Close)  
 **Responsável:** Lumen Pink / Antigravity  
 **Branch:** `feat/96-busca-hibrida-unificada-com-rrf-e-indice-flat-simd`  
 
@@ -119,9 +119,9 @@ impl EmbeddingProvider for TractEmbeddingProvider {
 
 ## 3. Critérios de Aceitação
 
-- [ ] `FlatVectorIndex` armazena e busca vetores de 384 dimensões com 100% de recall exato.
-- [ ] `FlatVectorIndex` suporta inserção e remoção $O(1)$ sem vazamento ou degradação.
-- [ ] `reciprocal_rank_fusion` eleva documentos presentes em ambos os rankings e preserva candidatos com match exclusivo em um canal.
-- [ ] O servidor não executa mais `SELECT ... embeddings_blob` de toda a tabela a cada busca; as buscas utilizam o índice vetorial em memória + FTS5.
-- [ ] O cliente atualiza a fatia de 90 dias no ciclo de sincronização em background.
-- [ ] Todos os testes unitários e de integração passam e o `cargo clippy` passa estritamente sem warnings.
+- [x] `FlatVectorIndex` armazena e busca vetores de 384 dimensões com 100% de recall exato.
+- [x] `FlatVectorIndex` suporta inserção e remoção $O(1)$ sem vazamento ou degradação.
+- [x] `reciprocal_rank_fusion` eleva documentos presentes em ambos os rankings e preserva candidatos com match exclusivo em um canal.
+- [x] O servidor não executa mais `SELECT ... embeddings_blob` de toda a tabela a cada busca; as buscas utilizam o índice vetorial em memória + FTS5.
+- [x] O cliente atualiza a fatia de 90 dias no ciclo de sincronização em background.
+- [x] Todos os testes unitários e de integração passam e o `cargo clippy` passa estritamente sem warnings.
