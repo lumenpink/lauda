@@ -352,7 +352,8 @@ async fn test_external_flag_rename_triggers_websocket_event() {
     std::fs::rename(&initial_file, &renamed_file).expect("renomear para :2,S");
 
     // O WebSocket DEVE receber mailbox_updated informando a alteração
-    let timeout_res = tokio::time::timeout(std::time::Duration::from_millis(1500), socket.next()).await;
+    let timeout_res =
+        tokio::time::timeout(std::time::Duration::from_millis(1500), socket.next()).await;
     let msg_res = timeout_res.expect("timeout aguardando evento de flag externa via inotify");
     let msg = msg_res.expect("mensagem").expect("valida");
 
