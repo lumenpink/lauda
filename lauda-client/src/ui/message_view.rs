@@ -392,7 +392,7 @@ pub fn MessageView(
                     if let Some(cc) = envelope.cc.as_ref() {
                         div { span { style: "font-weight: bold; color: #0a0a0a;", "CC: " } "{cc}" }
                     }
-                    div { span { style: "font-weight: bold; color: #0a0a0a;", "DATA: " } "{envelope.date}" }
+                    div { span { style: "font-weight: bold; color: #0a0a0a;", "DATA: " } "{crate::domain::time::format_local_date_display(&envelope.date)}" }
                 }
 
                 if let Some(ref crypto) = envelope.crypto_meta {

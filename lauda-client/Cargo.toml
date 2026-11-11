@@ -1,6 +1,6 @@
 [package]
 name = "lauda-client"
-version = "0.6.0-dev.2+20261111.446a4fe"
+version = "0.6.0-dev.3+20261111.9aeede6"
 edition = "2024"
 authors = ["Lumen <lumen@2lp.in>"]
 description = "Smolclient minimalista em Dioxus para leitura em texto puro e redação rápida"
@@ -17,6 +17,7 @@ thiserror = "2.0"
 async-trait = "0.1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tokio = { version = "1", features = ["time", "sync", "macros"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "wasmbind"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt", "time"] }

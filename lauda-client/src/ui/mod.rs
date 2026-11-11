@@ -108,6 +108,7 @@ pub fn App() -> Element {
     });
 
     let mut is_online = use_signal(|| true);
+    let mut sync_pending_count = use_signal(|| 0usize);
     #[allow(unused_mut)]
     let mut outbox_pending_count = use_signal(|| 0usize);
 
@@ -249,10 +250,18 @@ pub fn App() -> Element {
                             messages.set(server_msgs.clone());
                         }
 
+                        let now_unix = crate::domain::time::current_unix_timestamp();
+                        let missing = crate::domain::sync::count_missing_bodies(
+                            &active_box,
+                            &server_msgs,
+                            &cache,
+                            now_unix,
+                        );
+                        sync_pending_count.set(missing);
+
                         // Sincronização tripla unificada em background (corpos 90d, purga, contatos e agenda)
                         #[cfg(not(target_arch = "wasm32"))]
                         {
-                            let now_unix = crate::domain::time::current_unix_timestamp();
                             let sync_cfg = crate::domain::sync::SyncWorkerConfig::default();
                             let _ = crate::domain::sync::sync_all_cycle(
                                 &client,
@@ -263,6 +272,14 @@ pub fn App() -> Element {
                                 now_unix,
                             )
                             .await;
+
+                            let remaining = crate::domain::sync::count_missing_bodies(
+                                &active_box,
+                                &server_msgs,
+                                &cache,
+                                now_unix,
+                            );
+                            sync_pending_count.set(remaining);
                         }
                     }
 
@@ -339,15 +356,25 @@ pub fn App() -> Element {
                             "OUTBOX: {outbox_pending_count.read()}"
                         }
                     }
-                    if *is_online.read() {
-                        span {
-                            style: "background: #e8f5e9; color: #2e7d32; padding: 0.3rem 0.5rem; font-size: 0.75rem; font-weight: bold; border: 1px solid #2e7d32;",
-                            "● ONLINE"
-                        }
-                    } else {
-                        span {
-                            style: "background: #ffebee; color: #c62828; padding: 0.3rem 0.5rem; font-size: 0.75rem; font-weight: bold; border: 1px solid #c62828;",
-                            "○ OFFLINE (CACHE)"
+                    {
+                        let online = *is_online.read();
+                        let pending = *sync_pending_count.read();
+                        let status_text = crate::domain::sync::SyncStatusIndicator::format(online, pending);
+                        let (status_bg, status_color, status_border) = if online {
+                            if pending == 0 {
+                                ("#e8f5e9", "#2e7d32", "#2e7d32")
+                            } else {
+                                ("#e1f5fe", "#0277bd", "#0277bd")
+                            }
+                        } else {
+                            ("#f5f5f5", "#616161", "#9e9e9e")
+                        };
+
+                        rsx! {
+                            span {
+                                style: "background: {status_bg}; color: {status_color}; padding: 0.3rem 0.5rem; font-size: 0.75rem; font-weight: bold; border: 1px solid {status_border}; white-space: nowrap;",
+                                "{status_text}"
+                            }
                         }
                     }
 

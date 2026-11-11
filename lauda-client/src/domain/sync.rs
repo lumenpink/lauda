@@ -10,6 +10,48 @@ pub enum ActionType {
     Delete,
 }
 
+/// Formatador do indicador de estado de conexão e convergência para exibição no cabeçalho.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SyncStatusIndicator;
+
+impl SyncStatusIndicator {
+    pub fn format(is_online: bool, pending_count: usize) -> String {
+        if is_online {
+            if pending_count == 0 {
+                "● Sincronizado".to_string()
+            } else {
+                format!("↻ Sincronizando ({} restantes)", pending_count)
+            }
+        } else if pending_count == 0 {
+            "○ Offline".to_string()
+        } else {
+            format!("○ Offline ({} pendentes)", pending_count)
+        }
+    }
+}
+
+/// Conta quantas mensagens da lista de envelopes ainda não possuem corpo no cache local.
+pub fn count_missing_bodies(
+    mailbox: &str,
+    envelopes: &[MessageEnvelope],
+    cache: &LocalMessageCache,
+    now_unix: u64,
+) -> usize {
+    let cutoff_unix = now_unix.saturating_sub(RETENTION_90_DAYS_SECS);
+    envelopes
+        .iter()
+        .filter(|env| {
+            let env_unix = LocalMessageCache::parse_iso_date_to_unix(&env.date).unwrap_or(0);
+            env_unix >= cutoff_unix
+                && cache
+                    .load_message(mailbox, env.uid)
+                    .ok()
+                    .flatten()
+                    .is_none()
+        })
+        .count()
+}
+
 /// Registro persistente de ação enfileirada.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QueuedAction {
@@ -234,7 +276,7 @@ pub async fn prefetch_missing_bodies<C: MailApiClient + ?Sized>(
 ) -> Result<usize, ClientError> {
     let cutoff_unix = now_unix.saturating_sub(RETENTION_90_DAYS_SECS);
 
-    let mut missing_uids = Vec::new();
+    let mut missing = Vec::new();
     for env in envelopes {
         let env_unix = LocalMessageCache::parse_iso_date_to_unix(&env.date).unwrap_or(0);
         if env_unix >= cutoff_unix {
@@ -244,17 +286,18 @@ pub async fn prefetch_missing_bodies<C: MailApiClient + ?Sized>(
                 .flatten()
                 .is_some();
             if !already_cached {
-                missing_uids.push(env.uid);
+                missing.push((env.uid, env_unix));
             }
         }
     }
 
-    if missing_uids.is_empty() {
+    if missing.is_empty() {
         return Ok(0);
     }
 
-    // Mais recentes primeiro
-    missing_uids.sort_by(|a, b| b.cmp(a));
+    // Mais recentes por data primeiro (se empate na data, maior UID)
+    missing.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| b.0.cmp(&a.0)));
+    let missing_uids: Vec<u32> = missing.into_iter().map(|(uid, _)| uid).collect();
 
     let max_concurrent = std::cmp::max(1, concurrency_limit);
     let mut total_prefetched = 0;

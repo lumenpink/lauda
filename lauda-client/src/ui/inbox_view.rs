@@ -585,7 +585,7 @@ pub fn InboxView(
                             let has_att = env.has_attachments;
                             let sender = env.sender.clone();
                             let subject = env.subject.clone();
-                            let date = env.date.clone();
+                            let date = crate::domain::time::format_local_date_display(&env.date);
                             let font_weight = if unread { "bold" } else { "normal" };
 
                             rsx! {

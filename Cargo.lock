@@ -3112,9 +3112,10 @@ dependencies = [
 
 [[package]]
 name = "lauda-client"
-version = "0.5.1"
+version = "0.6.0-dev.2+20261111.446a4fe"
 dependencies = [
  "async-trait",
+ "chrono",
  "console_error_panic_hook",
  "crossterm",
  "dioxus",
@@ -3140,7 +3141,7 @@ dependencies = [
 
 [[package]]
 name = "lauda-index"
-version = "0.5.1"
+version = "0.6.0-dev.2+20261111.446a4fe"
 dependencies = [
  "lauda-types",
  "serde",
@@ -3151,7 +3152,7 @@ dependencies = [
 
 [[package]]
 name = "lauda-server"
-version = "0.5.1"
+version = "0.6.0-dev.2+20261111.446a4fe"
 dependencies = [
  "async-trait",
  "axum",
@@ -3181,7 +3182,7 @@ dependencies = [
 
 [[package]]
 name = "lauda-types"
-version = "0.5.1"
+version = "0.6.0-dev.2+20261111.446a4fe"
 dependencies = [
  "serde",
  "serde_json",
