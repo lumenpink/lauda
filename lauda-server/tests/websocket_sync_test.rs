@@ -7,6 +7,7 @@ use futures_util::{SinkExt, StreamExt};
 use http_body_util::BodyExt;
 use lauda_server::adapters::in_memory::InMemoryMailBackend;
 use lauda_server::app_router;
+use lauda_server::domain::MailBackend;
 use lauda_types::{LoginRequest, MailboxInfo, TokenResponse};
 use tokio_tungstenite::tungstenite::Message as TungsteniteMessage;
 use tokio_tungstenite::tungstenite::http::StatusCode as TungsteniteStatusCode;
@@ -272,5 +273,97 @@ async fn test_maildir_inotify_triggers_websocket_event() {
             );
         }
         other => panic!("Esperado evento Text mailbox_updated, obtido: {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_external_flag_rename_triggers_websocket_event() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let maildir_path = temp.path().join("maildir");
+    let cur_dir = maildir_path.join("cur");
+    let new_dir = maildir_path.join("new");
+    std::fs::create_dir_all(&cur_dir).expect("criar cur");
+    std::fs::create_dir_all(&new_dir).expect("criar new");
+
+    // Cria dovecot-uidlist com a mensagem 101 já mapeada
+    let uidlist = "3 V1234567890 N1 G0\n101 :101.mail.host\n";
+    std::fs::write(maildir_path.join("dovecot-uidlist"), uidlist).expect("escrever uidlist");
+
+    // Cria mensagem inicial não lida (sem flag S)
+    let raw_msg = "From: teste@2lp.in\r\nTo: hi@lumen.pink\r\nSubject: Teste Flags\r\n\r\nCorpo";
+    let initial_file = cur_dir.join("101.mail.host:2,");
+    std::fs::write(&initial_file, raw_msg).expect("gravar inicial");
+
+    let backend = Arc::new(lauda_server::adapters::MaildirBackend::new(&maildir_path));
+    backend.add_user("lumen", "senha123");
+    // Popula o SQLite previamente para que o UID 101 já esteja indexado
+    backend
+        .search_messages("lumen", "INBOX", "teste")
+        .await
+        .expect("indexar inicial");
+
+    let (events_tx, _) = tokio::sync::broadcast::channel(128);
+    let app =
+        lauda_server::app_router_with_events_tx(backend.clone(), TEST_SECRET, events_tx.clone());
+
+    let _watcher = backend
+        .clone()
+        .start_maildir_watcher(events_tx.clone())
+        .expect("iniciar watcher");
+
+    // Login e sobe servidor local
+    let login_body = serde_json::to_string(&LoginRequest {
+        username: "lumen".to_string(),
+        password: "senha123".to_string(),
+        client_type: None,
+    })
+    .unwrap();
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/auth/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(login_body))
+        .unwrap();
+
+    use tower::ServiceExt;
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    let token_resp: TokenResponse = serde_json::from_slice(&bytes).unwrap();
+    let token = token_resp.token;
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind listener");
+    let addr = listener.local_addr().expect("local addr");
+
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let ws_url = format!("ws://{}/ws?token={}", addr, token);
+    let (mut socket, _) = tokio_tungstenite::connect_async(&ws_url)
+        .await
+        .expect("conectar websocket");
+
+    // Simula cliente IMAP externo (Dovecot/SnappyMail/Thunderbird) marcando como lida (:2, -> :2,S)
+    let renamed_file = cur_dir.join("101.mail.host:2,S");
+    std::fs::rename(&initial_file, &renamed_file).expect("renomear para :2,S");
+
+    // O WebSocket DEVE receber mailbox_updated informando a alteração
+    let timeout_res = tokio::time::timeout(std::time::Duration::from_millis(1500), socket.next()).await;
+    let msg_res = timeout_res.expect("timeout aguardando evento de flag externa via inotify");
+    let msg = msg_res.expect("mensagem").expect("valida");
+
+    match msg {
+        TungsteniteMessage::Text(t) => {
+            assert!(
+                t.contains("mailbox_updated"),
+                "Evento esperado após rename de flag externa: mailbox_updated, obtido: {}",
+                t
+            );
+        }
+        other => panic!("Esperado evento Text, obtido: {:?}", other),
     }
 }

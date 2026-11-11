@@ -476,6 +476,10 @@ impl MaildirBackend {
         let mut max_uid = 1000u32;
         if let Ok(content) = std::fs::read_to_string(uidlist_file) {
             for line in content.lines() {
+                // Ignora o cabeçalho de metadados do Dovecot (ex: "3 V1234567890 N100 ...") que não contém ':'
+                if !line.contains(':') {
+                    continue;
+                }
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() >= 2
                     && let Ok(uid) = parts[0].parse::<u32>()
