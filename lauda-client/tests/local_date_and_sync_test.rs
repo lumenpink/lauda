@@ -1,6 +1,6 @@
 use lauda_client::adapters::InMemoryApiClient;
 use lauda_client::domain::cache::LocalMessageCache;
-use lauda_client::domain::sync::{prefetch_missing_bodies, SyncStatusIndicator};
+use lauda_client::domain::sync::{count_missing_bodies, prefetch_missing_bodies, SyncStatusIndicator};
 use lauda_client::domain::time::format_local_date_display;
 use lauda_types::{Message, MessageEnvelope};
 use tempfile::tempdir;
@@ -72,11 +72,18 @@ async fn test_prefetch_prioritizes_most_recent_date_over_uid() {
 
     let envelopes = vec![msg_old.envelope.clone(), msg_new.envelope.clone()];
 
+    // Valida count_missing_bodies
+    let missing_before = count_missing_bodies("INBOX", &envelopes, &cache, now_unix);
+    assert_eq!(missing_before, 2);
+
     let count = prefetch_missing_bodies(&client, "tok", "INBOX", &envelopes, &cache, 1, now_unix)
         .await
         .unwrap();
 
     assert_eq!(count, 2);
+
+    let missing_after = count_missing_bodies("INBOX", &envelopes, &cache, now_unix);
+    assert_eq!(missing_after, 0);
 
     // Ambas as mensagens devem estar salvas no cache
     let cached_new = cache.load_message("INBOX", 50).unwrap();
@@ -97,4 +104,16 @@ fn test_sync_status_indicator_text() {
         "○ Offline (5 pendentes)"
     );
     assert_eq!(SyncStatusIndicator::format(false, 0), "○ Offline");
+}
+
+#[test]
+fn test_mutation_detection_on_status_indicator_and_missing_counts() {
+    // 1. Mutante: online com pendência não pode dizer que está sincronizado
+    let mutated_format = SyncStatusIndicator::format(true, 10);
+    assert_ne!(mutated_format, "● Sincronizado", "Mutante sobreviveu: pendência não pode reportar sincronizado");
+
+    // 2. Mutante: offline não pode dizer que está online
+    let offline_format = SyncStatusIndicator::format(false, 0);
+    assert!(!offline_format.contains("Sincronizado"), "Mutante sobreviveu: offline reportou sincronizado");
+    assert!(offline_format.contains("Offline"));
 }
