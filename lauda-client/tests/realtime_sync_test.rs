@@ -1,6 +1,4 @@
-use lauda_client::domain::realtime::{
-    RealtimeEvent, build_ws_url, parse_server_realtime_event,
-};
+use lauda_client::domain::realtime::{RealtimeEvent, build_ws_url, parse_server_realtime_event};
 
 #[test]
 fn test_build_ws_url_variants() {

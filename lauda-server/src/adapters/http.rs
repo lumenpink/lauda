@@ -402,9 +402,7 @@ async fn ws_handler(
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|h| h.to_str().ok())
     {
-        auth_header
-            .strip_prefix("Bearer ")
-            .unwrap_or(auth_header)
+        auth_header.strip_prefix("Bearer ").unwrap_or(auth_header)
     } else {
         return Err((
             StatusCode::UNAUTHORIZED,
@@ -412,8 +410,12 @@ async fn ws_handler(
         ));
     };
 
-    let username = verify_token(token, &state.jwt_secret)
-        .map_err(|_| (StatusCode::UNAUTHORIZED, "Token inválido ou expirado".to_string()))?;
+    let username = verify_token(token, &state.jwt_secret).map_err(|_| {
+        (
+            StatusCode::UNAUTHORIZED,
+            "Token inválido ou expirado".to_string(),
+        )
+    })?;
 
     let rx = state.events_tx.subscribe();
     Ok(ws.on_upgrade(move |socket| handle_ws_socket(socket, username, rx)))

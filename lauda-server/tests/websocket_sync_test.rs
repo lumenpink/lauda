@@ -93,7 +93,9 @@ async fn test_ws_handshake_rejects_missing_or_invalid_token() {
 
     // 1. Conexão sem token deve ser rejeitada com 401
     let url_no_token = format!("ws://{}/ws", addr);
-    let err_no_token = tokio_tungstenite::connect_async(&url_no_token).await.unwrap_err();
+    let err_no_token = tokio_tungstenite::connect_async(&url_no_token)
+        .await
+        .unwrap_err();
     match err_no_token {
         tokio_tungstenite::tungstenite::Error::Http(resp) => {
             assert_eq!(
@@ -107,7 +109,9 @@ async fn test_ws_handshake_rejects_missing_or_invalid_token() {
 
     // 2. Conexão com token inválido deve ser rejeitada com 401
     let url_invalid = format!("ws://{}/ws?token=token_invalido_de_teste", addr);
-    let err_invalid = tokio_tungstenite::connect_async(&url_invalid).await.unwrap_err();
+    let err_invalid = tokio_tungstenite::connect_async(&url_invalid)
+        .await
+        .unwrap_err();
     match err_invalid {
         tokio_tungstenite::tungstenite::Error::Http(resp) => {
             assert_eq!(
@@ -203,11 +207,8 @@ async fn test_maildir_inotify_triggers_websocket_event() {
     backend.add_user("lumen", "senha123");
 
     let (events_tx, _) = tokio::sync::broadcast::channel(128);
-    let app = lauda_server::app_router_with_events_tx(
-        backend.clone(),
-        TEST_SECRET,
-        events_tx.clone(),
-    );
+    let app =
+        lauda_server::app_router_with_events_tx(backend.clone(), TEST_SECRET, events_tx.clone());
 
     // 1. Inicia watcher
     let _watcher_handle = backend

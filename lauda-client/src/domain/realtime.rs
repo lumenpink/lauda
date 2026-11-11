@@ -23,7 +23,10 @@ pub fn parse_server_realtime_event(payload: &str) -> Option<RealtimeEvent> {
 
     match event.as_str() {
         "mailbox_updated" => {
-            let mb = raw.mailbox.or(raw.r#box).unwrap_or_else(|| "INBOX".to_string());
+            let mb = raw
+                .mailbox
+                .or(raw.r#box)
+                .unwrap_or_else(|| "INBOX".to_string());
             Some(RealtimeEvent::MailboxUpdated { mailbox: mb })
         }
         "read_update" | "flag_update" | "delete" | "move" => Some(RealtimeEvent::MessageAction {
