@@ -1,6 +1,6 @@
 [package]
 name = "lauda-types"
-version = "0.6.0-dev.19+20261111.fd2cb3d"
+version = "0.6.0-dev.20+20261111.f356175"
 edition = "2024"
 authors = ["Lumen <lumen@2lp.in>"]
 description = "Modelos e contratos de dados serializáveis para o ecossistema Lauda"

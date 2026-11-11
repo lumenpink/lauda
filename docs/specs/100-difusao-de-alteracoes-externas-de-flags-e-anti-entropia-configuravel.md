@@ -2,7 +2,7 @@
 
 **ID do Ticket:** #100  
 **Norma:** GOST 1.5.0 (DD-TDD)  
-**Status:** Em Especificação (Fase 3)  
+**Status:** Concluído (Fase 9)  
 **Responsável:** Lumen Pink / Antigravity  
 
 ---
@@ -24,6 +24,10 @@
 - **Decisão 2: Parametrização do Fallback de Anti-Entropia:**
   - *Escolha adotada:* Em `main.rs`, ler `std::env::var("LAUDA_INDEX_INTERVAL_SECS")`, com fallback padrão de 300 segundos. Isso reduz em 95% os ciclos de leitura no Maildir sem desproteger a consistência em caso de falha de eventos do kernel.
 
+- **Decisão 3: Descarte de Cabeçalho no Parser do `dovecot-uidlist`:**
+  - *Contexto:* O Dovecot gera uma primeira linha de metadados no arquivo `dovecot-uidlist` (ex: `3 V1234567890 N100 ...`), onde o primeiro campo é a versão do formato (número 3). Como o código anterior fazia `parts[0].parse::<u32>()` sem verificar se a linha possuía `:`, o UID 3 era erroneamente cadastrado como um e-mail fantasma não existente no disco, forçando `to_index: [3]` a ser avaliado como pendente em todas as reconciliações.
+  - *Escolha adotada:* Filtrar linhas que não contêm o separador `:` antes de mapear entradas de arquivos no Maildir.
+
 ---
 
 ## 3. Contratos e Requisitos de Teste
@@ -32,4 +36,4 @@
    - Adicionar teste em `websocket_sync_test.rs` onde um arquivo existente em `cur/` sem flags é renomeado para incluir `:2,S`.
    - O WebSocket conectado DEVE receber `mailbox_updated` via inotify em menos de 1 segundo.
 2. **Verificação de Anti-Entropia:**
-   - Verificar resolução da variável de ambiente `LAUDA_INDEX_INTERVAL_SECS`.
+   - Teste unitário comprovando resolução da variável de ambiente `LAUDA_INDEX_INTERVAL_SECS` com valor padrão de 300s e sobreposição por valor numérico válido.
