@@ -388,7 +388,6 @@ impl MaildirBackend {
                                 if let Some(ref store) = self.sqlite_index
                                     && let Ok(reconcile) = store.reconcile_mailbox(mailbox, &active_uids)
                                 {
-                                    let changed = !reconcile.to_index.is_empty() || !reconcile.to_remove.is_empty();
                                     for del_uid in reconcile.to_remove {
                                         let _ = store.remove_document(mailbox, del_uid);
                                     }
@@ -404,18 +403,14 @@ impl MaildirBackend {
                                             }
                                         }
                                     }
-                                    if changed {
-                                        let _ = events_tx.send(format!(
-                                            "{{\"event\":\"mailbox_updated\",\"mailbox\":\"{}\"}}",
-                                            mailbox
-                                        ));
-                                    }
-                                } else {
-                                    let _ = events_tx.send(format!(
-                                        "{{\"event\":\"mailbox_updated\",\"mailbox\":\"{}\"}}",
-                                        mailbox
-                                    ));
                                 }
+
+                                // Emite o evento mailbox_updated sempre que o inotify estabilizar uma alteração no Maildir,
+                                // garantindo propagação imediata de renomeações de flags externas (:2,S) mesmo sem UIDs novos.
+                                let _ = events_tx.send(format!(
+                                    "{{\"event\":\"mailbox_updated\",\"mailbox\":\"{}\"}}",
+                                    mailbox
+                                ));
                             }
                         }
                     }

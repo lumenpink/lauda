@@ -32,7 +32,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let m = Arc::new(lauda_server::adapters::MaildirBackend::new(path));
         m.add_user("lumen", "senha123");
         m.add_user("hi@lumen.pink", "senha123");
-        m.clone().start_continuous_indexer(15);
+        let index_interval: u64 = std::env::var("LAUDA_INDEX_INTERVAL_SECS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(300);
+        tracing::info!(
+            "lauda-server: rotina de anti-entropia configurada para intervalo de {}s",
+            index_interval
+        );
+        m.clone().start_continuous_indexer(index_interval);
         m.clone().start_maildir_watcher(events_tx.clone());
         m
     } else {
