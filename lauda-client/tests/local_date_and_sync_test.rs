@@ -1,6 +1,8 @@
 use lauda_client::adapters::InMemoryApiClient;
 use lauda_client::domain::cache::LocalMessageCache;
-use lauda_client::domain::sync::{count_missing_bodies, prefetch_missing_bodies, SyncStatusIndicator};
+use lauda_client::domain::sync::{
+    SyncStatusIndicator, count_missing_bodies, prefetch_missing_bodies,
+};
 use lauda_client::domain::time::format_local_date_display;
 use lauda_types::{Message, MessageEnvelope};
 use tempfile::tempdir;
@@ -110,10 +112,16 @@ fn test_sync_status_indicator_text() {
 fn test_mutation_detection_on_status_indicator_and_missing_counts() {
     // 1. Mutante: online com pendência não pode dizer que está sincronizado
     let mutated_format = SyncStatusIndicator::format(true, 10);
-    assert_ne!(mutated_format, "● Sincronizado", "Mutante sobreviveu: pendência não pode reportar sincronizado");
+    assert_ne!(
+        mutated_format, "● Sincronizado",
+        "Mutante sobreviveu: pendência não pode reportar sincronizado"
+    );
 
     // 2. Mutante: offline não pode dizer que está online
     let offline_format = SyncStatusIndicator::format(false, 0);
-    assert!(!offline_format.contains("Sincronizado"), "Mutante sobreviveu: offline reportou sincronizado");
+    assert!(
+        !offline_format.contains("Sincronizado"),
+        "Mutante sobreviveu: offline reportou sincronizado"
+    );
     assert!(offline_format.contains("Offline"));
 }

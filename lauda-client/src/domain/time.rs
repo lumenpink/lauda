@@ -47,15 +47,15 @@ pub fn format_local_date_display(date_str: &str) -> String {
     // Tenta parsear via RFC 3339 primeiro
     let parsed_dt = DateTime::parse_from_rfc3339(trimmed)
         .map(|dt| dt.with_timezone(&Local))
-        .or_else(|_| {
-            DateTime::parse_from_rfc2822(trimmed).map(|dt| dt.with_timezone(&Local))
-        });
+        .or_else(|_| DateTime::parse_from_rfc2822(trimmed).map(|dt| dt.with_timezone(&Local)));
 
     let local_dt = match parsed_dt {
         Ok(dt) => dt,
         Err(_) => {
             // Fallback via timestamp unix caso o parser customizado do cache tenha sucesso
-            if let Some(unix) = crate::domain::cache::LocalMessageCache::parse_iso_date_to_unix(trimmed) {
+            if let Some(unix) =
+                crate::domain::cache::LocalMessageCache::parse_iso_date_to_unix(trimmed)
+            {
                 if let Some(utc) = DateTime::from_timestamp(unix as i64, 0) {
                     utc.with_timezone(&Local)
                 } else {
