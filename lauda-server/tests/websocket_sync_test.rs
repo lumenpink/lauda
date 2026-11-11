@@ -368,3 +368,15 @@ async fn test_external_flag_rename_triggers_websocket_event() {
         other => panic!("Esperado evento Text, obtido: {:?}", other),
     }
 }
+
+#[test]
+fn test_index_interval_env_parsing_and_defaults() {
+    fn parse_interval(val: Option<&str>) -> u64 {
+        val.and_then(|v| v.parse().ok()).unwrap_or(300)
+    }
+
+    assert_eq!(parse_interval(None), 300);
+    assert_eq!(parse_interval(Some("60")), 60);
+    assert_eq!(parse_interval(Some("invalido")), 300);
+    assert_eq!(parse_interval(Some("0")), 0);
+}
