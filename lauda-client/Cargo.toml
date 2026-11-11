@@ -1,6 +1,6 @@
 [package]
 name = "lauda-client"
-version = "0.6.0-dev.10+20261111.f4ad710"
+version = "0.6.0-dev.11+20261111.975263d"
 edition = "2024"
 authors = ["Lumen <lumen@2lp.in>"]
 description = "Smolclient minimalista em Dioxus para leitura em texto puro e redação rápida"
@@ -28,13 +28,15 @@ rusqlite = { version = "0.33", features = ["bundled"] }
 ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }
 crossterm = "0.28"
 tokio = { version = "1", features = ["rt-multi-thread"] }
+tokio-tungstenite = "0.29"
+futures-util = "0.3"
 ureq = "3.4.2"
 semver = "1.0"
 toml = "0.8"
 tempfile = "3"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-web-sys = { version = "0.3", features = ["Window", "Storage", "Location", "History", "console"] }
+web-sys = { version = "0.3", features = ["Window", "Storage", "Location", "History", "console", "WebSocket", "MessageEvent", "CloseEvent", "ErrorEvent"] }
 console_error_panic_hook = "0.1"
 js-sys = "0.3"
 wasm-bindgen-futures = "0.4"

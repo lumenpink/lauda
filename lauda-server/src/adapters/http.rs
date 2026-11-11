@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
+use axum::extract::ws::{Message as WsMessage, WebSocket, WebSocketUpgrade};
 use axum::extract::{FromRequestParts, Path, Query, State};
 use axum::http::request::Parts;
-use axum::http::{HeaderValue, StatusCode};
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, patch, post};
@@ -384,6 +385,85 @@ async fn compose_handler(
     Ok(StatusCode::CREATED)
 }
 
+#[derive(Debug, Deserialize)]
+pub struct WsQuery {
+    pub token: Option<String>,
+}
+
+async fn ws_handler(
+    State(state): State<AppState>,
+    Query(query): Query<WsQuery>,
+    headers: HeaderMap,
+    ws: WebSocketUpgrade,
+) -> Result<Response, (StatusCode, String)> {
+    let token = if let Some(ref t) = query.token {
+        t.as_str()
+    } else if let Some(auth_header) = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+    {
+        auth_header
+            .strip_prefix("Bearer ")
+            .unwrap_or(auth_header)
+    } else {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            "Token de autorização ausente".to_string(),
+        ));
+    };
+
+    let username = verify_token(token, &state.jwt_secret)
+        .map_err(|_| (StatusCode::UNAUTHORIZED, "Token inválido ou expirado".to_string()))?;
+
+    let rx = state.events_tx.subscribe();
+    Ok(ws.on_upgrade(move |socket| handle_ws_socket(socket, username, rx)))
+}
+
+async fn handle_ws_socket(
+    mut socket: WebSocket,
+    _username: String,
+    mut rx: tokio::sync::broadcast::Receiver<String>,
+) {
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(25));
+    interval.tick().await;
+
+    loop {
+        tokio::select! {
+            _ = interval.tick() => {
+                if socket.send(WsMessage::Ping(Default::default())).await.is_err() {
+                    break;
+                }
+            }
+            event_res = rx.recv() => {
+                match event_res {
+                    Ok(msg) => {
+                        if socket.send(WsMessage::Text(msg.into())).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                }
+            }
+            client_msg = socket.recv() => {
+                match client_msg {
+                    Some(Ok(WsMessage::Ping(payload))) => {
+                        let _ = socket.send(WsMessage::Pong(payload)).await;
+                    }
+                    Some(Ok(WsMessage::Pong(_))) => {}
+                    Some(Ok(WsMessage::Text(text))) => {
+                        if text.contains("ping") {
+                            let _ = socket.send(WsMessage::Text(r#"{"event":"pong"}"#.into())).await;
+                        }
+                    }
+                    Some(Ok(WsMessage::Close(_))) | None | Some(Err(_)) => break,
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
 async fn events_handler(
     State(state): State<AppState>,
     AuthUser(_username): AuthUser,
@@ -461,6 +541,14 @@ async fn put_rules_handler(
 
 pub fn app_router(backend: Arc<dyn MailBackend>, jwt_secret: impl Into<String>) -> Router {
     let (events_tx, _) = tokio::sync::broadcast::channel(128);
+    app_router_with_events_tx(backend, jwt_secret, events_tx)
+}
+
+pub fn app_router_with_events_tx(
+    backend: Arc<dyn MailBackend>,
+    jwt_secret: impl Into<String>,
+    events_tx: tokio::sync::broadcast::Sender<String>,
+) -> Router {
     let state = AppState {
         backend,
         jwt_secret: jwt_secret.into(),
@@ -511,6 +599,7 @@ fn build_router(state: AppState) -> Router {
     let base = Router::new()
         .route("/auth/login", post(login_handler))
         .route("/events", get(events_handler))
+        .route("/ws", get(ws_handler))
         .route("/contacts", get(list_contacts_handler))
         .route("/contacts/sync", post(sync_contacts_handler))
         .route("/mailboxes", get(list_mailboxes_handler))

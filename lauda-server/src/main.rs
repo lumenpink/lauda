@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use lauda_server::adapters::InMemoryMailBackend;
-use lauda_server::app_router;
+use lauda_server::app_router_with_events_tx;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -23,6 +23,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
+    let (events_tx, _) = tokio::sync::broadcast::channel(128);
+
     let backend: Arc<dyn lauda_server::domain::ports::MailBackend> = if let Some(path) =
         maildir_path
     {
@@ -31,6 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         m.add_user("lumen", "senha123");
         m.add_user("hi@lumen.pink", "senha123");
         m.clone().start_continuous_indexer(15);
+        m.clone().start_maildir_watcher(events_tx.clone());
         m
     } else {
         tracing::info!("lauda-server: inicializando InMemoryMailBackend de demonstração");
@@ -88,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         m
     };
-    let app = app_router(backend, jwt_secret);
+    let app = app_router_with_events_tx(backend, jwt_secret, events_tx);
 
     let listener = tokio::net::TcpListener::bind(&listen_addr).await?;
     tracing::info!("lauda-server escutando em {}", listen_addr);

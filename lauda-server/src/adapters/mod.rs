@@ -9,7 +9,9 @@ pub mod sqlite_index;
 
 pub use caldav::caldav_routes;
 pub use carddav::carddav_routes;
-pub use http::{app_router, app_router_with_calendar, app_router_with_contacts};
+pub use http::{
+    app_router, app_router_with_calendar, app_router_with_contacts, app_router_with_events_tx,
+};
 pub use in_memory::InMemoryMailBackend;
 pub use maildir::MaildirBackend;
 pub use sqlite_calendar::SqliteCalendarStore;

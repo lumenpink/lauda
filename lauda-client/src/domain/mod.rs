@@ -5,6 +5,7 @@ pub mod folders;
 pub mod fuzzy;
 pub mod outbox;
 pub mod ports;
+pub mod realtime;
 pub mod session;
 pub mod sync;
 pub mod time;
@@ -18,6 +19,7 @@ pub use contacts_cache::{LocalContactsCache, create_local_contact, format_contac
 pub use folders::{FolderNode, FolderRole, build_folder_tree};
 pub use outbox::{OutboxItem, OutboxQueue, OutboxStatus};
 pub use ports::{ClientError, MailApiClient};
+pub use realtime::{RealtimeEvent, build_ws_url, parse_server_realtime_event};
 pub use session::{
     SessionConfig, clear_session, get_default_session_path, load_session, save_session,
 };

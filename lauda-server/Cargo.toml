@@ -1,6 +1,6 @@
 [package]
 name = "lauda-server"
-version = "0.6.0-dev.10+20261111.f4ad710"
+version = "0.6.0-dev.11+20261111.975263d"
 edition = "2024"
 authors = ["Lumen <lumen@2lp.in>"]
 description = "Micro-daemon HTTP gateway e ponte Dovecot/Postfix para o ecossistema Lauda"
@@ -8,7 +8,7 @@ license = "GPL-3.0"
 
 [dependencies]
 lauda-types = { path = "../lauda-types" }
-axum = "0.8"
+axum = { version = "0.8", features = ["ws"] }
 tokio = { version = "1", features = ["full"] }
 jsonwebtoken = "9"
 serde = { version = "1.0", features = ["derive"] }
@@ -27,14 +27,18 @@ base64 = "0.22"
 html2text = "0.12"
 lauda-index = { path = "../lauda-index" }
 urupema = { version = "0.1.2", registry = "gambi" }
+notify = "8.0"
 
 [dev-dependencies]
 base64 = "0.22"
 chrono = "0.4"
+futures-util = "0.3"
 http-body-util = "0.1"
 lauda-client = { path = "../lauda-client" }
 minijinja = "2"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 tempfile = "3.10"
+tokio-tungstenite = "0.29"
 urupema = { version = "0.1.2", registry = "gambi" }
 
 

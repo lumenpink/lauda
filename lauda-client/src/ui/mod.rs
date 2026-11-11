@@ -108,6 +108,7 @@ pub fn App() -> Element {
     });
 
     let mut is_online = use_signal(|| true);
+    #[allow(unused_mut)]
     let mut sync_pending_count = use_signal(|| 0usize);
     #[allow(unused_mut)]
     let mut outbox_pending_count = use_signal(|| 0usize);
@@ -149,6 +150,21 @@ pub fn App() -> Element {
                 let actions = crate::domain::sync::ActionsQueue::new(&cache_dir);
 
                 let client = HttpApiClient::new(sess.server_url.clone());
+
+                #[cfg(not(target_arch = "wasm32"))]
+                let (realtime_tx, mut realtime_rx) = tokio::sync::mpsc::unbounded_channel();
+                #[cfg(not(target_arch = "wasm32"))]
+                let (_shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+
+                #[cfg(not(target_arch = "wasm32"))]
+                let ws_url = crate::domain::realtime::build_ws_url(&sess.server_url, &token);
+
+                #[cfg(not(target_arch = "wasm32"))]
+                tokio::spawn(crate::domain::realtime::run_desktop_realtime_loop(
+                    ws_url,
+                    realtime_tx,
+                    shutdown_rx,
+                ));
 
                 loop {
                     #[cfg(not(target_arch = "wasm32"))]
@@ -250,18 +266,18 @@ pub fn App() -> Element {
                             messages.set(server_msgs.clone());
                         }
 
-                        let now_unix = crate::domain::time::current_unix_timestamp();
-                        let missing = crate::domain::sync::count_missing_bodies(
-                            &active_box,
-                            &server_msgs,
-                            &cache,
-                            now_unix,
-                        );
-                        sync_pending_count.set(missing);
-
-                        // Sincronização tripla unificada em background (corpos 90d, purga, contatos e agenda)
                         #[cfg(not(target_arch = "wasm32"))]
                         {
+                            let now_unix = crate::domain::time::current_unix_timestamp();
+                            let missing = crate::domain::sync::count_missing_bodies(
+                                &active_box,
+                                &server_msgs,
+                                &cache,
+                                now_unix,
+                            );
+                            sync_pending_count.set(missing);
+
+                            // Sincronização tripla unificada em background (corpos 90d, purga, contatos e agenda)
                             let sync_cfg = crate::domain::sync::SyncWorkerConfig::default();
                             let _ = crate::domain::sync::sync_all_cycle(
                                 &client,
@@ -283,7 +299,34 @@ pub fn App() -> Element {
                         }
                     }
 
-                    // Pausa assíncrona segura em todas as plataformas (Tokio em desktop/Android, setTimeout em WASM)
+                    // Pausa assíncrona segura em todas as plataformas com detecção reativa via WebSocket
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        let mut sleep_future = std::pin::pin!(crate::domain::time::async_sleep(
+                            std::time::Duration::from_secs(60)
+                        ));
+                        tokio::select! {
+                            _ = &mut sleep_future => {}
+                            maybe_rt = realtime_rx.recv() => {
+                                match maybe_rt {
+                                    Some(crate::domain::realtime::RealtimeEvent::Connected) => {
+                                        is_online.set(true);
+                                    }
+                                    Some(crate::domain::realtime::RealtimeEvent::Disconnected) => {
+                                        is_online.set(false);
+                                        continue;
+                                    }
+                                    Some(crate::domain::realtime::RealtimeEvent::MailboxUpdated { .. })
+                                    | Some(crate::domain::realtime::RealtimeEvent::MessageAction { .. }) => {
+                                        is_online.set(true);
+                                    }
+                                    None => {}
+                                }
+                            }
+                        }
+                    }
+
+                    #[cfg(target_arch = "wasm32")]
                     crate::domain::time::async_sleep(std::time::Duration::from_secs(10)).await;
                     if session.read().token.is_none() {
                         break;

@@ -310,6 +310,111 @@ impl MaildirBackend {
         });
     }
 
+    /// Inicia o monitoramento em nível de kernel (inotify via notify) nas pastas Maildir,
+    /// disparando reconciliação imediata com debounce de 300ms e difusão no events_tx.
+    pub fn start_maildir_watcher(
+        self: Arc<Self>,
+        events_tx: tokio::sync::broadcast::Sender<String>,
+    ) -> Option<tokio::task::JoinHandle<()>> {
+        use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
+
+        let base_path = self.base_dir.clone();
+        if !base_path.exists() {
+            return None;
+        }
+
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut watcher = match RecommendedWatcher::new(
+            move |res: Result<Event, notify::Error>| {
+                if let Ok(event) = res {
+                    let _ = tx.send(event);
+                }
+            },
+            Config::default(),
+        ) {
+            Ok(w) => w,
+            Err(e) => {
+                tracing::warn!("Falha ao instanciar watcher notify: {}", e);
+                return None;
+            }
+        };
+
+        if let Err(e) = watcher.watch(&base_path, RecursiveMode::Recursive) {
+            tracing::warn!("Falha ao registrar watch no Maildir: {}", e);
+            return None;
+        }
+
+        let handle = tokio::spawn(async move {
+            let _watcher = watcher;
+            let mut debounce_timer = std::pin::pin!(tokio::time::sleep(Duration::from_millis(300)));
+            let mut pending_event = false;
+
+            loop {
+                tokio::select! {
+                    maybe_event = rx.recv() => {
+                        match maybe_event {
+                            Some(ev) => {
+                                use notify::EventKind;
+                                match ev.kind {
+                                    EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) => {
+                                        pending_event = true;
+                                        debounce_timer.as_mut().reset(tokio::time::Instant::now() + Duration::from_millis(300));
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            None => break,
+                        }
+                    }
+                    _ = &mut debounce_timer, if pending_event => {
+                        pending_event = false;
+                        tracing::debug!("Alteração no Maildir detectada via inotify. Executando reconciliação...");
+                        let mailboxes = vec!["INBOX".to_string()];
+                        for mailbox in &mailboxes {
+                            if let Ok(dir) = self.resolve_mailbox_dir(mailbox) {
+                                let (_, uid_to_prefix) = self.load_uid_maps(&dir);
+                                let active_uids: HashSet<u32> = uid_to_prefix.keys().copied().collect();
+                                if let Some(ref store) = self.sqlite_index
+                                    && let Ok(reconcile) = store.reconcile_mailbox(mailbox, &active_uids)
+                                {
+                                    let changed = !reconcile.to_index.is_empty() || !reconcile.to_remove.is_empty();
+                                    for del_uid in reconcile.to_remove {
+                                        let _ = store.remove_document(mailbox, del_uid);
+                                    }
+                                    let provider = lauda_index::SimpleCpuEmbeddingProvider;
+                                    for chunk in reconcile.to_index.chunks(25) {
+                                        for &uid in chunk {
+                                            if let Some(msg) = Self::read_message_static(&dir, uid) {
+                                                let mut temp_index = lauda_index::MessageIndex::new();
+                                                temp_index.index_message_semantic(mailbox, &msg, &provider);
+                                                if let Some(doc) = temp_index.documents().get(&uid) {
+                                                    let _ = store.save_document(mailbox, doc, 0);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if changed {
+                                        let _ = events_tx.send(format!(
+                                            "{{\"event\":\"mailbox_updated\",\"mailbox\":\"{}\"}}",
+                                            mailbox
+                                        ));
+                                    }
+                                } else {
+                                    let _ = events_tx.send(format!(
+                                        "{{\"event\":\"mailbox_updated\",\"mailbox\":\"{}\"}}",
+                                        mailbox
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        Some(handle)
+    }
+
     pub fn add_user(&self, username: impl Into<String>, password: impl Into<String>) {
         if let Ok(mut lock) = self.users.write() {
             lock.insert(username.into(), password.into());
