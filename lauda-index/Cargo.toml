@@ -1,6 +1,6 @@
 [package]
 name = "lauda-index"
-version = "0.5.0-dev.416+20261110.b603587"
+version = "0.5.1-dev.1+20261110.6a5d1fc"
 edition = "2024"
 authors = ["Lumen <lumen@2lp.in>"]
 description = "Motor de busca de e-mails em Rust puro com parser Gmail, BM25 e fuzzy search"
