@@ -2,7 +2,8 @@
 
 **ID do Ticket:** #99  
 **Norma:** GOST 1.5.0 (DD-TDD)  
-**Status:** Em Especificação (Fase 3)  
+**Status:** Concluído (Fase 9)  
+**Data de Fechamento:** 2026-11-11  
 **Responsável:** Lumen Pink / Antigravity  
 
 ---
@@ -99,3 +100,18 @@ O objetivo deste ticket é introduzir uma via reativa em tempo real com protocol
    - `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e execução de testes.
 6. **Fase 9 (Finish & Close):**
    - Laudo e consolidação.
+
+---
+
+## 5. Resumo da Implementação e Validação (Fase 9)
+
+- **Servidor (`lauda-server`):**
+  - Rota `/ws` com suporte a autenticação via `?token=` ou header Bearer, upgrade HTTP 101 e heartbeat (ping/pong) nativo do WebSocket.
+  - Monitoramento inotify via `notify::RecommendedWatcher` em `MaildirBackend::start_maildir_watcher`, com debounce de 300ms e broadcast imediato de `{"event":"mailbox_updated","mailbox":"..."}`.
+  - Testes em `websocket_sync_test.rs`: 3 testes cobrindo rejeição de token (401), handshake e envio/recebimento de comandos de controle, difusão de ações (leitura) e acionamento real de inotify ao gravar arquivo no Maildir.
+- **Cliente (`lauda-client`):**
+  - Módulo `lauda-client/src/domain/realtime.rs` com suporte a parsing de eventos e loop de conexão com reconexão resiliente (backoff exponencial).
+  - Integração no `ui/mod.rs`: o cliente agora reage instantaneamente aos eventos do servidor e reflete presença imediata (`is_online = true` ao conectar, `false` na queda), mantendo o timer periódico degradado de 60s apenas como contingência secundária.
+  - Compatibilidade com WASM preservada e validada via `cargo check --target wasm32-unknown-unknown`.
+- **Quality Gate:**
+  - `cargo fmt --check` e `cargo clippy --all-targets -- -D warnings` aprovados com zero advertências.

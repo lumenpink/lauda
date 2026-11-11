@@ -25,6 +25,7 @@ pub struct MaildirBackend {
     smtp_host: String,
     smtp_port: u16,
     indexing_active: Arc<AtomicBool>,
+    watcher_active: Arc<AtomicBool>,
 }
 
 /// Extrai o endereço de e-mail limpo de uma string que pode conter nome de exibição (ex: "Lumen <lumen@2lp.in>").
@@ -217,6 +218,7 @@ impl MaildirBackend {
             smtp_host,
             smtp_port,
             indexing_active: Arc::new(AtomicBool::new(false)),
+            watcher_active: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -235,6 +237,7 @@ impl MaildirBackend {
             smtp_host: smtp_host.into(),
             smtp_port,
             indexing_active: Arc::new(AtomicBool::new(false)),
+            watcher_active: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -317,6 +320,14 @@ impl MaildirBackend {
         events_tx: tokio::sync::broadcast::Sender<String>,
     ) -> Option<tokio::task::JoinHandle<()>> {
         use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
+
+        let is_running = self.watcher_active.clone();
+        if is_running.swap(true, Ordering::SeqCst) {
+            tracing::warn!(
+                "Watcher inotify já está em execução para este backend. Ignorando chamada duplicada."
+            );
+            return None;
+        }
 
         let base_path = self.base_dir.clone();
         if !base_path.exists() {
