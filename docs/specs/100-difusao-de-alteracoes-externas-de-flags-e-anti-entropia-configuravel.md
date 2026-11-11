@@ -37,3 +37,11 @@
    - O WebSocket conectado DEVE receber `mailbox_updated` via inotify em menos de 1 segundo.
 2. **Verificação de Anti-Entropia:**
    - Teste unitário comprovando resolução da variável de ambiente `LAUDA_INDEX_INTERVAL_SECS` com valor padrão de 300s e sobreposição por valor numérico válido.
+
+---
+
+## 4. Laudo de Resolução (Fase 9)
+
+- **[Resumo]:** Difusão imediata de renomeações de flags externas via WebSocket e parametrização do intervalo de reconciliação de anti-entropia.
+- **[Solução]:** Remoção da condição restritiva `if changed` no watcher inotify para difundir incondicionalmente `mailbox_updated` após estabilização de eventos no Maildir; descarte de linhas de cabeçalho no `dovecot-uidlist`; leitura de `LAUDA_INDEX_INTERVAL_SECS` com padrão de 300 segundos em `main.rs`.
+- **[Validação]:** Testes unitários e de integração `websocket_sync_test` aprovados em 100%, testes de mutação aprovados, `cargo fmt --check` e `cargo clippy --all-targets -- -D warnings` limpos.
