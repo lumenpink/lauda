@@ -285,7 +285,9 @@ where
 ///
 /// Prioriza as mensagens mais recentes (ordem decrescente de UID).
 /// Executa as requisições em lotes assíncronos controlados por `concurrency_limit` (ex.: 5).
-pub async fn prefetch_missing_bodies<C: MailApiClient + ?Sized>(
+/// Prefetch concorrente com callback de progresso incremental (#103).
+#[allow(clippy::too_many_arguments)]
+pub async fn prefetch_missing_bodies_with_progress<C: MailApiClient + ?Sized, F>(
     client: &C,
     token: &str,
     mailbox: &str,
@@ -293,7 +295,11 @@ pub async fn prefetch_missing_bodies<C: MailApiClient + ?Sized>(
     cache: &LocalMessageCache,
     concurrency_limit: usize,
     now_unix: u64,
-) -> Result<usize, ClientError> {
+    mut on_progress: F,
+) -> Result<usize, ClientError>
+where
+    F: FnMut(usize),
+{
     let cutoff_unix = now_unix.saturating_sub(RETENTION_90_DAYS_SECS);
 
     let mut missing = Vec::new();
@@ -312,6 +318,7 @@ pub async fn prefetch_missing_bodies<C: MailApiClient + ?Sized>(
     }
 
     if missing.is_empty() {
+        on_progress(0);
         return Ok(0);
     }
 
@@ -319,8 +326,12 @@ pub async fn prefetch_missing_bodies<C: MailApiClient + ?Sized>(
     missing.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| b.0.cmp(&a.0)));
     let missing_uids: Vec<u32> = missing.into_iter().map(|(uid, _)| uid).collect();
 
+    let total_missing = missing_uids.len();
+    on_progress(total_missing);
+
     let max_concurrent = std::cmp::max(1, concurrency_limit);
     let mut total_prefetched = 0;
+    let mut processed_so_far = 0;
 
     for chunk in missing_uids.chunks(max_concurrent) {
         let mut futs = Vec::with_capacity(chunk.len());
@@ -334,9 +345,35 @@ pub async fn prefetch_missing_bodies<C: MailApiClient + ?Sized>(
                 total_prefetched += 1;
             }
         }
+        processed_so_far += chunk.len();
+        let remaining = total_missing.saturating_sub(processed_so_far);
+        on_progress(remaining);
     }
 
     Ok(total_prefetched)
+}
+
+/// Prefetch concorrente dos corpos de mensagens faltantes dentro da janela de retenção (90 dias).
+pub async fn prefetch_missing_bodies<C: MailApiClient + ?Sized>(
+    client: &C,
+    token: &str,
+    mailbox: &str,
+    envelopes: &[MessageEnvelope],
+    cache: &LocalMessageCache,
+    concurrency_limit: usize,
+    now_unix: u64,
+) -> Result<usize, ClientError> {
+    prefetch_missing_bodies_with_progress(
+        client,
+        token,
+        mailbox,
+        envelopes,
+        cache,
+        concurrency_limit,
+        now_unix,
+        |_| {},
+    )
+    .await
 }
 
 /// Prefetch eager dos corpos das mensagens retornadas por busca remota que ainda não estão em cache,
@@ -488,21 +525,25 @@ pub struct SyncCycleResult {
     pub calendar_deleted: usize,
 }
 
-/// Executa uma rodada unificada de sincronização transacional:
+/// Executa uma rodada unificada de sincronização transacional com telemetria de progresso (#103):
 /// 1. Esvaziamento da fila de ações locais (Outbox).
 /// 2. Sincronização de envelopes e notificação diferencial de novas mensagens não lidas.
-/// 3. Prefetch eager concorrente de corpos dentro da janela de retenção (90 dias).
+/// 3. Prefetch eager concorrente de corpos dentro da janela de retenção (90 dias) com callback de progresso.
 /// 4. Purga automática de mensagens antigas expiradas (> 90 dias).
 /// 5. Reconciliação incremental de contatos com o servidor.
 /// 6. Reconciliação incremental de eventos de agenda com CalDAV.
-pub async fn sync_all_cycle<C: MailApiClient + ?Sized>(
+pub async fn sync_all_cycle_with_progress<C: MailApiClient + ?Sized, F>(
     client: &C,
     token: &str,
     mailbox: &str,
     cache_dir: &Path,
     config: &SyncWorkerConfig,
     now_unix: u64,
-) -> Result<SyncCycleResult, ClientError> {
+    on_progress: F,
+) -> Result<SyncCycleResult, ClientError>
+where
+    F: FnMut(usize),
+{
     let mut result = SyncCycleResult::default();
 
     // 1. Esvaziar fila de ações locais (Outbox)
@@ -548,8 +589,8 @@ pub async fn sync_all_cycle<C: MailApiClient + ?Sized>(
 
     let _ = message_cache.save_envelopes(mailbox, &remote_envelopes);
 
-    // 3. Prefetch eager dos corpos dentro da janela de retenção (90 dias)
-    let prefetched = prefetch_missing_bodies(
+    // 3. Prefetch eager dos corpos dentro da janela de retenção (90 dias) com telemetria
+    let prefetched = prefetch_missing_bodies_with_progress(
         client,
         token,
         mailbox,
@@ -557,6 +598,7 @@ pub async fn sync_all_cycle<C: MailApiClient + ?Sized>(
         &message_cache,
         config.prefetch_concurrency,
         now_unix,
+        on_progress,
     )
     .await?;
     result.messages_prefetched = prefetched;
@@ -606,6 +648,18 @@ pub async fn sync_all_cycle<C: MailApiClient + ?Sized>(
     }
 
     Ok(result)
+}
+
+/// Executa uma rodada unificada de sincronização transacional (wrapper para retrocompatibilidade).
+pub async fn sync_all_cycle<C: MailApiClient + ?Sized>(
+    client: &C,
+    token: &str,
+    mailbox: &str,
+    cache_dir: &Path,
+    config: &SyncWorkerConfig,
+    now_unix: u64,
+) -> Result<SyncCycleResult, ClientError> {
+    sync_all_cycle_with_progress(client, token, mailbox, cache_dir, config, now_unix, |_| {}).await
 }
 
 /// Manipulador de controle para o worker em execução em segundo plano.

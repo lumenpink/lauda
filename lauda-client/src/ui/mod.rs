@@ -287,15 +287,18 @@ pub fn App() -> Element {
                             );
                             sync_pending_count.set(missing);
 
-                            // Sincronização tripla unificada em background (corpos 90d, purga, contatos e agenda)
+                            // Sincronização tripla unificada em background (corpos 90d, purga, contatos e agenda) com progresso em tempo real (#103)
                             let sync_cfg = crate::domain::sync::SyncWorkerConfig::default();
-                            let _ = crate::domain::sync::sync_all_cycle(
+                            let _ = crate::domain::sync::sync_all_cycle_with_progress(
                                 &client,
                                 &token,
                                 &active_box,
                                 &cache_dir,
                                 &sync_cfg,
                                 now_unix,
+                                |remaining| {
+                                    sync_pending_count.set(remaining);
+                                },
                             )
                             .await;
 
