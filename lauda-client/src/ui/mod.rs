@@ -262,8 +262,18 @@ pub fn App() -> Element {
                         is_online.set(true);
                         #[cfg(not(target_arch = "wasm32"))]
                         let _ = cache.save_envelopes(&active_box, &server_msgs);
-                        if *messages.read() != server_msgs && messages.read().len() <= 50 {
-                            messages.set(server_msgs.clone());
+                        let cur_box = current_mailbox.read().clone();
+                        let fresh_opt = {
+                            let cur_msgs = messages.read();
+                            crate::domain::sync::reconcile_ui_messages(
+                                &cur_box,
+                                &active_box,
+                                &cur_msgs,
+                                &server_msgs,
+                            )
+                        };
+                        if let Some(fresh) = fresh_opt {
+                            messages.set(fresh);
                         }
 
                         #[cfg(not(target_arch = "wasm32"))]
@@ -289,13 +299,37 @@ pub fn App() -> Element {
                             )
                             .await;
 
-                            let remaining = crate::domain::sync::count_missing_bodies(
-                                &active_box,
-                                &server_msgs,
-                                &cache,
-                                now_unix,
-                            );
-                            sync_pending_count.set(remaining);
+                            // Atualização reativa imediata da lista de e-mails pós-sincronização (#102)
+                            let current_display_box = current_mailbox.read().clone();
+                            if let Ok(Some(reconciled)) = cache.load_envelopes(&active_box) {
+                                let fresh_opt = {
+                                    let cur_msgs = messages.read();
+                                    crate::domain::sync::reconcile_ui_messages(
+                                        &current_display_box,
+                                        &active_box,
+                                        &cur_msgs,
+                                        &reconciled,
+                                    )
+                                };
+                                if let Some(fresh) = fresh_opt {
+                                    messages.set(fresh);
+                                }
+                                let remaining = crate::domain::sync::count_missing_bodies(
+                                    &active_box,
+                                    &reconciled,
+                                    &cache,
+                                    now_unix,
+                                );
+                                sync_pending_count.set(remaining);
+                            } else {
+                                let remaining = crate::domain::sync::count_missing_bodies(
+                                    &active_box,
+                                    &server_msgs,
+                                    &cache,
+                                    now_unix,
+                                );
+                                sync_pending_count.set(remaining);
+                            }
                         }
                     }
 

@@ -52,6 +52,26 @@ pub fn count_missing_bodies(
         .count()
 }
 
+/// Avalia se a lista de mensagens na UI deve ser atualizada de forma reativa (#102).
+///
+/// Retorna `Some(novos_envelopes)` caso a caixa ativa seja a caixa sincronizada e
+/// os envelopes em cache divirjam da visualização atual. Retorna `None` caso contrário.
+pub fn reconcile_ui_messages(
+    current_box: &str,
+    synced_box: &str,
+    current_view_messages: &[MessageEnvelope],
+    cached_messages: &[MessageEnvelope],
+) -> Option<Vec<MessageEnvelope>> {
+    if current_box != synced_box {
+        return None;
+    }
+    if !cached_messages.is_empty() && current_view_messages != cached_messages {
+        Some(cached_messages.to_vec())
+    } else {
+        None
+    }
+}
+
 /// Registro persistente de ação enfileirada.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QueuedAction {
