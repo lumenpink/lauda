@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, LazyLock, RwLock};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -27,6 +27,54 @@ pub struct MaildirBackend {
     indexing_active: Arc<AtomicBool>,
     watcher_active: Arc<AtomicBool>,
 }
+
+/// Informações em cache de um arquivo de mensagem individual no Maildir.
+#[derive(Clone, Debug)]
+pub struct CachedFileInfo {
+    pub path: PathBuf,
+    pub filename: String,
+    pub is_read: bool,
+    pub is_flagged: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct MaildirDirMtimes {
+    cur_mtime: Option<std::time::SystemTime>,
+    new_mtime: Option<std::time::SystemTime>,
+    uidlist_mtime: Option<std::time::SystemTime>,
+    uidlist_len: Option<u64>,
+}
+
+impl MaildirDirMtimes {
+    fn capture(dir: &Path) -> Self {
+        let cur_mtime = std::fs::metadata(dir.join("cur"))
+            .and_then(|m| m.modified())
+            .ok();
+        let new_mtime = std::fs::metadata(dir.join("new"))
+            .and_then(|m| m.modified())
+            .ok();
+        let uidlist_meta = std::fs::metadata(dir.join("dovecot-uidlist")).ok();
+        let uidlist_mtime = uidlist_meta.as_ref().and_then(|m| m.modified().ok());
+        let uidlist_len = uidlist_meta.as_ref().map(|m| m.len());
+        Self {
+            cur_mtime,
+            new_mtime,
+            uidlist_mtime,
+            uidlist_len,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct MaildirDirCache {
+    mtimes: MaildirDirMtimes,
+    uid_to_file: HashMap<u32, CachedFileInfo>,
+    prefix_to_uid: HashMap<String, u32>,
+    uid_to_prefix: HashMap<u32, String>,
+}
+
+static MAILDIR_CACHE: LazyLock<RwLock<HashMap<PathBuf, MaildirDirCache>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// Extrai o endereço de e-mail limpo de uma string que pode conter nome de exibição (ex: "Lumen <lumen@2lp.in>").
 pub fn extract_clean_email(raw: &str) -> String {
@@ -463,13 +511,34 @@ impl MaildirBackend {
         Self::load_uid_maps_static(dir)
     }
 
-    pub(crate) fn load_uid_maps_static(dir: &Path) -> (HashMap<String, u32>, HashMap<u32, String>) {
+    /// Invalida explicitamente o cache em memória para um diretório Maildir.
+    pub fn invalidate_cache_static(dir: &Path) {
+        let canonical = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
+        if let Ok(mut cache) = MAILDIR_CACHE.write() {
+            cache.remove(&canonical);
+        }
+    }
+
+    /// Obtém ou atualiza o cache quente para o diretório informado.
+    fn get_or_refresh_dir_cache(dir: &Path) -> MaildirDirCache {
+        let canonical = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
+        let current_mtimes = MaildirDirMtimes::capture(dir);
+
+        // 1. Tentar leitura rápida (fast path)
+        if let Ok(read_guard) = MAILDIR_CACHE.read()
+            && let Some(entry) = read_guard.get(&canonical)
+            && entry.mtimes == current_mtimes
+        {
+            return entry.clone();
+        }
+
+        // 2. Cache miss ou dirty: reconstruir em um único passo
         let mut prefix_to_uid = HashMap::new();
         let mut uid_to_prefix = HashMap::new();
         let uidlist_file = dir.join("dovecot-uidlist");
 
         let mut max_uid = 1000u32;
-        if let Ok(content) = std::fs::read_to_string(uidlist_file) {
+        if let Ok(content) = std::fs::read_to_string(&uidlist_file) {
             for line in content.lines() {
                 // Ignora o cabeçalho de metadados do Dovecot (ex: "3 V1234567890 N100 ...") que não contém ':'
                 if !line.contains(':') {
@@ -492,25 +561,44 @@ impl MaildirBackend {
             }
         }
 
-        // Para arquivos sem entrada no dovecot-uidlist, garanta mapeamento consistente em O(1) com HashSet
+        // Scan de subpastas new e cur (cur após new para prevalecer flags finais)
+        struct DiscoveredFile {
+            path: PathBuf,
+            filename: String,
+            prefix: String,
+            is_read: bool,
+            is_flagged: bool,
+        }
+
+        let mut files = Vec::new();
         let mut unmapped_set = HashSet::new();
         let mut unmapped = Vec::new();
-        for sub in &["cur", "new"] {
-            if let Ok(entries) = std::fs::read_dir(dir.join(sub)) {
+
+        for sub in &["new", "cur"] {
+            let sub_path = dir.join(sub);
+            if let Ok(entries) = std::fs::read_dir(sub_path) {
                 for entry in entries.flatten() {
+                    let path = entry.path();
                     let filename = entry.file_name().to_string_lossy().to_string();
                     if filename.starts_with('.') {
                         continue;
                     }
-                    let prefix = Self::extract_prefix(&filename);
-                    if !prefix_to_uid.contains_key(prefix)
-                        && unmapped_set.insert(prefix.to_string())
-                    {
-                        unmapped.push(prefix.to_string());
+                    let prefix = Self::extract_prefix(&filename).to_string();
+                    if !prefix_to_uid.contains_key(&prefix) && unmapped_set.insert(prefix.clone()) {
+                        unmapped.push(prefix.clone());
                     }
+                    let (is_read, is_flagged) = Self::parse_maildir_flags(sub, &filename);
+                    files.push(DiscoveredFile {
+                        path,
+                        filename,
+                        prefix,
+                        is_read,
+                        is_flagged,
+                    });
                 }
             }
         }
+
         unmapped.sort();
         for prefix in unmapped {
             max_uid += 1;
@@ -518,7 +606,38 @@ impl MaildirBackend {
             uid_to_prefix.insert(max_uid, prefix);
         }
 
-        (prefix_to_uid, uid_to_prefix)
+        let mut uid_to_file = HashMap::with_capacity(files.len());
+        for f in files {
+            if let Some(&uid) = prefix_to_uid.get(&f.prefix) {
+                uid_to_file.insert(
+                    uid,
+                    CachedFileInfo {
+                        path: f.path,
+                        filename: f.filename,
+                        is_read: f.is_read,
+                        is_flagged: f.is_flagged,
+                    },
+                );
+            }
+        }
+
+        let new_cache_entry = MaildirDirCache {
+            mtimes: current_mtimes,
+            uid_to_file,
+            prefix_to_uid,
+            uid_to_prefix,
+        };
+
+        if let Ok(mut write_guard) = MAILDIR_CACHE.write() {
+            write_guard.insert(canonical, new_cache_entry.clone());
+        }
+
+        new_cache_entry
+    }
+
+    pub fn load_uid_maps_static(dir: &Path) -> (HashMap<String, u32>, HashMap<u32, String>) {
+        let cache = Self::get_or_refresh_dir_cache(dir);
+        (cache.prefix_to_uid, cache.uid_to_prefix)
     }
 
     fn format_address(addr: &Address) -> String {
@@ -563,37 +682,16 @@ impl MaildirBackend {
         Self::find_message_file_static(dir, uid)
     }
 
-    pub(crate) fn find_message_file_static(
-        dir: &Path,
-        uid: u32,
-    ) -> Option<(PathBuf, String, bool, bool)> {
-        let (prefix_to_uid, uid_to_prefix) = Self::load_uid_maps_static(dir);
-        let target_prefix = uid_to_prefix.get(&uid);
-
-        for sub in &["cur", "new"] {
-            let sub_path = dir.join(sub);
-            if let Ok(entries) = std::fs::read_dir(sub_path) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    let filename = entry.file_name().to_string_lossy().to_string();
-                    let prefix = Self::extract_prefix(&filename);
-
-                    let matched = if let Some(target) = target_prefix {
-                        prefix == target
-                    } else if let Some(&file_uid) = prefix_to_uid.get(prefix) {
-                        file_uid == uid
-                    } else {
-                        false
-                    };
-
-                    if matched {
-                        let (is_read, is_flagged) = Self::parse_maildir_flags(sub, &filename);
-                        return Some((path, filename, is_read, is_flagged));
-                    }
-                }
-            }
-        }
-        None
+    pub fn find_message_file_static(dir: &Path, uid: u32) -> Option<(PathBuf, String, bool, bool)> {
+        let cache = Self::get_or_refresh_dir_cache(dir);
+        cache.uid_to_file.get(&uid).map(|info| {
+            (
+                info.path.clone(),
+                info.filename.clone(),
+                info.is_read,
+                info.is_flagged,
+            )
+        })
     }
 
     fn parse_maildir_flags(sub: &str, filename: &str) -> (bool, bool) {
@@ -1155,6 +1253,7 @@ impl MailBackend for MaildirBackend {
             )));
         }
 
+        Self::invalidate_cache_static(&sent_dir);
         Ok(())
     }
 
@@ -1196,6 +1295,7 @@ impl MailBackend for MaildirBackend {
 
         std::fs::rename(&file_path, &new_path)
             .map_err(|e| BackendError::Internal(e.to_string()))?;
+        Self::invalidate_cache_static(&dir);
         Ok(())
     }
 
@@ -1225,6 +1325,11 @@ impl MailBackend for MaildirBackend {
 
         if let Some(ref store) = self.sqlite_index {
             let _ = store.remove_document(mailbox, uid);
+        }
+
+        Self::invalidate_cache_static(&dir);
+        if !mailbox.eq_ignore_ascii_case("Trash") {
+            Self::invalidate_cache_static(&self.base_dir.join(".Trash"));
         }
 
         Ok(())
@@ -1268,6 +1373,7 @@ impl MailBackend for MaildirBackend {
 
         std::fs::rename(&file_path, &new_path)
             .map_err(|e| BackendError::Internal(e.to_string()))?;
+        Self::invalidate_cache_static(&dir);
         Ok(())
     }
 
@@ -1302,6 +1408,9 @@ impl MailBackend for MaildirBackend {
         if let Some(ref store) = self.sqlite_index {
             let _ = store.remove_document(src_box, uid);
         }
+
+        Self::invalidate_cache_static(&src_dir);
+        Self::invalidate_cache_static(&dest_dir);
 
         Ok(())
     }
