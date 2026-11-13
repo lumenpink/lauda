@@ -101,10 +101,6 @@ if [ -f "$GRADLE_BUILD_KTS" ]; then
         echo "-> Injetando androidx.work:work-runtime-ktx em $GRADLE_BUILD_KTS..."
         sed -i '/dependencies {/a \    implementation("androidx.work:work-runtime-ktx:2.9.0")' "$GRADLE_BUILD_KTS"
     fi
-    if ! grep -q "org.unifiedpush.android:connector" "$GRADLE_BUILD_KTS"; then
-        echo "-> Injetando org.unifiedpush.android:connector em $GRADLE_BUILD_KTS..."
-        sed -i '/dependencies {/a \    implementation("org.unifiedpush.android:connector:2.1.1")' "$GRADLE_BUILD_KTS"
-    fi
 fi
 
 # Injetar network_security_config permitindo cleartext HTTP em rede local/Tailscale
