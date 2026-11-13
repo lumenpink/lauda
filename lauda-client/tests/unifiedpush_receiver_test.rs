@@ -17,8 +17,12 @@ fn test_unifiedpush_receiver_contract() {
         "Deve declarar a classe LaudaPushReceiver"
     );
     assert!(
-        content.contains("MessagingReceiver"),
-        "Deve estender MessagingReceiver do UnifiedPush"
+        content.contains("BroadcastReceiver"),
+        "Deve herdar diretamente de BroadcastReceiver nativo do Android"
+    );
+    assert!(
+        !content.contains("import org.unifiedpush.android.connector.MessagingReceiver"),
+        "Não deve depender da biblioteca externa MessagingReceiver"
     );
     assert!(
         content.contains("setExpedited") && content.contains("ExistingWorkPolicy.KEEP"),
@@ -44,10 +48,10 @@ fn test_publish_nightly_script_injects_unifiedpush() {
         "publish-nightly.sh deve sincronizar LaudaPushReceiver.kt"
     );
 
-    // 2. Deve injetar a dependência org.unifiedpush.android:connector
+    // 2. NÃO deve injetar pacote externo inatingível no Gradle
     assert!(
-        script_content.contains("org.unifiedpush.android:connector"),
-        "publish-nightly.sh deve injetar o SDK do UnifiedPush no build.gradle"
+        !script_content.contains("org.unifiedpush.android:connector"),
+        "publish-nightly.sh não deve tentar baixar org.unifiedpush.android:connector"
     );
 
     // 3. Deve injetar o receiver no AndroidManifest.xml
