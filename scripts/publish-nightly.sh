@@ -125,6 +125,65 @@ if [ -f "$MANIFEST_XML" ]; then
     sed -i 's/<activity /<activity android:icon="@mipmap\/ic_launcher" android:roundIcon="@mipmap\/ic_launcher_round" /g' "$MANIFEST_XML"
     # Garantir nome canônico "Lauda" e ícones oficiais
     sed -i 's/android:label="[^"]*"/android:label="@string\/app_name"/g' "$MANIFEST_XML"
+
+    # Injetar permissões para SyncAdapters nativos
+    for perm in \
+        "android.permission.READ_CONTACTS" \
+        "android.permission.WRITE_CONTACTS" \
+        "android.permission.READ_CALENDAR" \
+        "android.permission.WRITE_CALENDAR" \
+        "android.permission.GET_ACCOUNTS" \
+        "android.permission.MANAGE_ACCOUNTS" \
+        "android.permission.AUTHENTICATE_ACCOUNTS" \
+        "android.permission.READ_SYNC_SETTINGS" \
+        "android.permission.WRITE_SYNC_SETTINGS"; do
+        if ! grep -q "$perm" "$MANIFEST_XML"; then
+            sed -i "/<manifest/a \    <uses-permission android:name=\"$perm\" />" "$MANIFEST_XML"
+        fi
+    done
+
+    # Injetar declarações dos serviços de sincronização antes do fechamento </application>
+    if ! grep -q "in.twolp.lauda.LaudaAuthenticatorService" "$MANIFEST_XML"; then
+        sed -i '/<\/application>/i \
+        <service \
+            android:name="in.twolp.lauda.LaudaAuthenticatorService" \
+            android:exported="false"> \
+            <intent-filter> \
+                <action android:name="android.accounts.AccountAuthenticator" /> \
+            </intent-filter> \
+            <meta-data \
+                android:name="android.accounts.AccountAuthenticator" \
+                android:resource="@xml/authenticator" /> \
+        </service>' "$MANIFEST_XML"
+    fi
+
+    if ! grep -q "in.twolp.lauda.LaudaSyncService" "$MANIFEST_XML"; then
+        sed -i '/<\/application>/i \
+        <service \
+            android:name="in.twolp.lauda.LaudaSyncService" \
+            android:exported="true"> \
+            <intent-filter> \
+                <action android:name="android.content.SyncAdapter" /> \
+            </intent-filter> \
+            <meta-data \
+                android:name="android.content.SyncAdapter" \
+                android:resource="@xml/syncadapter" /> \
+        </service>' "$MANIFEST_XML"
+    fi
+
+    if ! grep -q "in.twolp.lauda.LaudaCalendarSyncService" "$MANIFEST_XML"; then
+        sed -i '/<\/application>/i \
+        <service \
+            android:name="in.twolp.lauda.LaudaCalendarSyncService" \
+            android:exported="true"> \
+            <intent-filter> \
+                <action android:name="android.content.SyncAdapter" /> \
+            </intent-filter> \
+            <meta-data \
+                android:name="android.content.SyncAdapter" \
+                android:resource="@xml/calendar_syncadapter" /> \
+        </service>' "$MANIFEST_XML"
+    fi
 fi
 
 # Injetar MainActivity.kt com suporte a OnBackPressedDispatcher (gestos de voltar)
@@ -133,6 +192,16 @@ if [ -f "$REPO_ROOT/lauda-client/android/MainActivity.kt" ]; then
     echo "-> Configurando OnBackPressedDispatcher em $MAIN_KT..."
     cp "$REPO_ROOT/lauda-client/android/MainActivity.kt" "$MAIN_KT"
 fi
+
+# Injetar serviços de sincronização e autenticador Kotlin em in/twolp/lauda/
+LAUDA_KOTLIN_DIR="$REPO_ROOT/target/dx/lauda-client/release/android/app/app/src/main/kotlin/in/twolp/lauda"
+mkdir -p "$LAUDA_KOTLIN_DIR"
+for kt_file in LaudaAuthenticatorService.kt LaudaSyncService.kt LaudaCalendarSyncService.kt; do
+    if [ -f "$REPO_ROOT/lauda-client/android/$kt_file" ]; then
+        echo "-> Sincronizando $kt_file em $LAUDA_KOTLIN_DIR..."
+        cp "$REPO_ROOT/lauda-client/android/$kt_file" "$LAUDA_KOTLIN_DIR/$kt_file"
+    fi
+done
 
 # Injetar recursos de ícones e arquivos do Lauda (res)
 ANDROID_APP_RES="$REPO_ROOT/target/dx/lauda-client/release/android/app/app/src/main/res"

@@ -29,7 +29,10 @@ fn test_android_syncadapter_resources_contract() {
 
     // 3. Validar calendar_syncadapter.xml (Calendário)
     let cal_xml_path = res_xml_dir.join("calendar_syncadapter.xml");
-    assert!(cal_xml_path.exists(), "calendar_syncadapter.xml deve existir");
+    assert!(
+        cal_xml_path.exists(),
+        "calendar_syncadapter.xml deve existir"
+    );
     let cal_content = std::fs::read_to_string(&cal_xml_path).unwrap();
     assert!(
         cal_content.contains("android:contentAuthority=\"com.android.calendar\""),
@@ -50,7 +53,10 @@ fn test_android_kotlin_services_exist() {
     let sync_kt = android_dir.join("LaudaSyncService.kt");
     let cal_kt = android_dir.join("LaudaCalendarSyncService.kt");
 
-    assert!(auth_kt.exists(), "LaudaAuthenticatorService.kt deve existir");
+    assert!(
+        auth_kt.exists(),
+        "LaudaAuthenticatorService.kt deve existir"
+    );
     assert!(sync_kt.exists(), "LaudaSyncService.kt deve existir");
     assert!(cal_kt.exists(), "LaudaCalendarSyncService.kt deve existir");
 
