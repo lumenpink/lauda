@@ -18,6 +18,8 @@ use tokio_stream::wrappers::BroadcastStream;
 use crate::auth::{create_token, verify_token};
 use crate::domain::{BackendError, MailBackend};
 
+pub type PushRegistry = Arc<tokio::sync::RwLock<std::collections::HashSet<String>>>;
+
 #[derive(Clone)]
 pub struct AppState {
     pub backend: Arc<dyn MailBackend>,
@@ -25,6 +27,7 @@ pub struct AppState {
     pub events_tx: tokio::sync::broadcast::Sender<String>,
     pub contacts_store: Option<Arc<crate::adapters::sqlite_contacts::SqliteContactsStore>>,
     pub calendar_store: Option<Arc<crate::adapters::sqlite_calendar::SqliteCalendarStore>>,
+    pub push_registry: PushRegistry,
 }
 
 pub struct AuthUser(pub String);
@@ -551,12 +554,14 @@ pub fn app_router_with_events_tx(
     jwt_secret: impl Into<String>,
     events_tx: tokio::sync::broadcast::Sender<String>,
 ) -> Router {
+    let push_registry = Arc::new(tokio::sync::RwLock::new(std::collections::HashSet::new()));
     let state = AppState {
         backend,
         jwt_secret: jwt_secret.into(),
         events_tx,
         contacts_store: None,
         calendar_store: None,
+        push_registry,
     };
 
     build_router(state)
@@ -568,12 +573,14 @@ pub fn app_router_with_contacts(
     contacts_store: crate::adapters::sqlite_contacts::SqliteContactsStore,
 ) -> Router {
     let (events_tx, _) = tokio::sync::broadcast::channel(128);
+    let push_registry = Arc::new(tokio::sync::RwLock::new(std::collections::HashSet::new()));
     let state = AppState {
         backend,
         jwt_secret: jwt_secret.into(),
         events_tx,
         contacts_store: Some(Arc::new(contacts_store)),
         calendar_store: None,
+        push_registry,
     };
 
     build_router(state)
@@ -586,22 +593,40 @@ pub fn app_router_with_calendar(
     calendar_store: crate::adapters::sqlite_calendar::SqliteCalendarStore,
 ) -> Router {
     let (events_tx, _) = tokio::sync::broadcast::channel(128);
+    let push_registry = Arc::new(tokio::sync::RwLock::new(std::collections::HashSet::new()));
     let state = AppState {
         backend,
         jwt_secret: jwt_secret.into(),
         events_tx,
         contacts_store: Some(Arc::new(contacts_store)),
         calendar_store: Some(Arc::new(calendar_store)),
+        push_registry,
     };
 
     build_router(state)
 }
 
 fn build_router(state: AppState) -> Router {
+    let push_registry = state.push_registry.clone();
+    let mut push_rx = state.events_tx.subscribe();
+    tokio::spawn(async move {
+        while let Ok(msg) = push_rx.recv().await {
+            if msg.starts_with("mail_updated:") {
+                dispatch_push_notifications(&push_registry).await;
+            }
+        }
+    });
+
     let base = Router::new()
         .route("/auth/login", post(login_handler))
         .route("/events", get(events_handler))
         .route("/ws", get(ws_handler))
+        .route("/api/push/register", post(register_push_handler))
+        .route(
+            "/api/push/unregister",
+            axum::routing::delete(unregister_push_handler),
+        )
+        .route("/api/push/notify", post(notify_push_handler))
         .route("/contacts", get(list_contacts_handler))
         .route("/contacts/sync", post(sync_contacts_handler))
         .route("/mailboxes", get(list_mailboxes_handler))
@@ -650,4 +675,69 @@ fn build_router(state: AppState) -> Router {
     }
 
     router
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PushRegisterRequest {
+    pub endpoint: String,
+    pub instance: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PushUnregisterRequest {
+    pub endpoint: String,
+}
+
+async fn register_push_handler(
+    State(state): State<AppState>,
+    Json(payload): Json<PushRegisterRequest>,
+) -> StatusCode {
+    let mut guard = state.push_registry.write().await;
+    guard.insert(payload.endpoint);
+    StatusCode::OK
+}
+
+async fn unregister_push_handler(
+    State(state): State<AppState>,
+    Json(payload): Json<PushUnregisterRequest>,
+) -> StatusCode {
+    let mut guard = state.push_registry.write().await;
+    guard.remove(&payload.endpoint);
+    StatusCode::OK
+}
+
+async fn notify_push_handler(State(state): State<AppState>) -> StatusCode {
+    dispatch_push_notifications(&state.push_registry).await;
+    StatusCode::OK
+}
+
+pub async fn dispatch_push_notifications(registry: &PushRegistry) {
+    let endpoints: Vec<String> = {
+        let guard = registry.read().await;
+        guard.iter().cloned().collect()
+    };
+
+    if endpoints.is_empty() {
+        return;
+    }
+
+    tokio::spawn(async move {
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(3))
+            .build();
+
+        if let Ok(client) = client {
+            for ep in endpoints {
+                let cl = client.clone();
+                tokio::spawn(async move {
+                    let _ = cl
+                        .post(&ep)
+                        .header("Title", "Lauda")
+                        .body("sync")
+                        .send()
+                        .await;
+                });
+            }
+        }
+    });
 }

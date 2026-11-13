@@ -54,8 +54,8 @@ async fn test_push_register_and_unregister_endpoints() {
 
 #[tokio::test]
 async fn test_push_dispatcher_triggers_blind_http_post() {
-    use std::sync::atomic::{AtomicBool, Ordering};
     use axum::routing::post;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     let received = Arc::new(AtomicBool::new(false));
     let received_clone = received.clone();
@@ -108,5 +108,8 @@ async fn test_push_dispatcher_triggers_blind_http_post() {
 
     // Aguardar entrega assíncrona
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    assert!(received.load(Ordering::SeqCst), "O webhook push deve ser entregue");
+    assert!(
+        received.load(Ordering::SeqCst),
+        "O webhook push deve ser entregue"
+    );
 }
