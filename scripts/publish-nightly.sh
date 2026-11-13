@@ -101,6 +101,10 @@ if [ -f "$GRADLE_BUILD_KTS" ]; then
         echo "-> Injetando androidx.work:work-runtime-ktx em $GRADLE_BUILD_KTS..."
         sed -i '/dependencies {/a \    implementation("androidx.work:work-runtime-ktx:2.9.0")' "$GRADLE_BUILD_KTS"
     fi
+    if ! grep -q "org.unifiedpush.android:connector" "$GRADLE_BUILD_KTS"; then
+        echo "-> Injetando org.unifiedpush.android:connector em $GRADLE_BUILD_KTS..."
+        sed -i '/dependencies {/a \    implementation("org.unifiedpush.android:connector:2.1.1")' "$GRADLE_BUILD_KTS"
+    fi
 fi
 
 # Injetar network_security_config permitindo cleartext HTTP em rede local/Tailscale
@@ -192,6 +196,20 @@ if [ -f "$MANIFEST_XML" ]; then
                 android:resource="@xml/calendar_syncadapter" /> \
         </service>' "$MANIFEST_XML"
     fi
+
+    if ! grep -q "in.twolp.lauda.LaudaPushReceiver" "$MANIFEST_XML"; then
+        sed -i '/<\/application>/i \
+        <receiver \
+            android:name="in.twolp.lauda.LaudaPushReceiver" \
+            android:exported="true"> \
+            <intent-filter> \
+                <action android:name="org.unifiedpush.android.connector.MESSAGE" /> \
+                <action android:name="org.unifiedpush.android.connector.NEW_ENDPOINT" /> \
+                <action android:name="org.unifiedpush.android.connector.REGISTRATION_FAILED" /> \
+                <action android:name="org.unifiedpush.android.connector.UNREGISTERED" /> \
+            </intent-filter> \
+        </receiver>' "$MANIFEST_XML"
+    fi
 fi
 
 # Injetar MainActivity.kt com suporte a OnBackPressedDispatcher (gestos de voltar)
@@ -204,7 +222,7 @@ fi
 # Injetar serviços de sincronização e autenticador Kotlin em in/twolp/lauda/
 LAUDA_KOTLIN_DIR="$REPO_ROOT/target/dx/lauda-client/release/android/app/app/src/main/kotlin/in/twolp/lauda"
 mkdir -p "$LAUDA_KOTLIN_DIR"
-for kt_file in LaudaAuthenticatorService.kt LaudaSyncService.kt LaudaCalendarSyncService.kt LaudaSyncWorker.kt; do
+for kt_file in LaudaAuthenticatorService.kt LaudaSyncService.kt LaudaCalendarSyncService.kt LaudaSyncWorker.kt LaudaPushReceiver.kt; do
     if [ -f "$REPO_ROOT/lauda-client/android/$kt_file" ]; then
         echo "-> Sincronizando $kt_file em $LAUDA_KOTLIN_DIR..."
         cp "$REPO_ROOT/lauda-client/android/$kt_file" "$LAUDA_KOTLIN_DIR/$kt_file"
