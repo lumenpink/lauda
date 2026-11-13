@@ -95,6 +95,14 @@ if old_block in content:
 "
 fi
 
+# Injetar dependência androidx.work:work-runtime-ktx em build.gradle.kts
+if [ -f "$GRADLE_BUILD_KTS" ]; then
+    if ! grep -q "androidx.work:work-runtime-ktx" "$GRADLE_BUILD_KTS"; then
+        echo "-> Injetando androidx.work:work-runtime-ktx em $GRADLE_BUILD_KTS..."
+        sed -i '/dependencies {/a \    implementation("androidx.work:work-runtime-ktx:2.9.0")' "$GRADLE_BUILD_KTS"
+    fi
+fi
+
 # Injetar network_security_config permitindo cleartext HTTP em rede local/Tailscale
 NETSEC_XML="$REPO_ROOT/target/dx/lauda-client/release/android/app/app/src/main/res/xml/network_security_config.xml"
 echo "-> Habilitando cleartext HTTP para rede local/Tailscale em $NETSEC_XML..."
@@ -196,7 +204,7 @@ fi
 # Injetar serviços de sincronização e autenticador Kotlin em in/twolp/lauda/
 LAUDA_KOTLIN_DIR="$REPO_ROOT/target/dx/lauda-client/release/android/app/app/src/main/kotlin/in/twolp/lauda"
 mkdir -p "$LAUDA_KOTLIN_DIR"
-for kt_file in LaudaAuthenticatorService.kt LaudaSyncService.kt LaudaCalendarSyncService.kt; do
+for kt_file in LaudaAuthenticatorService.kt LaudaSyncService.kt LaudaCalendarSyncService.kt LaudaSyncWorker.kt; do
     if [ -f "$REPO_ROOT/lauda-client/android/$kt_file" ]; then
         echo "-> Sincronizando $kt_file em $LAUDA_KOTLIN_DIR..."
         cp "$REPO_ROOT/lauda-client/android/$kt_file" "$LAUDA_KOTLIN_DIR/$kt_file"
