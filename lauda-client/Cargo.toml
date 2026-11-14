@@ -1,6 +1,6 @@
 [package]
 name = "lauda-client"
-version = "0.6.0-dev.46+20261113.4d3d416"
+version = "0.6.0-dev.47+20261113.16abe20"
 edition = "2024"
 authors = ["Lumen <lumen@2lp.in>"]
 description = "Smolclient minimalista em Dioxus para leitura em texto puro e redação rápida"

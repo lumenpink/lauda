@@ -8,7 +8,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import in.twolp.lauda.LaudaSyncWorker
+import `in`.twolp.lauda.LaudaSyncWorker
 import java.util.concurrent.TimeUnit
 
 typealias BuildConfig = com.example.LaudaClient.BuildConfig
@@ -38,7 +38,7 @@ class MainActivity : WryActivity() {
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
 
-            val syncRequest = PeriodicWorkRequestBuilder<LaudaSyncWorker>(15, TimeUnit.MINUTES)
+            val syncRequest = PeriodicWorkRequestBuilder<LaudaSyncWorker>(15L, TimeUnit.MINUTES)
                 .setConstraints(constraints)
                 .build()
 
