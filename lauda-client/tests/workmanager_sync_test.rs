@@ -9,8 +9,8 @@ fn test_workmanager_sync_worker_contract() {
     let content = std::fs::read_to_string(&worker_kt).unwrap();
 
     assert!(
-        content.contains("package in.twolp.lauda"),
-        "Deve pertencer ao pacote in.twolp.lauda"
+        content.contains("package `in`.twolp.lauda"),
+        "Deve pertencer ao pacote `in`.twolp.lauda escapado"
     );
     assert!(
         content.contains("class LaudaSyncWorker"),
@@ -54,6 +54,14 @@ fn test_main_activity_schedules_periodic_workmanager() {
     assert!(main_kt.exists(), "MainActivity.kt deve existir");
 
     let content = std::fs::read_to_string(&main_kt).unwrap();
+    assert!(
+        content.contains("import `in`.twolp.lauda.LaudaSyncWorker"),
+        "MainActivity.kt deve importar LaudaSyncWorker com crases escapatórias"
+    );
+    assert!(
+        content.contains("PeriodicWorkRequestBuilder<LaudaSyncWorker>(15L,"),
+        "MainActivity.kt deve passar 15L para PeriodicWorkRequestBuilder"
+    );
     assert!(
         content.contains("WorkManager") && content.contains("LaudaSyncWorker"),
         "MainActivity.kt deve inicializar o WorkManager com LaudaSyncWorker"

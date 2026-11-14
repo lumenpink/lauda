@@ -9,8 +9,8 @@ fn test_unifiedpush_receiver_contract() {
     let content = std::fs::read_to_string(&receiver_kt).unwrap();
 
     assert!(
-        content.contains("package in.twolp.lauda"),
-        "Deve pertencer ao pacote in.twolp.lauda"
+        content.contains("package `in`.twolp.lauda"),
+        "Deve pertencer ao pacote `in`.twolp.lauda escapado"
     );
     assert!(
         content.contains("class LaudaPushReceiver"),

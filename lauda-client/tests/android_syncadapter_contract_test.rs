@@ -62,8 +62,8 @@ fn test_android_kotlin_services_exist() {
 
     let auth_content = std::fs::read_to_string(&auth_kt).unwrap();
     assert!(
-        auth_content.contains("package in.twolp.lauda"),
-        "Pacote canônico in.twolp.lauda"
+        auth_content.contains("package `in`.twolp.lauda"),
+        "Pacote canônico `in`.twolp.lauda com escape de palavra reservada"
     );
     assert!(
         auth_content.contains("class LaudaAuthenticatorService"),
@@ -72,14 +72,18 @@ fn test_android_kotlin_services_exist() {
 
     let sync_content = std::fs::read_to_string(&sync_kt).unwrap();
     assert!(
+        sync_content.contains("package `in`.twolp.lauda"),
+        "Pacote canônico `in`.twolp.lauda em LaudaSyncService"
+    );
+    assert!(
         sync_content.contains("class LaudaSyncService"),
         "Declaração de LaudaSyncService"
     );
 
     let cal_content = std::fs::read_to_string(&cal_kt).unwrap();
     assert!(
-        cal_content.contains("class LaudaCalendarSyncService"),
-        "Declaração de LaudaCalendarSyncService"
+        cal_content.contains("package `in`.twolp.lauda"),
+        "Pacote canônico `in`.twolp.lauda em LaudaCalendarSyncService"
     );
 }
 
