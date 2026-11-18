@@ -1,5 +1,5 @@
 use lauda_client::domain::update::{
-    check_update, should_show_update_banner, UpdateManifest, UpdateStatus,
+    UpdateManifest, UpdateStatus, check_update, should_show_update_banner,
 };
 
 fn mock_manifest(version: &str, min_compatible_version: &str) -> UpdateManifest {
