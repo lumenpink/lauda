@@ -1,4 +1,6 @@
-use lauda_client::domain::update::{check_update, UpdateManifest, UpdateStatus};
+use lauda_client::domain::update::{
+    check_update, should_show_update_banner, UpdateManifest, UpdateStatus,
+};
 
 fn mock_manifest(version: &str, min_compatible_version: &str) -> UpdateManifest {
     UpdateManifest {
@@ -12,9 +14,6 @@ fn mock_manifest(version: &str, min_compatible_version: &str) -> UpdateManifest 
 
 #[test]
 fn test_check_update_identical_version_must_be_up_to_date() {
-    // Cenário real do bug do ticket #111:
-    // A versão instalada é idêntica à versão do manifesto, mas min_compatible_version
-    // é superior ("0.1.0" vs "0.0.2-...").
     let manifest = mock_manifest("0.0.2-dev.1+20261113.5b5c4c4", "0.1.0");
     let status = check_update("0.0.2-dev.1+20261113.5b5c4c4", &manifest);
 
@@ -34,6 +33,18 @@ fn test_check_update_identical_version_with_v_prefix() {
         status,
         UpdateStatus::UpToDate,
         "Versão com prefixo 'v' idêntica à remota deve ser UpToDate"
+    );
+}
+
+#[test]
+fn test_check_update_identical_version_with_spaces() {
+    let manifest = mock_manifest(" 0.5.0 ", "0.6.0");
+    let status = check_update("  v0.5.0  ", &manifest);
+
+    assert_eq!(
+        status,
+        UpdateStatus::UpToDate,
+        "Versão com espaços e prefixo 'v' deve ser UpToDate"
     );
 }
 
@@ -71,4 +82,35 @@ fn test_check_update_legitimate_required() {
         UpdateStatus::Required(manifest),
         "Versão local abaixo do mínimo compatível com remota mais nova deve ser Required"
     );
+}
+
+#[test]
+fn test_check_update_mutation_garbage_min_compatible() {
+    // Se min_compatible_version estiver vazia ou for lixo textual,
+    // triplet de min avalia para (0, 0, 0), portanto a atualização é opcional (Available)
+    let manifest = mock_manifest("0.6.0", "invalid-semver");
+    let status = check_update("0.5.0", &manifest);
+
+    assert_eq!(
+        status,
+        UpdateStatus::Available(manifest),
+        "Min compatível inválido não deve quebrar nem forçar Required indevido"
+    );
+}
+
+#[test]
+fn test_should_show_update_banner_logic() {
+    let manifest = mock_manifest("0.6.0", "0.5.0");
+
+    // Banner exibido se não foi dispensado
+    assert!(should_show_update_banner(Some(&manifest), None));
+
+    // Banner ocultado se a versão dispensada for a mesma
+    assert!(!should_show_update_banner(Some(&manifest), Some("0.6.0")));
+
+    // Banner reexibido se uma versão mais nova chegar após dispensa anterior
+    assert!(should_show_update_banner(Some(&manifest), Some("0.5.0")));
+
+    // Banner não exibido se manifest for None
+    assert!(!should_show_update_banner(None, None));
 }
