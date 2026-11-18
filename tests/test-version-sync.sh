@@ -65,5 +65,18 @@ if [ "$CLEAN_VAL" != "0.8.1-clean" ]; then
     exit 1
 fi
 
-echo "✓ Sucesso: VERSION permaneceu imutável e manifestos foram sincronizados passivamente com sucesso."
+# 5. Teste de mutação e resiliência: VERSION ausente ou vazio deve falhar
+rm -f "$VERSION_FILE"
+if "$REPO_ROOT/scripts/sync-version-manifests.sh" 2>/dev/null; then
+    echo "❌ ERRO: sync-version-manifests.sh deveria ter falhado com VERSION ausente!"
+    exit 1
+fi
+
+touch "$VERSION_FILE"
+if "$REPO_ROOT/scripts/sync-version-manifests.sh" 2>/dev/null; then
+    echo "❌ ERRO: sync-version-manifests.sh deveria ter falhado com VERSION vazio!"
+    exit 1
+fi
+
+echo "✓ Sucesso: VERSION permaneceu imutável, mutantes foram exterminados e manifestos foram sincronizados passivamente com sucesso."
 exit 0
