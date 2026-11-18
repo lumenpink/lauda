@@ -23,16 +23,28 @@ pub enum UpdateStatus {
 
 /// Compara semanticamente duas versões no formato "MAJOR.MINOR.PATCH" ou com sufixos.
 pub fn check_update(current_version: &str, manifest: &UpdateManifest) -> UpdateStatus {
+    let clean_current = current_version.trim().trim_start_matches('v');
+    let clean_remote = manifest.version.trim().trim_start_matches('v');
+
+    // 1. Curto-circuito de igualdade canônica estrita
+    if clean_current == clean_remote {
+        return UpdateStatus::UpToDate;
+    }
+
     let current_triplet = parse_semver_triplet(current_version);
     let remote_triplet = parse_semver_triplet(&manifest.version);
     let min_triplet = parse_semver_triplet(&manifest.min_compatible_version);
 
+    // 2. Se a versão remota não for estritamente mais recente, o app já está atualizado
+    if current_triplet >= remote_triplet {
+        return UpdateStatus::UpToDate;
+    }
+
+    // 3. Versão remota é estritamente mais recente: valida versão mínima compatível
     if current_triplet < min_triplet {
         UpdateStatus::Required(manifest.clone())
-    } else if current_triplet < remote_triplet {
-        UpdateStatus::Available(manifest.clone())
     } else {
-        UpdateStatus::UpToDate
+        UpdateStatus::Available(manifest.clone())
     }
 }
 
