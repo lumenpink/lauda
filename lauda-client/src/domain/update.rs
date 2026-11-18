@@ -50,6 +50,7 @@ pub fn check_update(current_version: &str, manifest: &UpdateManifest) -> UpdateS
 
 fn parse_semver_triplet(version: &str) -> (u32, u32, u32) {
     let clean = version
+        .trim()
         .trim_start_matches('v')
         .split('-')
         .next()
