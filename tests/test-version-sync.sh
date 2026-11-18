@@ -56,5 +56,14 @@ if [ "$SITE_NIGHTLY_VER_VAL" != "$TEST_VERSION" ]; then
     exit 1
 fi
 
+# 4. Caso de borda: VERSION contendo espaços em branco ou quebras de linha
+echo "  0.8.1-clean   " > "$VERSION_FILE"
+"$REPO_ROOT/scripts/sync-version-manifests.sh"
+CLEAN_VAL=$(python3 -c "import json; print(json.load(open('$SITE_VERSION'))['version'])")
+if [ "$CLEAN_VAL" != "0.8.1-clean" ]; then
+    echo "❌ ERRO: version.json não higienizou espaços em branco de VERSION!"
+    exit 1
+fi
+
 echo "✓ Sucesso: VERSION permaneceu imutável e manifestos foram sincronizados passivamente com sucesso."
 exit 0
