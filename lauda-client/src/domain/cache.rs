@@ -28,6 +28,8 @@ impl std::fmt::Debug for LocalMessageCache {
 }
 
 impl LocalMessageCache {
+    /// Nome canônico do banco de dados no IndexedDB para clientes web (WASM).
+    pub const IDB_DATABASE_NAME: &str = "lauda_messages";
     /// Abre ou cria o banco de cache SQLite no diretório base especificado.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn open<P: AsRef<Path>>(base_dir: P) -> std::io::Result<Self> {
@@ -811,7 +813,11 @@ impl LocalMessageCache {
         }
         #[cfg(target_arch = "wasm32")]
         {
-            let _ = (mailbox, docs);
+            let mailbox_str = mailbox.to_string();
+            let docs_vec = docs.to_vec();
+            wasm_bindgen_futures::spawn_local(async move {
+                let _ = Self::save_index_slice_idb(&mailbox_str, &docs_vec).await;
+            });
             Ok(())
         }
     }
@@ -849,8 +855,120 @@ impl LocalMessageCache {
         #[cfg(target_arch = "wasm32")]
         {
             let _ = mailbox;
+            // No WASM, o carregamento do IndexedDB é estritamente assíncrono via `load_index_slice_idb`.
             Ok(None)
         }
+    }
+
+    /// Inicializa a conexão com o IndexedDB do navegador.
+    #[cfg(target_arch = "wasm32")]
+    pub async fn open_rexie() -> Result<rexie::Rexie, std::io::Error> {
+        rexie::Rexie::builder(Self::IDB_DATABASE_NAME)
+            .version(1)
+            .add_object_store(rexie::ObjectStore::new("mailboxes").key_path("name"))
+            .add_object_store(rexie::ObjectStore::new("envelopes").key_path("key"))
+            .add_object_store(rexie::ObjectStore::new("index_slices").key_path("mailbox"))
+            .build()
+            .await
+            .map_err(|e| std::io::Error::other(e.to_string()))
+    }
+
+    /// Salva assincronamente a fatia de documentos pré-indexados no IndexedDB (WASM).
+    #[cfg(target_arch = "wasm32")]
+    pub async fn save_index_slice_idb(
+        mailbox: &str,
+        docs: &[lauda_index::IndexedDoc],
+    ) -> std::io::Result<()> {
+        let rexie = Self::open_rexie().await?;
+        let tx = rexie
+            .transaction(&["index_slices"], rexie::TransactionMode::ReadWrite)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        let store = tx
+            .store("index_slices")
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+        // Desacopla vetores pesados no WASM ao persistir
+        let stripped_docs: Vec<lauda_index::IndexedDoc> = docs
+            .iter()
+            .cloned()
+            .map(|mut d| {
+                d.segment_embeddings.clear();
+                d
+            })
+            .collect();
+
+        #[derive(serde::Serialize)]
+        struct IndexSliceRecord {
+            mailbox: String,
+            docs_json: String,
+        }
+
+        let docs_json =
+            serde_json::to_string(&stripped_docs).map_err(|e| std::io::Error::other(e.to_string()))?;
+        let record = IndexSliceRecord {
+            mailbox: mailbox.to_string(),
+            docs_json,
+        };
+        let json_str =
+            serde_json::to_string(&record).map_err(|e| std::io::Error::other(e.to_string()))?;
+        let js_val = js_sys::JSON::parse(&json_str)
+            .map_err(|e| std::io::Error::other(format!("{e:?}")))?;
+
+        store
+            .put(&js_val, None)
+            .await
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        tx.done()
+            .await
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Recupera assincronamente a fatia de documentos e reconstrói o `MessageIndex` para busca BM25 no WASM.
+    #[cfg(target_arch = "wasm32")]
+    pub async fn load_index_slice_idb(
+        mailbox: &str,
+    ) -> std::io::Result<Option<lauda_index::MessageIndex>> {
+        let rexie = Self::open_rexie().await?;
+        let tx = rexie
+            .transaction(&["index_slices"], rexie::TransactionMode::ReadOnly)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        let store = tx
+            .store("index_slices")
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+        let key = web_sys::wasm_bindgen::JsValue::from_str(mailbox);
+        let val = match store.get(key).await {
+            Ok(Some(v)) => v,
+            _ => return Ok(None),
+        };
+
+        if val.is_undefined() || val.is_null() {
+            return Ok(None);
+        }
+
+        let json_str: String = match js_sys::JSON::stringify(&val) {
+            Ok(s) => s.into(),
+            Err(_) => return Ok(None),
+        };
+
+        #[derive(serde::Deserialize)]
+        struct IndexSliceRecord {
+            docs_json: String,
+        }
+
+        if let Ok(record) = serde_json::from_str::<IndexSliceRecord>(&json_str)
+            && let Ok(docs) =
+                serde_json::from_str::<Vec<lauda_index::IndexedDoc>>(&record.docs_json)
+        {
+            let mut index = lauda_index::MessageIndex::new();
+            for d in docs {
+                index.insert_doc(d);
+            }
+            return Ok(Some(index));
+        }
+
+        Ok(None)
     }
 }
 
