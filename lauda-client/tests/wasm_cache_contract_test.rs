@@ -112,8 +112,5 @@ fn test_wasm_local_search_bm25_mutation_ranking_and_terms() {
         ranked[0], 501,
         "Documento com maior TF deve vir em primeiro no ranking BM25 do WASM"
     );
-    assert_eq!(
-        ranked[1], 502,
-        "Documento com menor TF deve vir em segundo"
-    );
+    assert_eq!(ranked[1], 502, "Documento com menor TF deve vir em segundo");
 }

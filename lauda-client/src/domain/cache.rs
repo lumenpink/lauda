@@ -903,16 +903,16 @@ impl LocalMessageCache {
             docs_json: String,
         }
 
-        let docs_json =
-            serde_json::to_string(&stripped_docs).map_err(|e| std::io::Error::other(e.to_string()))?;
+        let docs_json = serde_json::to_string(&stripped_docs)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
         let record = IndexSliceRecord {
             mailbox: mailbox.to_string(),
             docs_json,
         };
         let json_str =
             serde_json::to_string(&record).map_err(|e| std::io::Error::other(e.to_string()))?;
-        let js_val = js_sys::JSON::parse(&json_str)
-            .map_err(|e| std::io::Error::other(format!("{e:?}")))?;
+        let js_val =
+            js_sys::JSON::parse(&json_str).map_err(|e| std::io::Error::other(format!("{e:?}")))?;
 
         store
             .put(&js_val, None)
