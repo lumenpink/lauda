@@ -52,7 +52,8 @@ fn test_search_bm25_retrieval_and_ranking() {
         conn.execute(
             "INSERT INTO inverted_index (term, mailbox, uid, tf) VALUES (?1, ?2, ?3, ?4)",
             rusqlite::params!["orcamento", "INBOX", 4242, 5],
-        ).expect("insert inverted_index");
+        )
+        .expect("insert inverted_index");
     }
 
     let results = store
@@ -96,18 +97,21 @@ fn test_search_bm25_mutation_ordering_and_mailbox_isolation() {
         conn.execute(
             "INSERT INTO inverted_index (term, mailbox, uid, tf) VALUES (?1, ?2, ?3, ?4)",
             rusqlite::params!["relatorio", "INBOX", 1, 2],
-        ).expect("insert inverted doc 1");
+        )
+        .expect("insert inverted doc 1");
 
         conn.execute(
             "INSERT INTO inverted_index (term, mailbox, uid, tf) VALUES (?1, ?2, ?3, ?4)",
             rusqlite::params!["relatorio", "INBOX", 2, 10],
-        ).expect("insert inverted doc 2");
+        )
+        .expect("insert inverted doc 2");
 
         // Sent: doc 3 tem tf=50, mas pertence a outra caixa
         conn.execute(
             "INSERT INTO inverted_index (term, mailbox, uid, tf) VALUES (?1, ?2, ?3, ?4)",
             rusqlite::params!["relatorio", "Sent", 3, 50],
-        ).expect("insert inverted doc 3");
+        )
+        .expect("insert inverted doc 3");
     }
 
     let results = store
@@ -121,7 +125,16 @@ fn test_search_bm25_mutation_ordering_and_mailbox_isolation() {
     );
 
     // Valida ordenação BM25 (doc 2 com tf=10 deve vir antes do doc 1 com tf=2)
-    assert!(results.len() >= 2, "Ambos os documentos devem ser retornados");
-    assert_eq!(results[0].uid, 2, "Documento com maior TF deve ser ranqueado em primeiro");
-    assert_eq!(results[1].uid, 1, "Documento com menor TF deve ser ranqueado em segundo");
+    assert!(
+        results.len() >= 2,
+        "Ambos os documentos devem ser retornados"
+    );
+    assert_eq!(
+        results[0].uid, 2,
+        "Documento com maior TF deve ser ranqueado em primeiro"
+    );
+    assert_eq!(
+        results[1].uid, 1,
+        "Documento com menor TF deve ser ranqueado em segundo"
+    );
 }
