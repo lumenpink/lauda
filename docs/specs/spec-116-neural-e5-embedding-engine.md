@@ -21,3 +21,15 @@ Isso impedia que e-mails reais no `lauda-server` fossem indexados com representa
 2. Dimensão vetorial estritamente padronizada em 384 floats normalizados ($L_2 = 1.0$).
 3. Preservação estrita das instruções assimétricas E5 (`query: ` para buscas e `passage: ` para segmentos indexados via Urupema).
 4. Crate `lauda-index` compila tanto sem a feature `neural` (padrão hermético/WASM) quanto com a feature ativa.
+
+### Conclusão & Validação (Fase 9)
+1. **Implementação:**
+   - Adicionada variante `DynamicEmbeddingProvider::Neural(Arc<dyn EmbeddingProvider>)` em `lauda-index/src/index.rs`.
+   - Adicionados construtores `new_neural(provider)` e métodos de introspecção `is_neural()`.
+   - Extraído método `search_hybrid_with_provider` em `lauda-server/src/adapters/sqlite_index.rs`, desacoplando consultas híbridas e permitindo injeção explícita de provedor.
+2. **Testes & Cobertura:**
+   - Teste unitário e de contrato implementado em `lauda-index/tests/neural_e5_provider_test.rs`.
+   - Teste de mutação validando `embed_passage`, normalização L2 e fallback determinístico.
+3. **Quality Gate:**
+   - Formatação (`cargo fmt --check`), linting estrito (`cargo clippy --all-targets -p lauda-index -p lauda-server -- -D warnings`) e suíte de testes do módulo executados com 100% de sucesso.
+
