@@ -68,4 +68,25 @@ mod tests {
             vec!["atencao", "reuniao", "de", "orcamento", "planejamento"]
         );
     }
+
+    #[test]
+    fn test_mutation_diacritics_coverage() {
+        // Testa idempotência
+        assert_eq!(normalize(""), "");
+        assert_eq!(normalize("12345"), "12345");
+        assert_eq!(normalize("atencao"), "atencao");
+
+        // Diacríticos espanhóis e isolados
+        assert_eq!(normalize("ESPAÑA"), "espana");
+        assert_eq!(normalize("cañón"), "canon");
+
+        // Garante que nenhum caractere mapeado é acidentalmente ignorado
+        let all_upper = "ÁÀÃÂÄ ÉÈÊË ÍÌÎÏ ÓÒÕÔÖ ÚÙÛÜ Ç Ñ";
+        let all_lower = "áàãâä éèêë íìîï óòõôö úùûü ç ñ";
+        assert_eq!(normalize(all_upper), normalize(all_lower));
+        assert_eq!(
+            normalize(all_upper),
+            "aaaaa eeee iiii ooooo uuuu c n"
+        );
+    }
 }
