@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex, RwLock};
 
 use chrono::{DateTime, Utc};
-use lauda_index::{EmbeddingProvider, FlatVectorIndex, IndexedDoc, MessageIndex};
+use lauda_index::{FlatVectorIndex, IndexedDoc, MessageIndex};
 use lauda_types::{MailboxSyncStatus, MessageEnvelope};
 use rusqlite::{Connection, params};
 use urupema::domain::SegmentKind;
@@ -515,8 +515,19 @@ impl SqliteIndexStore {
         query: &str,
         limit: usize,
     ) -> Result<Vec<MessageEnvelope>, rusqlite::Error> {
+        let provider = lauda_index::DynamicEmbeddingProvider::from_path_or_fallback("models/e5-small.onnx");
+        self.search_hybrid_with_provider(mailbox, query, limit, &provider)
+    }
+
+    /// Executa busca híbrida com provedor customizado/injetado de embeddings.
+    pub fn search_hybrid_with_provider(
+        &self,
+        mailbox: &str,
+        query: &str,
+        limit: usize,
+        provider: &impl lauda_index::EmbeddingProvider,
+    ) -> Result<Vec<MessageEnvelope>, rusqlite::Error> {
         let parsed = lauda_index::parse_query(query);
-        let provider = lauda_index::SimpleCpuEmbeddingProvider;
         let query_vec = provider.embed_query(query);
 
         let conn = self.conn.lock().unwrap();
