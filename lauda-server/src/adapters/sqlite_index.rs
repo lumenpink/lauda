@@ -545,12 +545,11 @@ impl SqliteIndexStore {
                 .join(", ");
 
             let sql_bm25 = format!(
-                "SELECT d.uid
+                "SELECT i.uid
                  FROM inverted_index i
-                 JOIN indexed_documents d ON d.mailbox = i.mailbox AND d.uid = i.uid
                  WHERE i.mailbox = ?1 AND i.term IN ({})
-                 GROUP BY d.uid
-                 ORDER BY SUM(i.tf) DESC, d.uid DESC
+                 GROUP BY i.uid
+                 ORDER BY SUM(i.tf) DESC, i.uid DESC
                  LIMIT 50",
                 placeholders
             );
