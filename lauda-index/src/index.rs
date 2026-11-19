@@ -58,12 +58,27 @@ impl<P: EmbeddingProvider> EmbeddingProvider for E5InstructionProvider<P> {
 }
 
 /// Provedor dinâmico que carrega modelo neural se presente ou utiliza fallback gracioso.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum DynamicEmbeddingProvider {
     Fallback(SimpleCpuEmbeddingProvider),
+    Neural(std::sync::Arc<dyn EmbeddingProvider>),
+}
+
+impl std::fmt::Debug for DynamicEmbeddingProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Fallback(p) => f.debug_tuple("Fallback").field(p).finish(),
+            Self::Neural(_) => f.debug_tuple("Neural").finish(),
+        }
+    }
 }
 
 impl DynamicEmbeddingProvider {
+    /// Inicializa a variante neural com um provedor neural de inferência.
+    pub fn new_neural(provider: std::sync::Arc<dyn EmbeddingProvider>) -> Self {
+        Self::Neural(provider)
+    }
+
     pub fn from_path_or_fallback<P: AsRef<Path>>(path: P) -> Self {
         let p = path.as_ref();
         if p.exists() {
@@ -77,24 +92,31 @@ impl DynamicEmbeddingProvider {
     pub fn is_fallback(&self) -> bool {
         matches!(self, Self::Fallback(_))
     }
+
+    pub fn is_neural(&self) -> bool {
+        matches!(self, Self::Neural(_))
+    }
 }
 
 impl EmbeddingProvider for DynamicEmbeddingProvider {
     fn embed(&self, text: &str) -> Vec<f32> {
         match self {
             Self::Fallback(p) => p.embed(text),
+            Self::Neural(p) => p.embed(text),
         }
     }
 
     fn embed_query(&self, query: &str) -> Vec<f32> {
         match self {
             Self::Fallback(p) => p.embed_query(query),
+            Self::Neural(p) => p.embed_query(query),
         }
     }
 
     fn embed_passage(&self, passage: &str) -> Vec<f32> {
         match self {
             Self::Fallback(p) => p.embed_passage(passage),
+            Self::Neural(p) => p.embed_passage(passage),
         }
     }
 }
