@@ -20,3 +20,10 @@ Na interface (`inbox_view.rs`), a busca local tentava instanciar o `SimpleCpuEmb
 3. A busca local no WASM (`inbox_view.rs`) utiliza `local_index.search(&q)` ordenado por relevância BM25, sem exigir provedor vetorial.
 4. O cache nativo (`cfg(not(target_arch = "wasm32"))`) permanece 100% retrocompatível com SQLite.
 5. Validação com testes unitários no target nativo e compilação limpa no target WASM.
+
+### Conclusão & Validação (Fase 9)
+- Banco `lauda_messages` implementado no IndexedDB via `rexie` para persistência assíncrona de caixas, envelopes e `index_slices`.
+- Busca local no WASM (`inbox_view.rs`) desacoplada de vetores e operando via BM25 direto sobre o `MessageIndex` em memória.
+- Compilação validada com sucesso para os alvos nativo (Linux x86_64) e Web (`wasm32-unknown-unknown`).
+- Quality Gate aprovado sem warnings (`cargo fmt`, `cargo clippy -D warnings`, `cargo test`).
+
