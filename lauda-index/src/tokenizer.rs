@@ -84,9 +84,6 @@ mod tests {
         let all_upper = "ÁÀÃÂÄ ÉÈÊË ÍÌÎÏ ÓÒÕÔÖ ÚÙÛÜ Ç Ñ";
         let all_lower = "áàãâä éèêë íìîï óòõôö úùûü ç ñ";
         assert_eq!(normalize(all_upper), normalize(all_lower));
-        assert_eq!(
-            normalize(all_upper),
-            "aaaaa eeee iiii ooooo uuuu c n"
-        );
+        assert_eq!(normalize(all_upper), "aaaaa eeee iiii ooooo uuuu c n");
     }
 }
