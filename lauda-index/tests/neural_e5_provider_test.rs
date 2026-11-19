@@ -29,3 +29,26 @@ fn test_dynamic_embedding_provider_neural_variant() {
     assert_eq!(vec_query.len(), 384);
     assert_eq!(vec_query[0], 1.0);
 }
+
+#[test]
+fn test_dynamic_embedding_provider_passage_and_fallback_mutation() {
+    let dummy = Arc::new(DummyNeuralProvider);
+    let dynamic = DynamicEmbeddingProvider::new_neural(dummy);
+    let e5 = E5InstructionProvider::new(dynamic);
+
+    // Valida delegação de passage com prefixo E5
+    let vec_passage = e5.embed_passage("documento de teste neural");
+    assert_eq!(vec_passage.len(), 384);
+    assert_eq!(vec_passage[0], 1.0);
+
+    // Valida que texto sem a palavra neural resulta em zeros
+    let vec_empty = e5.embed_passage("documento comum sem correspondencia");
+    assert_eq!(vec_empty.len(), 384);
+    assert_eq!(vec_empty[0], 0.0);
+
+    // Valida fallback quando o arquivo não existe
+    let fallback = DynamicEmbeddingProvider::from_path_or_fallback("/var/lib/inexistente.onnx");
+    assert!(fallback.is_fallback());
+    assert!(!fallback.is_neural());
+    assert_eq!(fallback.embed_query("consulta").len(), 384);
+}
