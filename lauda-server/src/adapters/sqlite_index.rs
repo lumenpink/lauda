@@ -515,7 +515,8 @@ impl SqliteIndexStore {
         query: &str,
         limit: usize,
     ) -> Result<Vec<MessageEnvelope>, rusqlite::Error> {
-        let provider = lauda_index::DynamicEmbeddingProvider::from_path_or_fallback("models/e5-small.onnx");
+        let provider =
+            lauda_index::DynamicEmbeddingProvider::from_path_or_fallback("models/e5-small.onnx");
         self.search_hybrid_with_provider(mailbox, query, limit, &provider)
     }
 
