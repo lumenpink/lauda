@@ -544,6 +544,8 @@ impl SqliteIndexStore {
                 .collect::<Vec<_>>()
                 .join(", ");
 
+            // Otimização canônica (Ticket #113): busca indexada direta em inverted_index
+            // sem JOIN com indexed_documents, garantindo uso do B-Tree de termos em O(log N).
             let sql_bm25 = format!(
                 "SELECT i.uid
                  FROM inverted_index i
