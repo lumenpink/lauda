@@ -19,3 +19,8 @@ Isso gerava tokens corrompidos com caracteres maiúsculos mistos (ex.: `"ATENÇ�
 1. Frases inteiramente em maiúsculas (`"ATENÇÃO: REUNIÃO DE ORÇAMENTO"`) devem ser tokenizadas como `["atencao", "reuniao", "de", "orcamento"]`.
 2. Todos os diacríticos latinos padrão em português (`á, à, ã, â, ä, é, è, ê, ë, í, ì, î, ï, ó, ò, õ, ô, ö, ú, ù, û, ü, ç`) devem ser reduzidos às formas base (`a, e, i, o, u, c`), independentemente de serem maiúsculos ou minúsculos no texto de origem.
 3. Caracteres alfanuméricos ASCII normais devem ser preservados em caixa baixa (`A-Z` -> `a-z`, `0-9` preservados).
+
+### Conclusão & Validação (Fase 9)
+- Normalização Unicode implementada com sucesso com `c.to_lowercase()`.
+- Testes unitários, de mutação e quality gate (`cargo fmt`, `cargo clippy`) 100% aprovados.
+
