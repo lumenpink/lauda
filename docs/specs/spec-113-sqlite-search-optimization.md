@@ -34,3 +34,9 @@ Como a tabela `inverted_index` já é modelada com as colunas `(term, mailbox, u
 1. A consulta SQL em `SqliteIndexStore::search_hybrid` não referencia a tabela `indexed_documents`.
 2. A ordenação por relevância BM25 (`SUM(i.tf) DESC, i.uid DESC`) e o limite (`LIMIT 50`) permanecem idênticos.
 3. Testes unitários e de integração de `lauda-server` validam a recuperação exata dos mesmos UIDs esperados.
+
+### Conclusão & Validação (Fase 9)
+- Query BM25 reescrita para consulta direta na tabela `inverted_index`, eliminando JOIN desnecessário com `indexed_documents`.
+- `EXPLAIN QUERY PLAN` comprovou uso exclusivo de índice B-Tree sem referenciar tabela de documentos.
+- Testes unitários, de ordenação/isolamento e Quality Gate (`cargo fmt`, `cargo clippy -D warnings`) 100% aprovados.
+
