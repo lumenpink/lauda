@@ -3,14 +3,16 @@
 pub fn normalize(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     for c in input.chars() {
-        match c.to_ascii_lowercase() {
-            'á' | 'à' | 'ã' | 'â' | 'ä' => out.push('a'),
-            'é' | 'è' | 'ê' | 'ë' => out.push('e'),
-            'í' | 'ì' | 'î' | 'ï' => out.push('i'),
-            'ó' | 'ò' | 'õ' | 'ô' | 'ö' => out.push('o'),
-            'ú' | 'ù' | 'û' | 'ü' => out.push('u'),
-            'ç' => out.push('c'),
-            other => out.push(other),
+        for lower_c in c.to_lowercase() {
+            match lower_c {
+                'á' | 'à' | 'ã' | 'â' | 'ä' => out.push('a'),
+                'é' | 'è' | 'ê' | 'ë' => out.push('e'),
+                'í' | 'ì' | 'î' | 'ï' => out.push('i'),
+                'ó' | 'ò' | 'õ' | 'ô' | 'ö' => out.push('o'),
+                'ú' | 'ù' | 'û' | 'ü' => out.push('u'),
+                'ç' => out.push('c'),
+                other => out.push(other),
+            }
         }
     }
     out
