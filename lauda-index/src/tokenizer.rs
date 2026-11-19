@@ -48,4 +48,21 @@ mod tests {
             vec!["atencao", "reuniao", "de", "orcamento", "planejamento"]
         );
     }
+
+    #[test]
+    fn test_normalization_uppercase_diacritics() {
+        assert_eq!(normalize("ATENÇÃO"), "atencao");
+        assert_eq!(normalize("ORÇAMENTO"), "orcamento");
+        assert_eq!(normalize("REUNIÃO"), "reuniao");
+        assert_eq!(
+            normalize("ÁÉÍÓÚ ÀÈÌÒÙ ÂÊÎÔÛ ÄËÏÖÜ ÃÕ Ç"),
+            "aeiou aeiou aeiou aeiou ao c"
+        );
+
+        let tokens = tokenize("ATENÇÃO: REUNIÃO DE ORÇAMENTO & PLANEJAMENTO!");
+        assert_eq!(
+            tokens,
+            vec!["atencao", "reuniao", "de", "orcamento", "planejamento"]
+        );
+    }
 }
