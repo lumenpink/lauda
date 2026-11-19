@@ -1,5 +1,5 @@
 /// Normaliza uma string para indexação ou busca:
-/// converte para minúsculas e remove diacríticos (acentos) comuns em português.
+/// converte para minúsculas e remove diacríticos (acentos) comuns em português e espanhol.
 pub fn normalize(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     for c in input.chars() {
@@ -11,6 +11,7 @@ pub fn normalize(input: &str) -> String {
                 'ó' | 'ò' | 'õ' | 'ô' | 'ö' => out.push('o'),
                 'ú' | 'ù' | 'û' | 'ü' => out.push('u'),
                 'ç' => out.push('c'),
+                'ñ' => out.push('n'),
                 other => out.push(other),
             }
         }
