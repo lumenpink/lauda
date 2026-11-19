@@ -64,3 +64,56 @@ fn test_wasm_local_search_bm25_pure() {
         "Busca BM25 no WASM deve encontrar o documento 102"
     );
 }
+
+#[test]
+fn test_wasm_local_search_bm25_mutation_ranking_and_terms() {
+    let mut index = MessageIndex::new();
+
+    // Documento com alta frequência do termo (TF=10)
+    let doc_high_tf = IndexedDoc {
+        uid: 501,
+        mailbox: "INBOX".to_string(),
+        subject: "Urgente Urgente Urgente".to_string(),
+        sender: "alerta@empresa.com".to_string(),
+        date: "2026-11-19T10:00:00Z".to_string(),
+        has_attachments: false,
+        is_read: true,
+        is_flagged: false,
+        doc_len: 10,
+        subject_terms: HashSet::from(["urgente".to_string()]),
+        sender_terms: HashSet::from(["alerta".to_string()]),
+        term_frequencies: HashMap::from([("urgente".to_string(), 10)]),
+        segment_embeddings: vec![],
+    };
+
+    // Documento com baixa frequência do termo (TF=1)
+    let doc_low_tf = IndexedDoc {
+        uid: 502,
+        mailbox: "INBOX".to_string(),
+        subject: "Comunicado normal".to_string(),
+        sender: "comunicacao@empresa.com".to_string(),
+        date: "2026-11-19T10:05:00Z".to_string(),
+        has_attachments: false,
+        is_read: true,
+        is_flagged: false,
+        doc_len: 20,
+        subject_terms: HashSet::from(["comunicado".to_string(), "normal".to_string()]),
+        sender_terms: HashSet::from(["comunicacao".to_string()]),
+        term_frequencies: HashMap::from([("urgente".to_string(), 1)]),
+        segment_embeddings: vec![],
+    };
+
+    index.insert_doc(doc_high_tf);
+    index.insert_doc(doc_low_tf);
+
+    let ranked = index.search("urgente");
+    assert_eq!(ranked.len(), 2);
+    assert_eq!(
+        ranked[0], 501,
+        "Documento com maior TF deve vir em primeiro no ranking BM25 do WASM"
+    );
+    assert_eq!(
+        ranked[1], 502,
+        "Documento com menor TF deve vir em segundo"
+    );
+}
