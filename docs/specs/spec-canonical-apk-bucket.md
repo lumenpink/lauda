@@ -1,7 +1,7 @@
 # Especificação Técnica: Canonização de APK para `lauda.apk` & Publicação no `twolp-bucket`
 
 ## 1. Contexto e Motivação
-Para padronizar todos os clientes móveis do ecossistema sob a norma GOST e a convenção soberana 2lp, eliminamos sufixos como `-latest` ou `-app`. O pacote Android do Lauda passa a se chamar estritamente `lauda.apk`.
+Para padronizar todos os clientes móveis do ecossistema sob a norma GOST e a convenção autônoma 2lp, eliminamos sufixos como `-latest` ou `-app`. O pacote Android do Lauda passa a se chamar estritamente `lauda.apk`.
 A distribuição física é unificada no bucket Cloudflare R2 `twolp-bucket` servido sob o domínio `https://bucket.2lp.in/lauda.apk`, reduzindo custos computacionais de worker e eliminando os limites de tamanho do Cloudflare Workers Assets.
 
 ## 2. Nomenclatura Canônica e Redirecionamento

@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0.0",
+  "slug": "lauda",
+  "title": "Lauda",
+  "site_type": "app",
+  "tagline": "Cliente e servidor de correio eletrônico em Rust",
+  "summary": "Ecossistema de correio eletrônico descentralizado, busca híbrida e sincronização de Maildir.",
+  "abstract": "O Lauda é um ecossistema completo de correio eletrônico escrito em Rust, contemplando interface gráfica multiplataforma (Dioxus/Wasm), servidor SMTP/IMAP/Maildir assíncrono e motor de busca neural e léxica ultraveloz.",
+  "tags": [
+    "lauda",
+    "email",
+    "mail",
+    "smtp",
+    "imap",
+    "rust",
+    "dioxus"
+  ],
+  "icon": "📨",
+  "theme": {
+    "bg_color": "#1e1e2e",
+    "accent_color": "#89b4fa"
+  }
+}

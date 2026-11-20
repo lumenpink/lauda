@@ -9,7 +9,7 @@
 
 ## 1. Contexto e Motivação
 
-No destaque da Agenda Soberana (`lauda-client/src/ui/calendar_view.rs`), o tempo restante até os próximos eventos era calculado ingenuamente como `(ts - now_ts) / 60` e exibido apenas em minutos brutos (`"em {diff} min"`). Para eventos nos dias ou semanas seguintes, essa representação produzia números desproporcionais e pouco legíveis (ex: centenas ou milhares de minutos). Além disso, a ausência de um tique temporal reativo mantinha o valor visual congelado caso a tela permanecesse aberta sem interação.
+No destaque da Agenda Autônoma (`lauda-client/src/ui/calendar_view.rs`), o tempo restante até os próximos eventos era calculado ingenuamente como `(ts - now_ts) / 60` e exibido apenas em minutos brutos (`"em {diff} min"`). Para eventos nos dias ou semanas seguintes, essa representação produzia números desproporcionais e pouco legíveis (ex: centenas ou milhares de minutos). Além disso, a ausência de um tique temporal reativo mantinha o valor visual congelado caso a tela permanecesse aberta sem interação.
 
 ---
 

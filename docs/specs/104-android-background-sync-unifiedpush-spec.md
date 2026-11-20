@@ -33,7 +33,7 @@ Para atender a esses dois mundos de forma autônoma e colaborativa, estabelecemo
 - **Alternativa descartada 1:** Foreground Service permanente com notificação fixa na barra de status mantendo conexão TCP/WebSocket IMAP aberta.
   - *Motivo do descarte:* Drena severamente a bateria do celular, degrada a experiência do usuário com poluição visual obrigatória na barra de status e frequentemente é encerrado por fabricantes agressivos (Xiaomi MIUI, Samsung OneUI) quando a memória aperta.
 - **Alternativa descartada 2:** Uso exclusivo do Firebase Cloud Messaging (FCM) do Google.
-  - *Motivo do descarte:* Viola frontalmente os princípios de soberania e autonomia técnica do Lauda. Cria dependência obrigatória do Google Play Services e exige contas corporativas centralizadas no console do Google.
+  - *Motivo do descarte:* Viola frontalmente os princípios de autonomia e autonomia técnica do Lauda. Cria dependência obrigatória do Google Play Services e exige contas corporativas centralizadas no console do Google.
 - **Alternativa descartada 3:** Apenas WorkManager periódico de 15 minutos (sem push).
   - *Motivo do descarte:* Latência inaceitável para recebimento de comunicações urgentes. O usuário teria que aguardar até 15 minutos para saber de uma nova mensagem.
 - **Alternativa descartada 4:** Apenas UnifiedPush (sem WorkManager).

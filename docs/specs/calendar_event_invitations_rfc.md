@@ -10,7 +10,7 @@
 
 ## 1. Visão Geral & Motivação
 
-O subsistema de agenda soberana do Lauda (`lauda-types`, `lauda-client`, `lauda-server`) permite a criação rápida e fluida de eventos através de linguagem natural (`Quick-Add`) e sincronização bidirecional via CalDAV (RFC 4791).
+O subsistema de agenda autônoma do Lauda (`lauda-types`, `lauda-client`, `lauda-server`) permite a criação rápida e fluida de eventos através de linguagem natural (`Quick-Add`) e sincronização bidirecional via CalDAV (RFC 4791).
 
 Para viabilizar a colaboração com participantes externos sem depender de plataformas fechadas (Google Calendar, Microsoft 365, Apple iCloud), esta RFC padroniza o ciclo de vida completo de envio, atualização, cancelamento e confirmação de presença (RSVP) em eventos através do protocolo padrão da Internet: **iTIP sobre iMIP**.
 

@@ -11,7 +11,7 @@ O Forgejo Actions runner emite avisos e falhas estruturais quando workflows cont
 permissions:
   contents: write
 ```
-No ecossistema soberano hospedado no Forgejo (`gambi.2lp.in`), a concessão de credenciais e permissões é gerenciada diretamente pelo token de execução injetado pelo runner soberano, tornando o campo `permissions:` do GitHub Actions não suportado e causa de degradação ou rejeição na execução da esteira.
+No ecossistema autônomo hospedado no Forgejo (`gambi.2lp.in`), a concessão de credenciais e permissões é gerenciada diretamente pelo token de execução injetado pelo runner autônomo, tornando o campo `permissions:` do GitHub Actions não suportado e causa de degradação ou rejeição na execução da esteira.
 
 ## 2. Requisitos Técnicos
 1. **Remoção de `permissions:` em `.forgejo/workflows/ci.yml`:**

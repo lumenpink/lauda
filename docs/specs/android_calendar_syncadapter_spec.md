@@ -1,8 +1,8 @@
-# Especificação Técnica de Contratos: Android Calendar SyncAdapter Soberano
+# Especificação Técnica de Contratos: Android Calendar SyncAdapter Autônomo
 
 > **Documento de Especificação Técnica e Contratos Preliminares (Fase 3 - DD-TDD GOST)**  
 > **Ticket Vinculado:** [#40 - feat(calendar): android calendar syncadapter sob in.twolp.lauda](https://codeberg.org/lumenpink/lauda/issues/40)  
-> **Épico:** [#36 - feat(calendar): arquitetura soberana de agenda, caldav e fluxo continuo](https://codeberg.org/lumenpink/lauda/issues/36)  
+> **Épico:** [#36 - feat(calendar): arquitetura autônoma de agenda, caldav e fluxo continuo](https://codeberg.org/lumenpink/lauda/issues/36)  
 > **Norma Base:** GOST 1.4.0 / RFC 5545 (iCalendar) / Android CalendarContract API (API 14+)
 
 ---
@@ -76,7 +76,7 @@ Cada evento Lauda é projetado nas tabelas do `CalendarProvider`:
 
 | Campo `CalendarEvent` | Coluna Android (`CalendarContract.Events`) | Tipo / Transformação |
 | :--- | :--- | :--- |
-| `uid` | `_SYNC_ID` | String única soberana |
+| `uid` | `_SYNC_ID` | String única autônoma |
 | `summary` | `TITLE` | String de título do evento |
 | `description` | `DESCRIPTION` | Texto detalhado opcional |
 | `location` | `EVENT_LOCATION` | String de local |

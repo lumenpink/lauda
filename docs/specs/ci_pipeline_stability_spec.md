@@ -34,7 +34,7 @@ Esta especificação define a correção estrutural da esteira para garantir exe
   - Se a toolchain nativa estiver disponível no runner, compilar o APK Android para `aarch64` com `dx build -p lauda-client --android --renderer webview --release --target aarch64-linux-android`.
   - Injetar `versionCode` e `versionName` canônicos extraídos de `VERSION`.
   - Realizar strip com `llvm-strip` nas bibliotecas compartilhadas JNI (`libmain.so`).
-  - Assinar com a keystore soberana oficial `in_twolp_release.keystore` via `apksigner`.
+  - Assinar com a keystore autônoma oficial `in_twolp_release.keystore` via `apksigner`.
 - **Publicação R2:**
   - Fazer upload via `wrangler r2 object put` para `twolp-bucket/lauda.apk` e `twolp-bucket/lauda-latest.apk`.
 

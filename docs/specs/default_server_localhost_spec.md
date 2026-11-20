@@ -10,7 +10,7 @@
 ## 1. Visão Geral e Motivação
 
 Atualmente, ao instalar o Lauda smolclient em um dispositivo novo (em especial no Android via `detect_default_server_url()`), o campo de servidor padrão vem pré-preenchido com `https://lauda.lohn.in`.
-Isso quebra o princípio de soberania e neutralidade de cliente open source:
+Isso quebra o princípio de autonomia e neutralidade de cliente open source:
 1. Usuários que baixam o app não conseguem usar com seus próprios servidores sem alterar a URL pré-preenchida.
 2. Em ambientes de desenvolvimento e teste locais, o app tenta conectar à rede do Baquara em vez de se comunicar com o backend local (`lauda-server`) na porta padrão `8432`.
 

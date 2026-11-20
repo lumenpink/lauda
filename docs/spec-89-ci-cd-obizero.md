@@ -1,5 +1,5 @@
 # Especificação Normativa — Ticket #89
-## Continuous Deployment Soberano do lauda-server no Nó Central (obizero) e Descomissionamento do Watchtower
+## Continuous Deployment Autônomo do lauda-server no Nó Central (obizero) e Descomissionamento do Watchtower
 
 **Norma de Referência:** GOST v1.5.0 (Perfil Lumen — Seção 9)  
 **Status:** Aprovado para Implementação  
@@ -9,7 +9,7 @@
 
 ### 1. Escopo e Objetivos
 
-Esta especificação define o pipeline soberano de entrega contínua (Continuous Deployment - CD) do serviço de correio **`lauda-server`** no nó central de execução **`obizero`**, substituindo em definitivo o mecanismo legado de webhooks baseado no Watchtower:
+Esta especificação define o pipeline autônomo de entrega contínua (Continuous Deployment - CD) do serviço de correio **`lauda-server`** no nó central de execução **`obizero`**, substituindo em definitivo o mecanismo legado de webhooks baseado no Watchtower:
 
 1. **Construção Hermética da Imagem:**
    - A imagem Docker `lumenpink/lauda-server:latest` é gerada diretamente no Docker daemon do nó `obizero` via runner nativo do Forgejo.

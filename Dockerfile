@@ -42,4 +42,6 @@ ENV LAUDA_WEB_DIR="/app/web"
 
 EXPOSE 8432
 
+USER 1000:1000
+
 ENTRYPOINT ["lauda-server"]

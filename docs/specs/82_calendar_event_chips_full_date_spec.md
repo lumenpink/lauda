@@ -9,7 +9,7 @@
 
 ## 1. Visão Geral e Motivação
 
-Na interface da Agenda Soberana (`CalendarView`), na inclusão rápida de eventos via Quick-Add bar, à medida que o usuário digita uma descrição (ex.: `"Almoço amanhã às 12h30 no Fasano"` ou `"Plantão domingo às 19h"`), o `CalendarIntentParser` decompõe o texto e gera uma estrutura `ParsedCalendarIntent`.
+Na interface da Agenda Autônoma (`CalendarView`), na inclusão rápida de eventos via Quick-Add bar, à medida que o usuário digita uma descrição (ex.: `"Almoço amanhã às 12h30 no Fasano"` ou `"Plantão domingo às 19h"`), o `CalendarIntentParser` decompõe o texto e gera uma estrutura `ParsedCalendarIntent`.
 
 Entretanto, o chip de prévia reativo anterior limitava-se a exibir o texto estático genérico `"📅 Dia Inteiro"` ou `"📅 Com horário definido"`, omitindo a data real processada (dia, mês e ano calculados a partir do contexto temporal) e os horários processados de início e fim. Isso impedia que o usuário validasse se a data calculada (ex.: para termos relativos como "amanhã", "próxima sexta", "dia 25") estava correta antes de criar o evento ou complementar os detalhes.
 

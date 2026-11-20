@@ -1,4 +1,4 @@
-# Especificação Técnica — CD Soberano no Nó Central (obizero) via SSH (#64)
+# Especificação Técnica — CD Autônomo no Nó Central (obizero) via SSH (#64)
 
 - **ID do Ticket:** #64
 - **Status:** Aprovado
@@ -8,10 +8,10 @@
 ## 1. Contexto & Motivação
 Na esteira do Forgejo Runner, o contêiner de execução possui o socket `/var/run/docker.sock` e a chave SSH montada (`~/.ssh/id_obitwo`), porém não possui o caminho de arquivos do host (`/home/lumen/stacks`) montado diretamente em seu sistema de arquivos local.
 A tentativa de invocar `docker compose -f /home/lumen/stacks/mail/compose.yml` diretamente de dentro do contêiner do runner falha com `open /home/lumen/stacks/mail/compose.yml: no such file or directory`.
-A solução canônica e soberana, alinhada com o projeto `lacraia`, consiste em disparar a atualização através de sessão SSH autenticada contra o host (`172.17.0.1` / `lumen`), mantendo a verificação ativa de integridade (healthcheck), o protocolo de rollback automático em caso de falha e a purga de imagens órfãs.
+A solução canônica e autônoma, alinhada com o projeto `lacraia`, consiste em disparar a atualização através de sessão SSH autenticada contra o host (`172.17.0.1` / `lumen`), mantendo a verificação ativa de integridade (healthcheck), o protocolo de rollback automático em caso de falha e a purga de imagens órfãs.
 
 ## 2. Requisitos Técnicos
-1. **Conexão SSH Soberana:**
+1. **Conexão SSH Autônoma:**
    - Obter host via `${OBIZERO_SSH_HOST:-172.17.0.1}` e usuário via `${OBIZERO_SSH_USER:-lumen}`.
    - Utilizar a chave SSH disponível (`~/.ssh/id_obitwo` ou `~/.ssh/id_ed25519` ou `${OBIZERO_SSH_KEY}`).
    - Utilizar `-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15`.

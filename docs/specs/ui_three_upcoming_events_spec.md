@@ -9,7 +9,7 @@
 
 ## 1. Contexto e Motivação
 
-No topo da Agenda Soberana (`lauda-client/src/ui/calendar_view.rs`), o banner de destaque exibia exclusivamente 1 único compromisso (`next_event`). Para usuários que gerenciam múltiplas reuniões e compromissos diários, visualizar apenas um evento restringe a visibilidade da jornada imediata.
+No topo da Agenda Autônoma (`lauda-client/src/ui/calendar_view.rs`), o banner de destaque exibia exclusivamente 1 único compromisso (`next_event`). Para usuários que gerenciam múltiplas reuniões e compromissos diários, visualizar apenas um evento restringe a visibilidade da jornada imediata.
 
 Faz-se necessária a evolução do banner de destaque para exibir até 3 próximos eventos cronológicos futuros, apresentados em um layout compacto, claro e elegante dentro da identidade visual Trash Polka.
 

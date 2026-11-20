@@ -9,7 +9,7 @@
 
 ## 1. Visão Geral e Motivação
 
-O Lauda é um cliente e servidor de e-mail soberano com design minimalista. Embora disponha de interface web/desktop em Dioxus e aplicativo Android, usuários avançados de terminal e administradores de sistema necessitam de uma experiência interativa nativa de terminal (TUI - Terminal User Interface) ergonômica, rápida e focada em teclado, capaz de substituir clientes pesados ou dependentes de C como o *aerc* e o *mutt*.
+O Lauda é um cliente e servidor de e-mail autônomo com design minimalista. Embora disponha de interface web/desktop em Dioxus e aplicativo Android, usuários avançados de terminal e administradores de sistema necessitam de uma experiência interativa nativa de terminal (TUI - Terminal User Interface) ergonômica, rápida e focada em teclado, capaz de substituir clientes pesados ou dependentes de C como o *aerc* e o *mutt*.
 
 O objetivo deste ticket é fornecer uma TUI nativa em Rust via subcomando `tui` no binário cliente do Lauda (`lauda-client tui`), permitindo navegar pelas caixas postais, listar mensagens com atualização instantânea, ler e-mails formatados no terminal e disparar buscas.
 

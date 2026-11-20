@@ -2,7 +2,7 @@
 
 > **Documento de Especificação Técnica (Fase 3 - DD-TDD GOST)**  
 > **Ticket Vinculado:** [#39 - feat(calendar): quick-add bar, timeline stream e rsvp de convites no lauda-client](https://codeberg.org/lumenpink/lauda/issues/39)  
-> **Épico:** [#36 - feat(calendar): arquitetura soberana de agenda, caldav e fluxo continuo](https://codeberg.org/lumenpink/lauda/issues/36)  
+> **Épico:** [#36 - feat(calendar): arquitetura autônoma de agenda, caldav e fluxo continuo](https://codeberg.org/lumenpink/lauda/issues/36)  
 > **Norma Base:** GOST 1.4.0 / Optimistic UI Pattern / Neo-Brutalist & Trash Polka Design System
 
 ---

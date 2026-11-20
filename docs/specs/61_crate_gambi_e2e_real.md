@@ -8,11 +8,11 @@
 ## 1. Contexto & Motivação
 Anteriormente, o `lauda` dependia de código-fonte de repositórios irmãos (`ishcondidim`, `papeli` e `urupema`) via referências relativas de sistema de arquivos (`path = "../../..."`).
 Isso forçava a esteira de CI e o `Dockerfile` a clonar manualmente os três repositórios a cada ciclo de compilação ou teste.
-Com a publicação da biblioteca `urupema` no registro soberano de pacotes Cargo (`gambi.2lp.in`), o `lauda-index` e `lauda-server` passam a consumi-la diretamente como crate soberana (`registry = "gambi"`).
+Com a publicação da biblioteca `urupema` no registro autônomo de pacotes Cargo (`gambi.2lp.in`), o `lauda-index` e `lauda-server` passam a consumi-la diretamente como crate autônoma (`registry = "gambi"`).
 Paralelamente, removem-se as `dev-dependencies` dos repositórios irmãos e os testes são consolidados para validar o ecossistema de ponta a ponta sem necessidade de clonar ou compilar as árvores de código externas.
 
 ## 2. Requisitos Técnicos
-1. **Configuração do Registro Soberano Gambi:**
+1. **Configuração do Registro Autônomo Gambi:**
    - Declarar o registro `gambi` em `.cargo/config.toml`:
      ```toml
      [registries.gambi]
@@ -34,5 +34,5 @@ Paralelamente, removem-se as `dev-dependencies` dos repositórios irmãos e os t
 
 ## 3. Critérios de Aceitação
 - Build e testes do workspace passando com `cargo test --workspace`.
-- Auditoria do workflow soberano em `tests/audit_cd_workflow.sh` aprovada com validação de mutantes.
+- Auditoria do workflow autônomo em `tests/audit_cd_workflow.sh` aprovada com validação de mutantes.
 - Conformidade estrita Gosplan via `cccp check --strict`.

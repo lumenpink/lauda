@@ -1,10 +1,10 @@
 # Especificação Técnica: Auto-Atualizador & Distribuição na Banca (Ticket #88)
 
 ## 1. Contexto e Motivação
-Em conformidade com a norma GOST v1.5.0, a compilação de binários nativos de release e desenvolvimento é restrita à esteira sequencial (Forgejo Runner). A distribuição oficial ocorre através da vitrine soberana da Banca (`https://banca.2lp.in/downloads/lauda/`), com retenção estrita de 5 versões estáveis e 10 compilações de desenvolvimento (nightly).
+Em conformidade com a norma GOST v1.5.0, a compilação de binários nativos de release e desenvolvimento é restrita à esteira sequencial (Forgejo Runner). A distribuição oficial ocorre através da vitrine autônoma da Banca (`https://banca.2lp.in/downloads/lauda/`), com retenção estrita de 5 versões estáveis e 10 compilações de desenvolvimento (nightly).
 O binário do cliente `lauda` passa a incorporar funcionalidade nativa de auto-atualização atômica e verificação de novas versões, consumindo diretamente esses canais.
 
-## 2. Endpoints Soberanos da Banca
+## 2. Endpoints Autônomos da Banca
 O módulo de atualização resolve os seguintes endpoints:
 - **Canal Estável (Produção)**:
   - Binário mais recente: `https://banca.2lp.in/downloads/lauda/stable-latest/lauda`
@@ -15,7 +15,7 @@ O módulo de atualização resolve os seguintes endpoints:
 - **Versão Fixada (Pin)**:
   - `https://banca.2lp.in/downloads/lauda/releases/v{pin}/lauda`
 
-Nenhum fallback para releases do Codeberg ou GitHub é executado, mantendo a soberania da infraestrutura.
+Nenhum fallback para releases do Codeberg ou GitHub é executado, mantendo a autonomia da infraestrutura.
 
 ## 3. Persistência de Configuração e Canal Padrão
 Para permitir que o usuário defina seu canal de preferência (por exemplo, `nightly` para receber compilações frequentes ou `stable` para lançamentos validados):
@@ -55,8 +55,8 @@ O `lauda` adiciona os seguintes subcomandos:
 ## 6. Pipeline de Entrega na Esteira
 No workflow de CI (`.forgejo/workflows/ci.yml`), a etapa de build publica os artefatos compilados na rota `/srv/banca/downloads/lauda/` e no R2 da Banca, atualizando os links `stable-latest` ou `nightly-latest` e o arquivo `version` correspondente.
 
-## 7. Soberania e Descontinuação de Auto-Update Intrusivo (Ticket #55)
-Em conformidade com a decisão soberana de arquitetura, o Lauda **não** executa rotinas de auto-update, auto-check periódico em background ou daemons no arranque (startup).
+## 7. Autonomia e Descontinuação de Auto-Update Intrusivo (Ticket #55)
+Em conformidade com a decisão autônoma de arquitetura, o Lauda **não** executa rotinas de auto-update, auto-check periódico em background ou daemons no arranque (startup).
 A verificação periódica ou em background de todo o ecossistema é delegada à **Jornaleira** para as usuárias que optarem por utilizá-la.
 O cliente do Lauda preserva de forma estrita e autônoma seus comandos manuais sob demanda (`lauda check-update` e `lauda update`), assegurando que a usuária não é obrigada a usar um gerenciador externo caso deseje atualizar o Lauda de forma standalone.
 

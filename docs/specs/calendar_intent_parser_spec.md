@@ -2,14 +2,14 @@
 
 > **Documento de Especificação Técnica (Fase 3 - DD-TDD GOST)**  
 > **Ticket Vinculado:** [#37 - feat(calendar): smart intent parser e tipos iCalendar RFC 5545 no lauda-types](https://codeberg.org/lumenpink/lauda/issues/37)  
-> **Épico:** [#36 - feat(calendar): arquitetura soberana de agenda, caldav e fluxo continuo](https://codeberg.org/lumenpink/lauda/issues/36)  
+> **Épico:** [#36 - feat(calendar): arquitetura autônoma de agenda, caldav e fluxo continuo](https://codeberg.org/lumenpink/lauda/issues/36)  
 > **Norma Base:** GOST 1.4.0 / RFC 5545 (Internet Calendaring and Scheduling Core Object Specification - iCalendar)
 
 ---
 
 ## 1. Visão Geral e Princípios de Design
 
-A gestão tradicional de calendários falha pela sobrecarga cognitiva de formulários com dezenas de campos para registrar compromissos rotineiros. O `lauda-types` introduz o núcleo determinístico e interoperável da agenda soberana do Lauda:
+A gestão tradicional de calendários falha pela sobrecarga cognitiva de formulários com dezenas de campos para registrar compromissos rotineiros. O `lauda-types` introduz o núcleo determinístico e interoperável da agenda autônoma do Lauda:
 
 1. **Modelos Canônicos Puros:** Estruturas de dados em Rust puro (`CalendarEvent`, `EventTime`, `RecurrenceRule`, `Attendee`), serializáveis via `serde`, compatíveis com compilação WebAssembly (Wasm) e zero dependências pesadas de runtime.
 2. **Smart Intent Parser (Linguagem Natural PT-BR / EN):** Motor de interpretação de texto livre determinístico, offline e sem IA externa, capaz de extrair título, datas relativas, horários, intervalos, locais e regras de repetição a partir de uma única linha.

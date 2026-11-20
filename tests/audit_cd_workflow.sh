@@ -6,7 +6,7 @@ WORKFLOW="${ROOT_DIR}/.forgejo/workflows/ci.yml"
 DOCKERFILE="${ROOT_DIR}/Dockerfile"
 CARGO_CONFIG="${ROOT_DIR}/.cargo/config.toml"
 
-echo "=== [TEST] Auditoria do Workflow de CD Soberano (lauda) ==="
+echo "=== [TEST] Auditoria do Workflow de CD Autônomo (lauda) ==="
 
 check_not_present() {
     local target="$1"
@@ -38,9 +38,9 @@ FAILED=0
 check_not_present "$WORKFLOW" 'WATCHTOWER' "Ausência de variáveis e webhooks do Watchtower" || FAILED=1
 check_not_present "$WORKFLOW" 'watchtower' "Ausência de referências literais ao Watchtower" || FAILED=1
 
-# 2. Deploy local soberano no obizero via SSH (#64)
+# 2. Deploy local autônomo no obizero via SSH (#64)
 check_present "$WORKFLOW" 'OBIZERO_SSH_HOST' "Presença de configuração de SSH para deploy local no obizero" || FAILED=1
-check_present "$WORKFLOW" 'ssh $SSH_OPTS' "Invocação de deploy soberano via SSH no obizero" || FAILED=1
+check_present "$WORKFLOW" 'ssh $SSH_OPTS' "Invocação de deploy autônomo via SSH no obizero" || FAILED=1
 check_present "$WORKFLOW" 'docker compose -f /home/lumen/stacks/mail/compose.yml up -d --no-build lauda-server' "Comando de deploy local sem download redundante" || FAILED=1
 
 # 3. Sondagem ativa de healthcheck
@@ -63,10 +63,10 @@ check_present "$DOCKERFILE" 'crates.2lp.in' "Pull-through cache configurado no D
 # 8. Ausência de clones manuais e configuração do registro gambi (#61)
 check_not_present "$DOCKERFILE" 'git clone' "Ausência de clones de dependências no Dockerfile" || FAILED=1
 check_not_present "$WORKFLOW" 'ishcondidim.git' "Ausência de clones de dependências no ci.yml" || FAILED=1
-check_present "$CARGO_CONFIG" 'https://gambi.2lp.in/api/packages/lumen/cargo/' "Registro soberano gambi configurado em .cargo/config.toml" || FAILED=1
-check_present "$DOCKERFILE" 'https://gambi.2lp.in/api/packages/lumen/cargo/' "Registro soberano gambi configurado no Dockerfile" || FAILED=1
+check_present "$CARGO_CONFIG" 'https://gambi.2lp.in/api/packages/lumen/cargo/' "Registro autônomo gambi configurado em .cargo/config.toml" || FAILED=1
+check_present "$DOCKERFILE" 'https://gambi.2lp.in/api/packages/lumen/cargo/' "Registro autônomo gambi configurado no Dockerfile" || FAILED=1
 
-# 9. Soberania irrestrita e saneamento de forges externas (#62)
+# 9. Autonomia irrestrita e saneamento de forges externas (#62)
 check_not_present "$DOCKERFILE" 'docker.io' "Ausência de docker.io no Dockerfile" || FAILED=1
 check_not_present "$WORKFLOW" 'docker.io' "Ausência de docker.io no ci.yml" || FAILED=1
 check_not_present "$DOCKERFILE" 'github.com' "Ausência de github.com no Dockerfile" || FAILED=1
@@ -75,8 +75,8 @@ check_not_present "$DOCKERFILE" 'codeberg.org' "Ausência de codeberg.org no Doc
 check_not_present "$WORKFLOW" 'codeberg.org' "Ausência de codeberg.org no ci.yml" || FAILED=1
 check_not_present "$WORKFLOW" 'GIT_2LP_TOKEN' "Ausência de secret legado GIT_2LP_TOKEN no ci.yml" || FAILED=1
 check_present "$WORKFLOW" 'GAMBI_2LP_IN_TOKEN' "Presença de GAMBI_2LP_IN_TOKEN no ci.yml" || FAILED=1
-check_present "$DOCKERFILE" 'gambi.2lp.in/lumen/gost-ci-cross' "Uso de gost-ci-cross soberano no Dockerfile" || FAILED=1
-check_present "$DOCKERFILE" 'gambi.2lp.in/lumen/mirror-debian' "Uso de mirror-debian soberano no Dockerfile" || FAILED=1
+check_present "$DOCKERFILE" 'gambi.2lp.in/lumen/gost-ci-cross' "Uso de gost-ci-cross autônomo no Dockerfile" || FAILED=1
+check_present "$DOCKERFILE" 'gambi.2lp.in/lumen/mirror-debian' "Uso de mirror-debian autônomo no Dockerfile" || FAILED=1
 
 # 10. Concorrência com cancel-in-progress (#89)
 check_present "$WORKFLOW" 'cancel-in-progress: true' "Presença de cancel-in-progress: true no ci.yml" || FAILED=1
@@ -140,4 +140,4 @@ if [ $FAILED -ne 0 ]; then
     exit 1
 fi
 
-echo "✔ [GREEN TEST] Auditoria aprovada: CD soberano e saneamento validados."
+echo "✔ [GREEN TEST] Auditoria aprovada: CD autônomo e saneamento validados."

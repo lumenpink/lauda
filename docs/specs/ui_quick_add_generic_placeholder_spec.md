@@ -9,7 +9,7 @@
 
 ## 1. Contexto e Motivação
 
-O campo de inserção em linha única na Agenda Soberana (`lauda-client/src/ui/calendar_view.rs`) atualmente utiliza um exemplo de texto fixo com referências a pessoas e locais específicos: `"Ex: Almoço com Marcelo amanhã 12h30 no Fasano"`.
+O campo de inserção em linha única na Agenda Autônoma (`lauda-client/src/ui/calendar_view.rs`) atualmente utiliza um exemplo de texto fixo com referências a pessoas e locais específicos: `"Ex: Almoço com Marcelo amanhã 12h30 no Fasano"`.
 
 Para garantir neutralidade, profissionalismo e maior clareza pedagógica aos novos usuários sobre como redigir comandos em linguagem natural, o texto de sugestão (placeholder) deve ser padronizado para um formato impessoal e universal.
 

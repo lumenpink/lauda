@@ -2,14 +2,14 @@
 
 > **Documento de Especificação Técnica (Fase 3 - DD-TDD GOST)**  
 > **Ticket Vinculado:** [#38 - feat(caldav): persistência SQLite e endpoints CalDAV no lauda-server](https://codeberg.org/lumenpink/lauda/issues/38)  
-> **Épico:** [#36 - feat(calendar): arquitetura soberana de agenda, caldav e fluxo continuo](https://codeberg.org/lumenpink/lauda/issues/36)  
+> **Épico:** [#36 - feat(calendar): arquitetura autônoma de agenda, caldav e fluxo continuo](https://codeberg.org/lumenpink/lauda/issues/36)  
 > **Norma Base:** GOST 1.4.0 / RFC 4791 (CalDAV) / RFC 4918 (WebDAV) / RFC 6578 (Sync-Collection) / RFC 6764 (Service Discovery)
 
 ---
 
 ## 1. Visão Geral da Arquitetura
 
-O `lauda-server` passa a gerenciar compromissos e calendários de forma soberana e persistente, implementando:
+O `lauda-server` passa a gerenciar compromissos e calendários de forma autônoma e persistente, implementando:
 1. **Motor Relacional SQLite em Modo WAL (`calendar.db`):** Armazena eventos e metadados indexados por fatias temporais (`start_ts`, `end_ts`) e carimbos de sincronização com soft-delete para replicação idempotente.
 2. **Endpoints Canônicos CalDAV (RFC 4791 / RFC 6578):** Expostos sobre Axum com suporte a clientes de mercado (Thunderbird, DAVx⁵, Fossify/Simple Calendar, iOS/macOS Calendar).
 3. **Interoperabilidade Total:** Tradução direta entre os modelos canônicos do `lauda-types` (`CalendarEvent`) e os payloads brutos `.ics` (iCalendar RFC 5545).

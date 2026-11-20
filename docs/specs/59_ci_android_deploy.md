@@ -31,7 +31,7 @@ Com a criação e publicação da imagem canônica `gambi.2lp.in/lumen/gost-ci-a
      - `DX_BIN="$(command -v dx 2>/dev/null || echo "/home/lumen/.local/dx-0.7/bin/dx")"`
 3. **Geração Incremental do `versionCode`:**
    - Garantir que cada compilação de nightly utilize `VERSION_CODE="$(date +%y%m%d%H)"` para que o versionCode seja estritamente monotônico e superior a `26101811`, permitindo que os clientes Android e F-Droid detectem a atualização imediatamente.
-4. **Soberania de Repositórios Git:**
+4. **Autonomia de Repositórios Git:**
    - Quaisquer referências nos scripts a forges de código devem apontar estritamente para `gambi.2lp.in` (veto absoluto a `codeberg.org`).
 
 ## 3. Critérios de Aceitação

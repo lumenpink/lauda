@@ -2,7 +2,7 @@
 
 > Cliente de correio eletrônico acolhedor, focado na experiência aconchegante de ler cartas com calma e escrever com tranquilidade e sem ruído, construído em Rust com **Dioxus 0.7**, backend em **Axum** e motor inteligente de indexação **lauda-index**.
 
-[![GOST Compliance](https://img.shields.io/badge/GOST-1.5.0-crimson)](https://gambi.2lp.in/lumen/gost)
+[![GOST Compliance](https://img.shields.io/badge/GOST-3.0.0-crimson)](.gost/GOST.md)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](./LICENSE)
 [![Website](https://img.shields.io/badge/portal-lauda.2lp.in-red)](https://lauda.2lp.in)
 
@@ -38,6 +38,12 @@ cargo test --all-targets --all-features
 
 ## 📄 Licenciamento
 
+Em conformidade com a norma técnica [GOST v3.0.0](.gost/GOST.md):
+
 - **Código-fonte:** [GPL-3.0](./LICENSE)
 - **Mídias e Ilustrações:** [CC-BY-SA-4.0](./LICENSE-MEDIA)
 - **Marcas e Insígnias:** [CC-BY-ND-4.0](./LICENSE-LOGO)
+
+---
+
+Feito com amor travesti por [Lumen Pink](https://lumen.pink).

@@ -1,7 +1,7 @@
-# Especificação Técnica de Contratos: Android SyncAdapter e Normalizador Telefônico Soberano
+# Especificação Técnica de Contratos: Android SyncAdapter e Normalizador Telefônico Autônomo
 
 > **Documento de Especificação e Contrato Preliminar (Fase 3 - DD-TDD GOST)**  
-> **Ticket Vinculado:** [#35 - feat(contacts): android syncadapter e normalizador telefônico soberano](https://codeberg.org/lumenpink/lauda/issues/35)  
+> **Ticket Vinculado:** [#35 - feat(contacts): android syncadapter e normalizador telefônico autônomo](https://codeberg.org/lumenpink/lauda/issues/35)  
 > **Norma Base:** GOST 1.4.0 / RFC 6350 (vCard 4.0) / RFC 6578 (Sync-Collection) / ITU-T E.164 / Resolução ANATEL nº 553/2010
 
 ---
@@ -10,7 +10,7 @@
 
 O `lauda-client` atua como um cidadão de primeira classe no sistema operacional Android, registrando uma conta oficial de usuário gerenciada (`in.twolp.lauda`) e um serviço de sincronização bidirecional (`SyncAdapter`) que conecta o `ContactsProvider` nativo do Android ao repositório incremental do `lauda-server`.
 
-Adicionalmente, incorpora um motor soberano de normalização e higienização telefônica focado nas idiossincrasias do plano de numeração brasileiro (E.164 / ANATEL) e suporte a aniversários (`BDAY`).
+Adicionalmente, incorpora um motor autônomo de normalização e higienização telefônica focado nas idiossincrasias do plano de numeração brasileiro (E.164 / ANATEL) e suporte a aniversários (`BDAY`).
 
 ```
                 ┌──────────────────────────────────────────────┐
@@ -78,7 +78,7 @@ Cada contato Lauda gera um registro correspondente em `RawContacts` marcado com 
 
 | Campo `ContactEntry` | Tabela / MimeType Android | Coluna Android | Observações / Regra |
 | :--- | :--- | :--- | :--- |
-| `id` (UUID) | `RawContacts.SOURCE_ID` | `sourceid` | Chave de reconciliação soberana |
+| `id` (UUID) | `RawContacts.SOURCE_ID` | `sourceid` | Chave de reconciliação autônoma |
 | `name` / `given_name` | `StructuredName.CONTENT_ITEM_TYPE` | `DISPLAY_NAME`, `GIVEN_NAME`, `FAMILY_NAME` | Separado heuristicamente |
 | `email` | `Email.CONTENT_ITEM_TYPE` | `DATA1`, `TYPE_WORK` / `TYPE_HOME` | Preservado íntegro |
 | `phone` | `Phone.CONTENT_ITEM_TYPE` | `DATA1`, `DATA4` (Normalized) | Higienizado em E.164 pelo motor |
@@ -88,7 +88,7 @@ Cada contato Lauda gera um registro correspondente em `RawContacts` marcado com 
 
 ---
 
-## 4. Motor Soberano de Higienização Telefônica Brasileira (`PhoneNormalizer`)
+## 4. Motor Autônomo de Higienização Telefônica Brasileira (`PhoneNormalizer`)
 
 O plano de numeração brasileiro (Resolução ANATEL nº 553/2010 e padrão ITU-T E.164) apresenta desafios específicos que este motor resolve de forma hermética:
 
