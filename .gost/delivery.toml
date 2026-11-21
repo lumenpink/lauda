@@ -1,12 +1,17 @@
 # Manifesto Declarativo de Continuous Deployment (CD) — Lauda
-# Conforme convenções de presença ativa da Metanorma GOST v3.0
-
 [binaries]
 target = "banca"
 
+[mobile]
+target = "pratilera"
+app_id = "org.pink.lauda"
+
 [sites]
 target = "cloudflare-pages"
-dir = "site/dist"
+domain = "lauda.2lp.in"
+dir = "site"
 
-[containers]
-target = "gambi"
+[services]
+stack = "mail"
+node = "obizero"
+healthz = "http://127.0.0.1:8080/healthz"
