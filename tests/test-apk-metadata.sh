@@ -104,17 +104,20 @@ if [ "$VER_NAME" = "9.9.9-mutacao" ]; then
 fi
 echo "✅ Teste de mutação validado com sucesso!"
 
-echo "-> Validando gatilho de automação da Pratilera no CI..."
+echo "-> Validando publicação do APK nos Generic Packages para consumo pelo Kombinat..."
 CI_WORKFLOW="$REPO_ROOT/.forgejo/workflows/ci.yml"
 if [ ! -f "$CI_WORKFLOW" ]; then
     echo "ERRO: $CI_WORKFLOW não encontrado."
     exit 1
 fi
-if ! grep -q "Trigger Pratilera Store Update" "$CI_WORKFLOW" || \
-   ! grep -q "https://gambi.2lp.in/api/v1/repos/lumen/banca/actions/workflows/ci.yml/dispatches" "$CI_WORKFLOW"; then
-    echo "ERRO: .forgejo/workflows/ci.yml deve conter o step Trigger Pratilera Store Update apontando para a API de dispatches da banca."
+if ! grep -q "cccp package upload" "$CI_WORKFLOW"; then
+    echo "ERRO: .forgejo/workflows/ci.yml deve publicar o APK via cccp package upload."
     exit 1
 fi
-echo "✅ Gatilho de automação da Pratilera no CI validado com sucesso!"
+if grep -q "Trigger Pratilera Store Update" "$CI_WORKFLOW"; then
+    echo "ERRO: .forgejo/workflows/ci.yml não deve conter step legado Trigger Pratilera Store Update."
+    exit 1
+fi
+echo "✅ Publicação de APK via Generic Packages validada com sucesso!"
 
 echo "🎉 Todos os testes de metadados do APK passaram!"
