@@ -96,7 +96,7 @@ jobs:
 
       - name: "Publish Site Bundle to Forgejo Generic Packages"
         env:
-          GAMBI_2LP_IN_TOKEN: ${{ secrets.REGISTRY_TOKEN || secrets.GAMBI_2LP_IN_TOKEN || secrets.FORGEJO_TOKEN || secrets.GIT_2LP_TOKEN }}
+          GAMBI_2LP_IN_TOKEN: ${{ secrets.REGISTRY_TOKEN || secrets.GAMBI_2LP_IN_TOKEN || secrets.FORGEJO_TOKEN }}
         run: |
           cccp package upload site
 
@@ -200,7 +200,7 @@ jobs:
 
       - name: "Publish Artifacts to Forgejo Generic Packages"
         env:
-          GAMBI_2LP_IN_TOKEN: ${{ secrets.REGISTRY_TOKEN || secrets.GAMBI_2LP_IN_TOKEN || secrets.FORGEJO_TOKEN || secrets.GIT_2LP_TOKEN }}
+          GAMBI_2LP_IN_TOKEN: ${{ secrets.REGISTRY_TOKEN || secrets.GAMBI_2LP_IN_TOKEN || secrets.FORGEJO_TOKEN }}
         run: |
           VERSION="${{ steps.meta.outputs.version }}"
           for PKG in dist/packages/*; do
@@ -238,7 +238,7 @@ jobs:
 
       - name: "Publish Signed APKs to Forgejo Generic Packages"
         env:
-          GAMBI_2LP_IN_TOKEN: ${{ secrets.REGISTRY_TOKEN || secrets.GAMBI_2LP_IN_TOKEN || secrets.FORGEJO_TOKEN || secrets.GIT_2LP_TOKEN }}
+          GAMBI_2LP_IN_TOKEN: ${{ secrets.REGISTRY_TOKEN || secrets.GAMBI_2LP_IN_TOKEN || secrets.FORGEJO_TOKEN }}
         run: |
           for apk in target/dist/apk/*.apk site/*.apk; do
             [ -f "$apk" ] || continue

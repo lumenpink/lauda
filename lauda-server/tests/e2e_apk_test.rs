@@ -613,10 +613,14 @@ fn test_ci_workflow_avoids_unreachable_container_and_has_stable_hermetic_test_pi
         "ci.yml deve utilizar GAMBI_2LP_IN_TOKEN em vez de GIT_2LP_TOKEN"
     );
 
-    // 3. Deve conter gatilho de dispatch para a Pratilera
+    // 3. Publicação de artefatos via Forgejo Generic Packages (sem gatilho direto legado para Pratilera)
     assert!(
-        content.contains("trigger-pratilera:"),
-        "ci.yml deve conter job trigger-pratilera para atualizar o catálogo da banca"
+        content.contains("cccp package upload"),
+        "ci.yml deve publicar artefatos no Forgejo Generic Packages para consumo pelo Kombinat"
+    );
+    assert!(
+        !content.contains("trigger-pratilera:"),
+        "ci.yml não deve conter job legado trigger-pratilera (orquestração movida para o Kombinat)"
     );
 }
 
