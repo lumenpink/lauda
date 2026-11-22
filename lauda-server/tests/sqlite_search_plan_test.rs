@@ -212,15 +212,22 @@ fn test_mutation_covering_index_multi_term_and_empty_terms() {
     let results = store
         .search_hybrid("INBOX", "contrato aditivo", 10)
         .expect("search hybrid multi-term");
-    assert!(results.len() >= 2, "Ambos os documentos devem ser recuperados");
-    assert_eq!(results[0].uid, 10, "Doc 10 com maior soma de TF deve vir em primeiro");
+    assert!(
+        results.len() >= 2,
+        "Ambos os documentos devem ser recuperados"
+    );
+    assert_eq!(
+        results[0].uid, 10,
+        "Doc 10 com maior soma de TF deve vir em primeiro"
+    );
     assert_eq!(results[1].uid, 20, "Doc 20 deve vir em segundo");
 
     // Busca com termo inexistente: retorna vazio sem panic
     let empty_results = store
         .search_hybrid("INBOX", "inexistente_xyz_123", 10)
         .expect("search hybrid empty");
-    assert!(empty_results.is_empty(), "Termo inexistente deve retornar lista vazia");
+    assert!(
+        empty_results.is_empty(),
+        "Termo inexistente deve retornar lista vazia"
+    );
 }
-
-
