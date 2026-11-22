@@ -190,7 +190,8 @@ impl SqliteIndexStore {
                  PRIMARY KEY (term, mailbox, uid)
              );
 
-             CREATE INDEX IF NOT EXISTS idx_inverted_term_box ON inverted_index(term, mailbox);",
+             CREATE INDEX IF NOT EXISTS idx_inverted_term_box ON inverted_index(term, mailbox);
+             CREATE INDEX IF NOT EXISTS idx_inverted_bm25_covering ON inverted_index(mailbox, term, tf, uid);",
         )?;
         Ok(())
     }
@@ -556,11 +557,11 @@ impl SqliteIndexStore {
                 .collect::<Vec<_>>()
                 .join(", ");
 
-            // Otimização canônica (Ticket #113): busca indexada direta em inverted_index
-            // sem JOIN com indexed_documents, garantindo uso do B-Tree de termos em O(log N).
+            // Otimização canônica (Tickets #113 e #118): busca indexada direta em inverted_index
+            // utilizando covering index explícito para eliminar table lookups e scans desnecessários.
             let sql_bm25 = format!(
                 "SELECT i.uid
-                 FROM inverted_index i
+                 FROM inverted_index i INDEXED BY idx_inverted_bm25_covering
                  WHERE i.mailbox = ?1 AND i.term IN ({})
                  GROUP BY i.uid
                  ORDER BY SUM(i.tf) DESC, i.uid DESC
