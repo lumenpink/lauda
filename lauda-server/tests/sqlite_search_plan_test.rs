@@ -176,3 +176,51 @@ fn test_search_bm25_covering_index_plan() {
     );
 }
 
+#[test]
+fn test_mutation_covering_index_multi_term_and_empty_terms() {
+    let temp = tempdir().expect("tempdir");
+    let db_path = temp.path().join("covering_multi_mutation_test.db");
+    let store = SqliteIndexStore::open(&db_path).expect("abrir sqlite index");
+
+    {
+        let conn = rusqlite::Connection::open(&db_path).expect("open raw sqlite");
+
+        // Documento 10: contém "contrato" (tf=3) e "aditivo" (tf=4) -> soma = 7
+        conn.execute(
+            "INSERT INTO indexed_documents (mailbox, uid, subject, sender, date, is_read, is_flagged, has_attachments, doc_len, terms_json)
+             VALUES (?1, ?2, ?3, ?4, ?5, 0, 0, 0, 10, '{}')",
+            rusqlite::params!["INBOX", 10, "Contrato Aditivo", "juridico@lohn.in", "2026-11-20T10:00:00Z"],
+        ).expect("insert doc 10");
+        conn.execute(
+            "INSERT INTO inverted_index (term, mailbox, uid, tf) VALUES ('contrato', 'INBOX', 10, 3), ('aditivo', 'INBOX', 10, 4)",
+            [],
+        ).expect("insert terms doc 10");
+
+        // Documento 20: contém apenas "contrato" (tf=5) -> soma = 5
+        conn.execute(
+            "INSERT INTO indexed_documents (mailbox, uid, subject, sender, date, is_read, is_flagged, has_attachments, doc_len, terms_json)
+             VALUES (?1, ?2, ?3, ?4, ?5, 0, 0, 0, 10, '{}')",
+            rusqlite::params!["INBOX", 20, "Contrato Original", "juridico@lohn.in", "2026-11-20T11:00:00Z"],
+        ).expect("insert doc 20");
+        conn.execute(
+            "INSERT INTO inverted_index (term, mailbox, uid, tf) VALUES ('contrato', 'INBOX', 20, 5)",
+            [],
+        ).expect("insert terms doc 20");
+    }
+
+    // Busca multi-termo: doc 10 deve ser ranqueado à frente do doc 20 pela soma de TF
+    let results = store
+        .search_hybrid("INBOX", "contrato aditivo", 10)
+        .expect("search hybrid multi-term");
+    assert!(results.len() >= 2, "Ambos os documentos devem ser recuperados");
+    assert_eq!(results[0].uid, 10, "Doc 10 com maior soma de TF deve vir em primeiro");
+    assert_eq!(results[1].uid, 20, "Doc 20 deve vir em segundo");
+
+    // Busca com termo inexistente: retorna vazio sem panic
+    let empty_results = store
+        .search_hybrid("INBOX", "inexistente_xyz_123", 10)
+        .expect("search hybrid empty");
+    assert!(empty_results.is_empty(), "Termo inexistente deve retornar lista vazia");
+}
+
+
