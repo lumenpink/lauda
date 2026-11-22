@@ -687,5 +687,12 @@ async fn test_maildir_search_does_not_perform_blocking_reconcile() {
     let res = search_res.unwrap();
     assert_eq!(res.sync_status.total_count, 1);
     assert_eq!(res.sync_status.indexed_count, 0, "Não deve indexar inline durante a busca");
+    assert!(res.messages.is_empty(), "Sem documentos indexados, a busca deve retornar vazia sem erro");
+
+    // Valida busca com query vazia (listagem direta de mensagens sem reconciliar)
+    let empty_search_res = backend.search_messages("lumen", "INBOX", "").await;
+    assert!(empty_search_res.is_ok());
+    let empty_res = empty_search_res.unwrap();
+    assert_eq!(empty_res.messages.len(), 1, "Busca vazia deve listar os envelopes físicos disponíveis");
 }
 
