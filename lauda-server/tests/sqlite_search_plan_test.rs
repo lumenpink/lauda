@@ -251,3 +251,46 @@ fn test_mutation_covering_index_multi_term_and_empty_terms() {
         "Termo inexistente deve retornar lista vazia"
     );
 }
+
+#[test]
+fn test_mutation_sqlite_covering_index_cardinality_stress() {
+    let temp = tempdir().expect("tempdir");
+    let db_path = temp.path().join("cardinality_stress_test.db");
+    let store = SqliteIndexStore::open(&db_path).expect("abrir sqlite index");
+
+    {
+        let conn = rusqlite::Connection::open(&db_path).expect("open raw sqlite");
+
+        // Simula 100 termos diferentes para a mesma mailbox
+        for i in 1..=100 {
+            let term = format!("termo_{i}");
+            conn.execute(
+                "INSERT INTO inverted_index (term, mailbox, uid, tf) VALUES (?1, 'INBOX', ?2, 1)",
+                rusqlite::params![term, i as u32],
+            )
+            .expect("insert term");
+        }
+
+        // Insere também em indexed_documents para que a busca possa preencher os envelopes
+        for (uid, tf) in [(101, 5), (102, 10), (103, 1)] {
+            conn.execute(
+                "INSERT INTO indexed_documents (mailbox, uid, subject, sender, date, is_read, is_flagged, has_attachments, doc_len, terms_json)
+                 VALUES ('INBOX', ?1, ?2, 'test@example.com', '2026-11-20T10:00:00Z', 0, 0, 0, 10, '{}')",
+                rusqlite::params![uid, format!("Doc {uid}")],
+            ).expect("insert doc");
+            conn.execute(
+                "INSERT INTO inverted_index (term, mailbox, uid, tf) VALUES ('lisiane', 'INBOX', ?1, ?2)",
+                rusqlite::params![uid, tf],
+            ).expect("insert lisiane");
+        }
+    }
+
+    let results = store
+        .search_hybrid("INBOX", "lisiane", 10)
+        .expect("search hybrid lisiane");
+    assert_eq!(results.len(), 3, "Deve encontrar exatamente os 3 documentos para lisiane");
+    assert_eq!(results[0].uid, 102, "Doc 102 com tf=10 deve vir em primeiro");
+    assert_eq!(results[1].uid, 101, "Doc 101 com tf=5 deve vir em segundo");
+    assert_eq!(results[2].uid, 103, "Doc 103 com tf=1 deve vir em terceiro");
+}
+
