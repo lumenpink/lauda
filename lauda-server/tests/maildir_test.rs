@@ -651,3 +651,41 @@ async fn test_maildir_large_volume_perf() {
         elapsed
     );
 }
+
+#[tokio::test]
+async fn test_maildir_search_does_not_perform_blocking_reconcile() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+
+    std::fs::create_dir_all(root.join("cur")).unwrap();
+    std::fs::create_dir_all(root.join("new")).unwrap();
+
+    // Mensagem com conteúdo relevante
+    let msg1 = "1728000001.M123P456.test:2,S";
+    let content = "From: remetente@2lp.in\nTo: dest@2lp.in\nSubject: Lisiane Contrato\nDate: Mon, 05 Oct 2026 12:00:00 +0000\nContent-Type: text/plain; charset=utf-8\n\nTexto relevante para teste.\n";
+    std::fs::write(root.join("cur").join(msg1), content).unwrap();
+
+    let uidlist = "3 V1728000000 N100 Gabcdef\n100 :1728000001.M123P456.test\n";
+    std::fs::write(root.join("dovecot-uidlist"), uidlist).unwrap();
+
+    let backend = MaildirBackend::new(root);
+    backend.add_user("lumen", "senha123");
+
+    // A busca NÃO deve depender de reconciliação síncrona nem travar quando não indexada
+    let start = std::time::Instant::now();
+    let search_res = backend.search_messages("lumen", "INBOX", "lisiane").await;
+    let elapsed = start.elapsed();
+
+    assert!(search_res.is_ok(), "Busca deve retornar Ok mesmo sem mensagens no índice");
+    assert!(
+        elapsed < std::time::Duration::from_millis(500),
+        "Busca não deve bloquear síncrona com reconciliação: demorou {:?}",
+        elapsed
+    );
+
+    // O status deve indicar 0 indexados e 1 total sem ter indexado inline
+    let res = search_res.unwrap();
+    assert_eq!(res.sync_status.total_count, 1);
+    assert_eq!(res.sync_status.indexed_count, 0, "Não deve indexar inline durante a busca");
+}
+
