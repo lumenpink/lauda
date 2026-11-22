@@ -1556,53 +1556,7 @@ impl MailBackend for MaildirBackend {
             let active_uids: HashSet<u32> = uid_to_prefix.keys().copied().collect();
             let total_count = active_uids.len() as u64;
 
-            // 1. Reconciliação inteligente com dovecot-uidlist / active_uids
-            let reconcile = store
-                .reconcile_mailbox(mailbox, &active_uids)
-                .map_err(|e| {
-                    BackendError::Internal(format!("Erro ao reconciliar índice SQLite: {}", e))
-                })?;
-
-            // Expurgar e-mails excluídos do SQLite
-            for del_uid in reconcile.to_remove {
-                let _ = store.remove_document(mailbox, del_uid);
-            }
-
-            // Indexar pequenos lotes para não bloquear a resposta da requisição HTTP
-            let provider = lauda_index::SimpleCpuEmbeddingProvider;
-            for new_uid in reconcile.to_index.iter().take(5) {
-                if let Ok(msg) = self.get_message(username, mailbox, *new_uid).await {
-                    let mut temp_index = lauda_index::MessageIndex::new();
-                    temp_index.index_message_semantic(mailbox, &msg, &provider);
-                    if let Some(doc) = temp_index.documents().get(new_uid) {
-                        let _ = store.save_document(mailbox, doc, 0);
-                    }
-                }
-            }
-
-            // Iniciar worker em segundo plano para indexar o restante do acervo sem travar a API
-            if reconcile.to_index.len() > 5 {
-                let remaining_uids: Vec<u32> = reconcile.to_index[5..].to_vec();
-                let store_clone = store.clone();
-                let dir_clone = dir.clone();
-                let mailbox_clone = mailbox.to_string();
-                tokio::spawn(async move {
-                    let provider = lauda_index::SimpleCpuEmbeddingProvider;
-                    for chunk in remaining_uids.chunks(50) {
-                        for uid in chunk {
-                            if let Some(msg) = Self::read_message_static(&dir_clone, *uid) {
-                                let mut temp_index = lauda_index::MessageIndex::new();
-                                temp_index.index_message_semantic(&mailbox_clone, &msg, &provider);
-                                if let Some(doc) = temp_index.documents().get(uid) {
-                                    let _ = store_clone.save_document(&mailbox_clone, doc, 0);
-                                }
-                            }
-                        }
-                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-                    }
-                });
-            }
-
+            // Busca puramente de leitura instantânea no índice SQLite (sem travar em reconciliações síncronas)
             let sync_status = store
                 .get_sync_status(mailbox, total_count)
                 .unwrap_or_else(|_| MailboxSyncStatus::new(0, total_count));
@@ -1615,7 +1569,7 @@ impl MailBackend for MaildirBackend {
                 });
             }
 
-            // 2. Busca híbrida (BM25 + Cosseno Urupema) direta do índice SQLite
+            // Busca híbrida (BM25 + Cosseno Urupema) direta do índice SQLite em sub-segundo
             let ranked = store.search_hybrid(mailbox, query, 50).map_err(|e| {
                 BackendError::Internal(format!("Erro na busca híbrida SQLite: {}", e))
             })?;
