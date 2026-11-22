@@ -20,3 +20,9 @@ Além disso, os artefatos estáticos WebAssembly servidos em `site/app` encontra
 2. Validar via teste de plano de execução que queries sobre `inverted_index` utilizam index-only scan (sem table access para `tf` e `uid`).
 3. O endpoint de busca deve retornar resultados em tempo de resposta adequado sem expirar conexões ativas.
 4. O artefato WebAssembly em `site/app/assets/` deve ser atualizado e sincronizado com os fontes vigentes.
+
+### Conclusão & Validação (Fase 9)
+1. **Covering Index & Query Plan:** Foi criado o índice cobridor `idx_inverted_bm25_covering` sobre `(mailbox, term, tf, uid)` em `lauda-server/src/adapters/sqlite_index.rs` e forçado o uso explícito de `INDEXED BY idx_inverted_bm25_covering`. Os testes de plano de query em `sqlite_search_plan_test.rs` confirmam que as buscas operam em index-only scan sem tocar na tabela base.
+2. **Bundle WebAssembly:** O bundle do `lauda-client` foi recompilado para WebAssembly em modo release com `dx build`, gerando os novos binários em `site/app/assets/` (`lauda-client_bg-dxh35a41849c0996122.wasm` e `lauda-client-dxh40c933f83d99997.js`) e sincronizado em `site/app/index.html`.
+3. **Quality Gate:** Suite de testes de plano de execução e testes de mutação aprovados integralmente, com `cargo clippy --all-targets -p lauda-server -- -D warnings` e `cargo fmt` 100% limpos.
+
