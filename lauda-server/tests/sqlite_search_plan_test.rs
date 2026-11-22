@@ -154,7 +154,7 @@ fn test_search_bm25_covering_index_plan() {
     let mut idx_rows = check_idx.query([]).expect("query index");
     let row = idx_rows.next().expect("next row").expect("has index");
     let index_sql: String = row.get(0).expect("sql");
-    
+
     // O índice cobridor DEVE ter a ordem (term, mailbox, tf, uid) para otimização de alta cardinalidade
     assert!(
         index_sql.contains("(term, mailbox, tf, uid)"),
@@ -288,9 +288,15 @@ fn test_mutation_sqlite_covering_index_cardinality_stress() {
     let results = store
         .search_hybrid("INBOX", "lisiane", 10)
         .expect("search hybrid lisiane");
-    assert_eq!(results.len(), 3, "Deve encontrar exatamente os 3 documentos para lisiane");
-    assert_eq!(results[0].uid, 102, "Doc 102 com tf=10 deve vir em primeiro");
+    assert_eq!(
+        results.len(),
+        3,
+        "Deve encontrar exatamente os 3 documentos para lisiane"
+    );
+    assert_eq!(
+        results[0].uid, 102,
+        "Doc 102 com tf=10 deve vir em primeiro"
+    );
     assert_eq!(results[1].uid, 101, "Doc 101 com tf=5 deve vir em segundo");
     assert_eq!(results[2].uid, 103, "Doc 103 com tf=1 deve vir em terceiro");
 }
-
