@@ -23,3 +23,9 @@ A investigação direta do plano de execução e das estatísticas de tabela rev
 1. `SqliteIndexStore::init_schema` deve criar o índice cobridor com a ordem `(term, mailbox, tf, uid)`.
 2. A conexão SQLite deve aplicar os PRAGMAs otimizados de leitura e cache.
 3. Testes de plano de execução devem confirmar que a consulta `INDEXED BY idx_inverted_bm25_covering` com filtro `term IN (...) AND mailbox = ?` continua sendo index-only scan.
+
+### Conclusão & Validação (Fase 9)
+1. **Reordenação do Índice Cobridor:** O índice cobridor `idx_inverted_bm25_covering` foi reordenado para `(term, mailbox, tf, uid)`, tirando proveito da alta cardinalidade de `term` (2.3M) para seeks diretos no B-Tree.
+2. **PRAGMAs de Conexão:** Ativados `PRAGMA mmap_size = 268435456;` e `PRAGMA cache_size = -64000;` no `SqliteIndexStore`.
+3. **Validação:** Testes de plano de execução, mutação e Quality Gate executados e aprovados integralmente.
+
