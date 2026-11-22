@@ -162,6 +162,8 @@ impl SqliteIndexStore {
             "PRAGMA journal_mode = WAL;
              PRAGMA synchronous = NORMAL;
              PRAGMA foreign_keys = ON;
+             PRAGMA mmap_size = 268435456;
+             PRAGMA cache_size = -64000;
 
              CREATE TABLE IF NOT EXISTS indexed_documents (
                  mailbox TEXT NOT NULL,
@@ -191,7 +193,7 @@ impl SqliteIndexStore {
              );
 
              CREATE INDEX IF NOT EXISTS idx_inverted_term_box ON inverted_index(term, mailbox);
-             CREATE INDEX IF NOT EXISTS idx_inverted_bm25_covering ON inverted_index(mailbox, term, tf, uid);",
+             CREATE INDEX IF NOT EXISTS idx_inverted_bm25_covering ON inverted_index(term, mailbox, tf, uid);",
         )?;
         Ok(())
     }
@@ -338,6 +340,11 @@ impl SqliteIndexStore {
             to_index,
             to_remove,
         })
+    }
+
+    /// Retorna uma referência bloqueada à conexão interna do SQLite (usado em testes e manutenções).
+    pub fn raw_connection(&self) -> std::sync::MutexGuard<'_, Connection> {
+        self.conn.lock().unwrap()
     }
 
     /// Carrega o índice em memória estruturado a partir do banco SQLite para busca veloz.

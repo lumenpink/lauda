@@ -161,11 +161,22 @@ fn test_search_bm25_covering_index_plan() {
         "O índice cobridor deve ser indexado por (term, mailbox, tf, uid) para seeks instantâneos: {index_sql}"
     );
 
-    // Valida que os PRAGMAs mmap_size e cache_size foram configurados
-    let mmap_size: i64 = conn.query_row("PRAGMA mmap_size", [], |r| r.get(0)).expect("mmap_size");
-    let cache_size: i64 = conn.query_row("PRAGMA cache_size", [], |r| r.get(0)).expect("cache_size");
-    assert!(mmap_size >= 268435456, "PRAGMA mmap_size deve ser no mínimo 256MB: {mmap_size}");
-    assert!(cache_size <= -64000, "PRAGMA cache_size deve ser no mínimo 64MB (-64000 kib): {cache_size}");
+    // Valida que os PRAGMAs mmap_size e cache_size foram configurados na conexão do store
+    let internal_conn = _store.raw_connection();
+    let mmap_size: i64 = internal_conn
+        .query_row("PRAGMA mmap_size", [], |r| r.get(0))
+        .expect("mmap_size");
+    let cache_size: i64 = internal_conn
+        .query_row("PRAGMA cache_size", [], |r| r.get(0))
+        .expect("cache_size");
+    assert!(
+        mmap_size >= 268435456,
+        "PRAGMA mmap_size deve ser no mínimo 256MB: {mmap_size}"
+    );
+    assert!(
+        cache_size <= -64000,
+        "PRAGMA cache_size deve ser no mínimo 64MB (-64000 kib): {cache_size}"
+    );
 
     // Valida que o plano de execução para a query BM25 utiliza o índice cobridor
     let sql = "EXPLAIN QUERY PLAN SELECT i.uid FROM inverted_index i INDEXED BY idx_inverted_bm25_covering WHERE i.mailbox = ?1 AND i.term IN (?2) GROUP BY i.uid ORDER BY SUM(i.tf) DESC, i.uid DESC LIMIT 50";
