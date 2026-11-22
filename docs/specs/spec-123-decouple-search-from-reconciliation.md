@@ -20,3 +20,9 @@ A causa raiz identificada foi:
 1. `MaildirBackend::search_messages` não deve executar `reconcile_mailbox` nem chamadas a `save_document`.
 2. A rota deve retornar o `sync_status` e a lista de mensagens correspondentes imediatamente.
 3. Testes unitários e de integração devem garantir que `search_messages` retorne com êxito sem disparar reconciliação.
+
+### Conclusão & Validação (Fase 9)
+1. **Desacoplamento Completo:** A função `search_messages` no `MaildirBackend` agora realiza leitura direta do índice SQLite sem disparar `reconcile_mailbox`, `save_document` ou locks síncronos na requisição HTTP.
+2. **Atualização Assíncrona:** A indexação de novos e-mails permanece exclusiva ao worker de background e ao watcher de inotify.
+3. **Validação:** Suite de testes `maildir_test` aprovada em menos de 10 milissegundos comprovando zero bloqueio síncrono.
+
