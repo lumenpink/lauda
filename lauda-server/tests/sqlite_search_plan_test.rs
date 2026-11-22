@@ -138,3 +138,41 @@ fn test_search_bm25_mutation_ordering_and_mailbox_isolation() {
         "Documento com menor TF deve ser ranqueado em segundo"
     );
 }
+
+#[test]
+fn test_search_bm25_covering_index_plan() {
+    let temp = tempdir().expect("tempdir");
+    let db_path = temp.path().join("covering_plan_test.db");
+    let _store = SqliteIndexStore::open(&db_path).expect("abrir sqlite index");
+
+    let conn = rusqlite::Connection::open(&db_path).expect("open raw sqlite");
+
+    // Valida que o índice cobridor específico existe no catálogo de índices
+    let mut check_idx = conn
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_inverted_bm25_covering'")
+        .expect("prepare index check");
+    let mut idx_rows = check_idx.query([]).expect("query index");
+    let has_covering_index = idx_rows.next().expect("next row").is_some();
+    assert!(
+        has_covering_index,
+        "O índice cobridor idx_inverted_bm25_covering deve estar criado no schema do SqliteIndexStore"
+    );
+
+    // Valida que o plano de execução para a query BM25 utiliza o índice cobridor
+    let sql = "EXPLAIN QUERY PLAN SELECT i.uid FROM inverted_index i WHERE i.mailbox = ?1 AND i.term IN (?2) GROUP BY i.uid ORDER BY SUM(i.tf) DESC, i.uid DESC LIMIT 50";
+    let mut stmt = conn.prepare(sql).expect("prepare explain");
+    let rows = stmt
+        .query_map(rusqlite::params!["INBOX", "baquara"], |row| {
+            row.get::<_, String>(3)
+        })
+        .expect("query map");
+
+    let details: Vec<String> = rows.flatten().collect();
+    let full_plan = details.join(" | ");
+
+    assert!(
+        full_plan.contains("idx_inverted_bm25_covering") || full_plan.contains("COVERING INDEX"),
+        "O plano de execução deve utilizar o índice cobridor (COVERING INDEX): {full_plan}"
+    );
+}
+
