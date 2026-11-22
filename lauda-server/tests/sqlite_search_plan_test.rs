@@ -149,14 +149,23 @@ fn test_search_bm25_covering_index_plan() {
 
     // Valida que o índice cobridor específico existe no catálogo de índices
     let mut check_idx = conn
-        .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_inverted_bm25_covering'")
+        .prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_inverted_bm25_covering'")
         .expect("prepare index check");
     let mut idx_rows = check_idx.query([]).expect("query index");
-    let has_covering_index = idx_rows.next().expect("next row").is_some();
+    let row = idx_rows.next().expect("next row").expect("has index");
+    let index_sql: String = row.get(0).expect("sql");
+    
+    // O índice cobridor DEVE ter a ordem (term, mailbox, tf, uid) para otimização de alta cardinalidade
     assert!(
-        has_covering_index,
-        "O índice cobridor idx_inverted_bm25_covering deve estar criado no schema do SqliteIndexStore"
+        index_sql.contains("(term, mailbox, tf, uid)"),
+        "O índice cobridor deve ser indexado por (term, mailbox, tf, uid) para seeks instantâneos: {index_sql}"
     );
+
+    // Valida que os PRAGMAs mmap_size e cache_size foram configurados
+    let mmap_size: i64 = conn.query_row("PRAGMA mmap_size", [], |r| r.get(0)).expect("mmap_size");
+    let cache_size: i64 = conn.query_row("PRAGMA cache_size", [], |r| r.get(0)).expect("cache_size");
+    assert!(mmap_size >= 268435456, "PRAGMA mmap_size deve ser no mínimo 256MB: {mmap_size}");
+    assert!(cache_size <= -64000, "PRAGMA cache_size deve ser no mínimo 64MB (-64000 kib): {cache_size}");
 
     // Valida que o plano de execução para a query BM25 utiliza o índice cobridor
     let sql = "EXPLAIN QUERY PLAN SELECT i.uid FROM inverted_index i INDEXED BY idx_inverted_bm25_covering WHERE i.mailbox = ?1 AND i.term IN (?2) GROUP BY i.uid ORDER BY SUM(i.tf) DESC, i.uid DESC LIMIT 50";
