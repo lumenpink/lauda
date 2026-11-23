@@ -34,37 +34,37 @@ impl CandleEmbeddingProvider {
     /// Carrega o modelo a partir de um diretório contendo `model.safetensors` e `tokenizer.json`
     /// (ou a partir do caminho direto de um arquivo safetensors com tokenizer no mesmo diretório).
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, String> {
-        let path = path.as_ref();
-        let (weights_path, tokenizer_path, config_path) = if path.is_dir() {
-            (
-                path.join("model.safetensors"),
-                path.join("tokenizer.json"),
-                path.join("config.json"),
-            )
-        } else {
-            let parent = path.parent().unwrap_or_else(|| Path::new("."));
-            (
-                path.to_path_buf(),
-                parent.join("tokenizer.json"),
-                parent.join("config.json"),
-            )
-        };
-
-        if !weights_path.exists() {
-            return Err(format!(
-                "Pesos do modelo não encontrados: {}",
-                weights_path.display()
-            ));
-        }
-        if !tokenizer_path.exists() {
-            return Err(format!(
-                "Tokenizer não encontrado: {}",
-                tokenizer_path.display()
-            ));
-        }
-
         #[cfg(feature = "candle")]
         {
+            let path = path.as_ref();
+            let (weights_path, tokenizer_path, config_path) = if path.is_dir() {
+                (
+                    path.join("model.safetensors"),
+                    path.join("tokenizer.json"),
+                    path.join("config.json"),
+                )
+            } else {
+                let parent = path.parent().unwrap_or_else(|| Path::new("."));
+                (
+                    path.to_path_buf(),
+                    parent.join("tokenizer.json"),
+                    parent.join("config.json"),
+                )
+            };
+
+            if !weights_path.exists() {
+                return Err(format!(
+                    "Pesos do modelo não encontrados: {}",
+                    weights_path.display()
+                ));
+            }
+            if !tokenizer_path.exists() {
+                return Err(format!(
+                    "Tokenizer não encontrado: {}",
+                    tokenizer_path.display()
+                ));
+            }
+
             let device = Device::Cpu;
             let config: BertConfig = if config_path.exists() {
                 let data = std::fs::read_to_string(&config_path)
@@ -105,6 +105,7 @@ impl CandleEmbeddingProvider {
 
         #[cfg(not(feature = "candle"))]
         {
+            let _ = path;
             Err(
                 "Suporte ao Candle desativado neste binário (feature flag desabilitada)"
                     .to_string(),

@@ -208,17 +208,16 @@ impl MailApiClient for InMemoryApiClient {
         }
 
         let mut index = lauda_index::MessageIndex::new();
-        let provider = lauda_index::SimpleCpuEmbeddingProvider;
 
         for msg in box_msgs {
-            index.index_message_semantic(mailbox, msg, &provider);
+            index.index_message(mailbox, msg);
         }
 
-        let results = index.search_hybrid(query, &provider, 0.5);
+        let results = index.search(query);
 
         let mut envelopes = Vec::new();
-        for res in results {
-            if let Some(found) = box_msgs.iter().find(|m| m.envelope.uid == res.uid) {
+        for uid in results {
+            if let Some(found) = box_msgs.iter().find(|m| m.envelope.uid == uid) {
                 envelopes.push(found.envelope.clone());
             }
         }

@@ -164,50 +164,24 @@ pub fn InboxView(
 
                 let local_envelopes: Vec<MessageEnvelope> =
                     if let Ok(Some(local_index)) = local_index_res {
-                        #[cfg(target_arch = "wasm32")]
-                        {
-                            // No WASM: busca BM25 local pura, instantânea e sem alocação vetorial
-                            let matched_uids = local_index.search(&q);
-                            let docs = local_index.documents();
-                            matched_uids
-                                .into_iter()
-                                .filter_map(|uid| {
-                                    docs.get(&uid).map(|doc| MessageEnvelope {
-                                        uid: doc.uid,
-                                        subject: doc.subject.clone(),
-                                        sender: doc.sender.clone(),
-                                        date: doc.date.clone(),
-                                        cc: None,
-                                        has_attachments: doc.has_attachments,
-                                        is_read: doc.is_read,
-                                        is_flagged: doc.is_flagged,
-                                        crypto_meta: None,
-                                    })
+                        let matched_uids = local_index.search(&q);
+                        let docs = local_index.documents();
+                        matched_uids
+                            .into_iter()
+                            .filter_map(|uid| {
+                                docs.get(&uid).map(|doc| MessageEnvelope {
+                                    uid: doc.uid,
+                                    subject: doc.subject.clone(),
+                                    sender: doc.sender.clone(),
+                                    date: doc.date.clone(),
+                                    cc: None,
+                                    has_attachments: doc.has_attachments,
+                                    is_read: doc.is_read,
+                                    is_flagged: doc.is_flagged,
+                                    crypto_meta: None,
                                 })
-                                .collect()
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
-                        {
-                            let provider = lauda_index::SimpleCpuEmbeddingProvider;
-                            let ranked = local_index.search_hybrid_rrf(&q, &provider, 60.0);
-                            let docs = local_index.documents();
-                            ranked
-                                .into_iter()
-                                .filter_map(|r| {
-                                    docs.get(&r.uid).map(|doc| MessageEnvelope {
-                                        uid: doc.uid,
-                                        subject: doc.subject.clone(),
-                                        sender: doc.sender.clone(),
-                                        date: doc.date.clone(),
-                                        cc: None,
-                                        has_attachments: doc.has_attachments,
-                                        is_read: doc.is_read,
-                                        is_flagged: doc.is_flagged,
-                                        crypto_meta: None,
-                                    })
-                                })
-                                .collect()
-                        }
+                            })
+                            .collect()
                     } else {
                         Vec::new()
                     };

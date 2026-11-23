@@ -793,7 +793,7 @@ impl SqliteIndexStore {
         let conn = self.read_conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT uid, subject, sender, date, is_read, is_flagged, has_attachments,
-                    doc_len, terms_json, embeddings_blob
+                    doc_len, terms_json
              FROM indexed_documents WHERE mailbox = ?1 ORDER BY uid DESC",
         )?;
 
@@ -808,7 +808,6 @@ impl SqliteIndexStore {
             let has_attachments: bool = row.get::<_, i64>(6)? != 0;
             let doc_len: usize = row.get::<_, i64>(7)? as usize;
             let terms_json: String = row.get(8)?;
-            let embeddings_blob: Vec<u8> = row.get(9)?;
             Ok((
                 uid,
                 subject,
@@ -819,7 +818,6 @@ impl SqliteIndexStore {
                 has_attachments,
                 doc_len,
                 terms_json,
-                embeddings_blob,
             ))
         })?;
 
@@ -834,7 +832,6 @@ impl SqliteIndexStore {
                 has_attachments,
                 doc_len,
                 terms_json,
-                embeddings_blob,
             ) = r?;
 
             if let Ok(parsed_date) = DateTime::parse_from_rfc3339(&date)
@@ -849,7 +846,7 @@ impl SqliteIndexStore {
 
             let term_frequencies: HashMap<String, u32> =
                 serde_json::from_str(&terms_json).unwrap_or_default();
-            let segment_embeddings = decode_segment_embeddings(&embeddings_blob);
+            let segment_embeddings = Vec::new();
 
             let subject_terms = lauda_index::tokenize(&lauda_index::normalize(&subject))
                 .into_iter()

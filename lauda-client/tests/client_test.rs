@@ -382,9 +382,9 @@ fn test_format_search_hint_dynamic_countdown() {
 }
 
 #[tokio::test]
-async fn test_client_offline_index_slice_and_hybrid_search() {
+async fn test_client_offline_index_slice_and_bm25_search() {
     use lauda_client::domain::LocalMessageCache;
-    use lauda_index::{MessageIndex, SimpleCpuEmbeddingProvider};
+    use lauda_index::MessageIndex;
     use tempfile::tempdir;
 
     let temp = tempdir().expect("tempdir");
@@ -392,7 +392,6 @@ async fn test_client_offline_index_slice_and_hybrid_search() {
 
     // Cria documento indexado simulado vindo do servidor
     let mut server_index = MessageIndex::new();
-    let provider = SimpleCpuEmbeddingProvider;
 
     let msg = Message {
         envelope: MessageEnvelope {
@@ -412,7 +411,7 @@ async fn test_client_offline_index_slice_and_hybrid_search() {
         html_sanitized: None,
     };
 
-    server_index.index_message_semantic("INBOX", &msg, &provider);
+    server_index.index_message("INBOX", &msg);
     let docs: Vec<_> = server_index.documents().values().cloned().collect();
 
     // 1. Salvar fatia de 90 dias no SQLite do cliente
@@ -420,16 +419,15 @@ async fn test_client_offline_index_slice_and_hybrid_search() {
         .save_index_slice("INBOX", &docs)
         .expect("salvar fatia local");
 
-    // 2. Carregar fatia offline e executar busca híbrida
+    // 2. Carregar fatia offline e executar busca BM25
     let local_index = cache
         .load_index_slice("INBOX")
         .expect("carregar fatia local")
         .expect("indice deve existir");
 
-    let results = local_index.search_hybrid("pix", &provider, 0.5);
+    let results = local_index.search("pix");
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0].uid, 777);
-    assert!(results[0].semantic_score > 0.0);
+    assert_eq!(results[0], 777);
 }
 
 #[tokio::test]
