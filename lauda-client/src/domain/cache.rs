@@ -805,7 +805,14 @@ impl LocalMessageCache {
                 .map_err(|e| std::io::Error::other(e.to_string()))?;
 
             for doc in docs {
-                if let Ok(json) = serde_json::to_string(doc) {
+                let doc_to_save = if !doc.segment_embeddings.is_empty() {
+                    let mut stripped = doc.clone();
+                    stripped.segment_embeddings.clear();
+                    stripped
+                } else {
+                    doc.clone()
+                };
+                if let Ok(json) = serde_json::to_string(&doc_to_save) {
                     let _ = stmt.execute(params![mailbox, doc.uid, json]);
                 }
             }
