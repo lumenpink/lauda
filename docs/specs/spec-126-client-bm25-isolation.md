@@ -41,9 +41,9 @@ Definiu-se uma mudança de paradigma arquitetural:
 
 ### Critérios de Aceitação (GOST DD-TDD)
 
-- [ ] **Fase 4 (Red Test):** Teste unitário no cliente e servidor validando que fatias exportadas possuem zero embeddings e que a busca local do cliente funciona estritamente com BM25 sem dependência neural.
-- [ ] **Fase 5 (Green Implement):** Implementação do desacoplamento de dependências, purga na exportação do slice e unificação da busca BM25 no cliente.
-- [ ] **Fase 6 (Refactor):** Limpeza de imports e formatação canônica.
-- [ ] **Fase 7 (Mutation Test):** Testes de mutação cobrindo integridade do BM25 local após recepção de fatias sem embeddings.
-- [ ] **Fase 8 (Quality Gate):** `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e testes passando offline.
-- [ ] **Fase 9 (Close):** Fechamento do ticket via `cccp close` e integração na `main`.
+- [x] **Fase 4 (Red Test):** Teste unitário no cliente e servidor validando que fatias exportadas possuem zero embeddings e que a busca local do cliente funciona estritamente com BM25 sem dependência neural.
+- [x] **Fase 5 (Green Implement):** Implementação do desacoplamento de dependências, purga na exportação do slice e unificação da busca BM25 no cliente.
+- [x] **Fase 6 (Refactor):** Limpeza de imports e formatação canônica.
+- [x] **Fase 7 (Mutation Test):** Testes de mutação cobrindo integridade do BM25 local após recepção de fatias sem embeddings.
+- [x] **Fase 8 (Quality Gate):** `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e testes passando offline.
+- [x] **Fase 9 (Close):** Fechamento do ticket via `cccp close` e integração na `main`.
