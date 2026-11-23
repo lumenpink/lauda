@@ -90,10 +90,18 @@ async fn search_messages_handler(
     Query(query): Query<SearchQuery>,
 ) -> Result<Response, (StatusCode, String)> {
     let mailbox = query.r#box.as_deref().unwrap_or("INBOX");
-    let result = state
+    let search_fut = state
         .backend
-        .search_messages(&username, mailbox, &query.q)
+        .search_messages(&username, mailbox, &query.q);
+
+    let result = tokio::time::timeout(std::time::Duration::from_secs(10), search_fut)
         .await
+        .map_err(|_| {
+            (
+                StatusCode::GATEWAY_TIMEOUT,
+                "Tempo limite de 10s excedido na busca de mensagens".to_string(),
+            )
+        })?
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let mut resp = Json(result.clone()).into_response();
@@ -119,10 +127,18 @@ async fn search_mailbox_handler(
     Path(mailbox): Path<String>,
     Query(query): Query<MailboxSearchQuery>,
 ) -> Result<Response, (StatusCode, String)> {
-    let result = state
+    let search_fut = state
         .backend
-        .search_messages(&username, &mailbox, &query.q)
+        .search_messages(&username, &mailbox, &query.q);
+
+    let result = tokio::time::timeout(std::time::Duration::from_secs(10), search_fut)
         .await
+        .map_err(|_| {
+            (
+                StatusCode::GATEWAY_TIMEOUT,
+                "Tempo limite de 10s excedido na busca de mensagens".to_string(),
+            )
+        })?
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let mut resp = Json(result.clone()).into_response();

@@ -97,23 +97,86 @@ pub fn extract_representative_vector(embeddings: &[(SegmentKind, Vec<f32>)]) -> 
 /// Adaptador de persistência SQLite para o índice híbrido (BM25 + Vetores Urupema com FlatVectorIndex em RAM).
 #[derive(Clone)]
 pub struct SqliteIndexStore {
-    conn: Arc<Mutex<Connection>>,
+    write_conn: Arc<Mutex<Connection>>,
+    read_conn: Arc<Mutex<Connection>>,
     vector_indexes: Arc<RwLock<HashMap<String, FlatVectorIndex>>>,
 }
 
 impl SqliteIndexStore {
     /// Abre ou cria o banco SQLite de índice no caminho especificado e carrega os vetores em RAM.
+    /// Utiliza conexões dedicadas e isoladas para escrita e leitura sob modo WAL,
+    /// garantindo que o indexador contínuo em background nunca bloqueie as buscas HTTP.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, rusqlite::Error> {
-        let conn = Connection::open(path)?;
-        let vector_indexes = Arc::new(RwLock::new(HashMap::new()));
-        Self::preload_vector_indexes(&conn, &vector_indexes);
+        let path_ref = path.as_ref();
+        let write_conn = Connection::open(path_ref)?;
+        write_conn.execute_batch(
+            "PRAGMA journal_mode = WAL;
+             PRAGMA synchronous = NORMAL;
+             PRAGMA foreign_keys = ON;
+             PRAGMA busy_timeout = 5000;
+             PRAGMA mmap_size = 268435456;
+             PRAGMA cache_size = -64000;",
+        )?;
 
-        let store = Self {
-            conn: Arc::new(Mutex::new(conn)),
+        let write_conn = Arc::new(Mutex::new(write_conn));
+        let vector_indexes = Arc::new(RwLock::new(HashMap::new()));
+
+        Self::init_schema_on_conn(&write_conn)?;
+
+        let read_conn = Connection::open_with_flags(
+            path_ref,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )?;
+        read_conn.execute_batch(
+            "PRAGMA busy_timeout = 5000;
+             PRAGMA query_only = ON;
+             PRAGMA mmap_size = 268435456;
+             PRAGMA cache_size = -64000;",
+        )?;
+        Self::preload_vector_indexes(&read_conn, &vector_indexes);
+
+        Ok(Self {
+            write_conn,
+            read_conn: Arc::new(Mutex::new(read_conn)),
             vector_indexes,
-        };
-        store.init_schema()?;
-        Ok(store)
+        })
+    }
+
+    /// Inicializa as tabelas no modo WAL para alto desempenho e concorrência na conexão de escrita.
+    fn init_schema_on_conn(conn: &Arc<Mutex<Connection>>) -> Result<(), rusqlite::Error> {
+        let conn = conn.lock().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS indexed_documents (
+                 mailbox TEXT NOT NULL,
+                 uid INTEGER NOT NULL,
+                 mtime INTEGER NOT NULL DEFAULT 0,
+                 subject TEXT NOT NULL,
+                 sender TEXT NOT NULL,
+                 date TEXT NOT NULL,
+                 is_read INTEGER NOT NULL DEFAULT 0,
+                 is_flagged INTEGER NOT NULL DEFAULT 0,
+                 has_attachments INTEGER NOT NULL DEFAULT 0,
+                 doc_len INTEGER NOT NULL DEFAULT 0,
+                 terms_json TEXT NOT NULL DEFAULT '{}',
+                 embeddings_blob BLOB,
+                 PRIMARY KEY (mailbox, uid)
+             );
+
+             CREATE INDEX IF NOT EXISTS idx_indexed_docs_box ON indexed_documents(mailbox);
+             CREATE INDEX IF NOT EXISTS idx_indexed_docs_box_uid ON indexed_documents(mailbox, uid);
+
+             CREATE TABLE IF NOT EXISTS inverted_index (
+                 term TEXT NOT NULL,
+                 mailbox TEXT NOT NULL,
+                 uid INTEGER NOT NULL,
+                 tf INTEGER NOT NULL,
+                 PRIMARY KEY (term, mailbox, uid)
+             );
+
+             CREATE INDEX IF NOT EXISTS idx_inverted_term_box ON inverted_index(term, mailbox);
+             CREATE INDEX IF NOT EXISTS idx_inverted_bm25_covering ON inverted_index(term, mailbox, tf, uid);",
+        )?;
+        Ok(())
     }
 
     /// Carrega previamente todos os vetores indexados em lote para a matriz contígua em RAM.
@@ -156,46 +219,8 @@ impl SqliteIndexStore {
     }
 
     /// Inicializa as tabelas no modo WAL para alto desempenho e concorrência.
-    fn init_schema(&self) -> Result<(), rusqlite::Error> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute_batch(
-            "PRAGMA journal_mode = WAL;
-             PRAGMA synchronous = NORMAL;
-             PRAGMA foreign_keys = ON;
-             PRAGMA mmap_size = 268435456;
-             PRAGMA cache_size = -64000;
-
-             CREATE TABLE IF NOT EXISTS indexed_documents (
-                 mailbox TEXT NOT NULL,
-                 uid INTEGER NOT NULL,
-                 mtime INTEGER NOT NULL DEFAULT 0,
-                 subject TEXT NOT NULL,
-                 sender TEXT NOT NULL,
-                 date TEXT NOT NULL,
-                 is_read INTEGER NOT NULL DEFAULT 0,
-                 is_flagged INTEGER NOT NULL DEFAULT 0,
-                 has_attachments INTEGER NOT NULL DEFAULT 0,
-                 doc_len INTEGER NOT NULL DEFAULT 0,
-                 terms_json TEXT NOT NULL DEFAULT '{}',
-                 embeddings_blob BLOB,
-                 PRIMARY KEY (mailbox, uid)
-             );
-
-             CREATE INDEX IF NOT EXISTS idx_indexed_docs_box ON indexed_documents(mailbox);
-             CREATE INDEX IF NOT EXISTS idx_indexed_docs_box_uid ON indexed_documents(mailbox, uid);
-
-             CREATE TABLE IF NOT EXISTS inverted_index (
-                 term TEXT NOT NULL,
-                 mailbox TEXT NOT NULL,
-                 uid INTEGER NOT NULL,
-                 tf INTEGER NOT NULL,
-                 PRIMARY KEY (term, mailbox, uid)
-             );
-
-             CREATE INDEX IF NOT EXISTS idx_inverted_term_box ON inverted_index(term, mailbox);
-             CREATE INDEX IF NOT EXISTS idx_inverted_bm25_covering ON inverted_index(term, mailbox, tf, uid);",
-        )?;
-        Ok(())
+    pub fn init_schema(&self) -> Result<(), rusqlite::Error> {
+        Self::init_schema_on_conn(&self.write_conn)
     }
 
     /// Salva ou atualiza um documento indexado no SQLite.
@@ -205,12 +230,14 @@ impl SqliteIndexStore {
         doc: &IndexedDoc,
         mtime: i64,
     ) -> Result<(), rusqlite::Error> {
-        let conn = self.conn.lock().unwrap();
+        let mut conn = self.write_conn.lock().unwrap();
         let terms_json =
             serde_json::to_string(&doc.term_frequencies).unwrap_or_else(|_| "{}".to_string());
         let embeddings_blob = encode_segment_embeddings(&doc.segment_embeddings);
 
-        conn.execute(
+        let tx = conn.transaction()?;
+
+        tx.execute(
             "INSERT OR REPLACE INTO indexed_documents (
                 mailbox, uid, mtime, subject, sender, date,
                 is_read, is_flagged, has_attachments, doc_len,
@@ -233,17 +260,21 @@ impl SqliteIndexStore {
         )?;
 
         // Atualiza a tabela de índice invertido
-        conn.execute(
+        tx.execute(
             "DELETE FROM inverted_index WHERE mailbox = ?1 AND uid = ?2",
             params![mailbox, doc.uid],
         )?;
 
-        let mut stmt = conn.prepare(
-            "INSERT OR REPLACE INTO inverted_index (term, mailbox, uid, tf) VALUES (?1, ?2, ?3, ?4)",
-        )?;
-        for (term, &tf) in &doc.term_frequencies {
-            stmt.execute(params![term, mailbox, doc.uid, tf])?;
+        {
+            let mut stmt = tx.prepare(
+                "INSERT OR REPLACE INTO inverted_index (term, mailbox, uid, tf) VALUES (?1, ?2, ?3, ?4)",
+            )?;
+            for (term, &tf) in &doc.term_frequencies {
+                stmt.execute(params![term, mailbox, doc.uid, tf])?;
+            }
         }
+
+        tx.commit()?;
 
         // Atualiza o índice vetorial em RAM
         if let Some(rep_vec) = extract_representative_vector(&doc.segment_embeddings)
@@ -261,15 +292,17 @@ impl SqliteIndexStore {
 
     /// Remove um documento indexado do SQLite e do índice vetorial em RAM.
     pub fn remove_document(&self, mailbox: &str, uid: u32) -> Result<(), rusqlite::Error> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
+        let mut conn = self.write_conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        tx.execute(
             "DELETE FROM indexed_documents WHERE mailbox = ?1 AND uid = ?2",
             params![mailbox, uid],
         )?;
-        conn.execute(
+        tx.execute(
             "DELETE FROM inverted_index WHERE mailbox = ?1 AND uid = ?2",
             params![mailbox, uid],
         )?;
+        tx.commit()?;
 
         let mut indexes = self.vector_indexes.write().unwrap();
         if let Some(idx) = indexes.get_mut(mailbox) {
@@ -282,15 +315,17 @@ impl SqliteIndexStore {
     /// Limpa todos os documentos indexados e termos invertidos da caixa postal informada,
     /// permitindo uma reindexação completa do zero.
     pub fn clear_mailbox_index(&self, mailbox: &str) -> Result<(), rusqlite::Error> {
-        let conn = self.conn.lock().unwrap();
-        conn.execute(
+        let mut conn = self.write_conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        tx.execute(
             "DELETE FROM indexed_documents WHERE mailbox = ?1",
             params![mailbox],
         )?;
-        conn.execute(
+        tx.execute(
             "DELETE FROM inverted_index WHERE mailbox = ?1",
             params![mailbox],
         )?;
+        tx.commit()?;
 
         let mut indexes = self.vector_indexes.write().unwrap();
         if let Some(idx) = indexes.get_mut(mailbox) {
@@ -299,10 +334,9 @@ impl SqliteIndexStore {
 
         Ok(())
     }
-
     /// Retorna todos os UIDs atualmente presentes no banco para a caixa postal informada.
     pub fn get_indexed_uids(&self, mailbox: &str) -> Result<HashSet<u32>, rusqlite::Error> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn.lock().unwrap();
         let mut stmt = conn.prepare("SELECT uid FROM indexed_documents WHERE mailbox = ?1")?;
         let rows = stmt.query_map(params![mailbox], |row| row.get::<_, u32>(0))?;
         let mut uids = HashSet::new();
@@ -344,12 +378,12 @@ impl SqliteIndexStore {
 
     /// Retorna uma referência bloqueada à conexão interna do SQLite (usado em testes e manutenções).
     pub fn raw_connection(&self) -> std::sync::MutexGuard<'_, Connection> {
-        self.conn.lock().unwrap()
+        self.write_conn.lock().unwrap()
     }
 
     /// Carrega o índice em memória estruturado a partir do banco SQLite para busca veloz.
     pub fn load_mailbox_index(&self, mailbox: &str) -> Result<MessageIndex, rusqlite::Error> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT uid, subject, sender, date, is_read, is_flagged, has_attachments,
                     doc_len, terms_json, embeddings_blob
@@ -436,7 +470,7 @@ impl SqliteIndexStore {
         mailbox: &str,
         total_count: u64,
     ) -> Result<MailboxSyncStatus, rusqlite::Error> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn.lock().unwrap();
         let indexed_count: i64 = conn.query_row(
             "SELECT count(*) FROM indexed_documents WHERE mailbox = ?1",
             params![mailbox],
@@ -458,7 +492,7 @@ impl SqliteIndexStore {
             return Ok(Vec::new());
         }
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn.lock().unwrap();
         let placeholders = tokens
             .iter()
             .enumerate()
@@ -539,8 +573,6 @@ impl SqliteIndexStore {
         let parsed = lauda_index::parse_query(query);
         let query_vec = provider.embed_query(query);
 
-        let conn = self.conn.lock().unwrap();
-
         // 1. Canal Léxico: Top 50 UIDs via índice invertido relacional (BM25)
         // Filtra stop words comuns para evitar ruído falso de preposições no índice invertido
         let raw_tokens = lauda_index::tokenize(query);
@@ -557,6 +589,7 @@ impl SqliteIndexStore {
         let mut lexical_uids: Vec<u32> = Vec::new();
 
         if !tokens.is_empty() {
+            let conn = self.read_conn.lock().unwrap();
             let placeholders = tokens
                 .iter()
                 .enumerate()
@@ -610,6 +643,7 @@ impl SqliteIndexStore {
         if fused.is_empty() {
             if tokens.is_empty() && parsed.clauses.is_empty() {
                 // Query em branco: retorna mensagens mais recentes
+                let conn = self.read_conn.lock().unwrap();
                 let mut stmt = conn.prepare(
                     "SELECT uid, subject, sender, date, is_read, is_flagged, has_attachments
                      FROM indexed_documents WHERE mailbox = ?1 ORDER BY uid DESC LIMIT ?2",
@@ -669,33 +703,36 @@ impl SqliteIndexStore {
         }
 
         let mut envelopes_by_uid: HashMap<u32, MessageEnvelope> = HashMap::new();
-        let mut stmt = conn.prepare(&sql_docs)?;
-        let rows = stmt.query_map(rusqlite::params_from_iter(doc_params.iter()), |row| {
-            let uid: u32 = row.get(0)?;
-            let subject: String = row.get(1)?;
-            let sender: String = row.get(2)?;
-            let date: String = row.get(3)?;
-            let is_read: bool = row.get::<_, i64>(4)? != 0;
-            let is_flagged: bool = row.get::<_, i64>(5)? != 0;
-            let has_attachments: bool = row.get::<_, i64>(6)? != 0;
-            Ok((
-                uid,
-                MessageEnvelope {
+        {
+            let conn = self.read_conn.lock().unwrap();
+            let mut stmt = conn.prepare(&sql_docs)?;
+            let rows = stmt.query_map(rusqlite::params_from_iter(doc_params.iter()), |row| {
+                let uid: u32 = row.get(0)?;
+                let subject: String = row.get(1)?;
+                let sender: String = row.get(2)?;
+                let date: String = row.get(3)?;
+                let is_read: bool = row.get::<_, i64>(4)? != 0;
+                let is_flagged: bool = row.get::<_, i64>(5)? != 0;
+                let has_attachments: bool = row.get::<_, i64>(6)? != 0;
+                Ok((
                     uid,
-                    subject,
-                    sender,
-                    date,
-                    cc: None,
-                    has_attachments,
-                    is_read,
-                    is_flagged,
-                    crypto_meta: None,
-                },
-            ))
-        })?;
+                    MessageEnvelope {
+                        uid,
+                        subject,
+                        sender,
+                        date,
+                        cc: None,
+                        has_attachments,
+                        is_read,
+                        is_flagged,
+                        crypto_meta: None,
+                    },
+                ))
+            })?;
 
-        for r in rows.flatten() {
-            envelopes_by_uid.insert(r.0, r.1);
+            for r in rows.flatten() {
+                envelopes_by_uid.insert(r.0, r.1);
+            }
         }
 
         // 5. Aplica filtros estruturais de Query e preserva a ordem exata do RRF
@@ -754,7 +791,7 @@ impl SqliteIndexStore {
             DateTime::<Utc>::MIN_UTC
         };
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self.read_conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT uid, subject, sender, date, is_read, is_flagged, has_attachments,
                     doc_len, terms_json, embeddings_blob
