@@ -42,12 +42,12 @@ Para suportar tanto 384 quanto 768 dimensões (e futuras extensões) preservando
 
 ## 4. Critérios de Aceitação (GOST DD-TDD)
 
-- [ ] **Fase 4 (Red Test):** Testes unitários comprovando que:
+- [x] **Fase 4 (Red Test):** Testes unitários comprovando que:
   1. `encode_segment_embeddings` e `decode_segment_embeddings` preservam vetores de 768 dimensões sem corrupção.
   2. Blobs legados de 384 dimensões continuam sendo decodificados corretamente.
   3. `SqliteIndexStore` indexa e busca documentos com vetores de 768 dimensões via KNN no `FlatVectorIndex`.
-- [ ] **Fase 5 (Green Implement):** Implementação da serialização V2 auto-descritiva e suporte à dimensão dinâmica no `FlatVectorIndex`.
-- [ ] **Fase 6 (Refactor):** Otimizações e limpeza de código.
-- [ ] **Fase 7 (Mutation Test):** Testes de mutação cobrindo alternância de dimensões, vetores malformados e integridade de norma euclidiana.
-- [ ] **Fase 8 (Quality Gate):** `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e testes offline aprovados.
-- [ ] **Fase 9 (Close):** Fechamento do Ticket #127 e integração na `main`.
+- [x] **Fase 5 (Green Implement):** Implementação da serialização V2 auto-descritiva e suporte à dimensão dinâmica no `FlatVectorIndex`.
+- [x] **Fase 6 (Refactor):** Otimizações e limpeza de código.
+- [x] **Fase 7 (Mutation Test):** Testes de mutação cobrindo alternância de dimensões, vetores malformados e integridade de norma euclidiana.
+- [x] **Fase 8 (Quality Gate):** `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` e testes offline aprovados.
+- [x] **Fase 9 (Close):** Fechamento do Ticket #127 e integração na `main`.
