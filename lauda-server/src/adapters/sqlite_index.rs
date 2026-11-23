@@ -123,10 +123,8 @@ impl SqliteIndexStore {
 
         Self::init_schema_on_conn(&write_conn)?;
 
-        let read_conn = Connection::open_with_flags(
-            path_ref,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-        )?;
+        let read_conn =
+            Connection::open_with_flags(path_ref, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
         read_conn.execute_batch(
             "PRAGMA busy_timeout = 5000;
              PRAGMA query_only = ON;

@@ -90,9 +90,7 @@ async fn search_messages_handler(
     Query(query): Query<SearchQuery>,
 ) -> Result<Response, (StatusCode, String)> {
     let mailbox = query.r#box.as_deref().unwrap_or("INBOX");
-    let search_fut = state
-        .backend
-        .search_messages(&username, mailbox, &query.q);
+    let search_fut = state.backend.search_messages(&username, mailbox, &query.q);
 
     let result = tokio::time::timeout(std::time::Duration::from_secs(10), search_fut)
         .await
@@ -127,9 +125,7 @@ async fn search_mailbox_handler(
     Path(mailbox): Path<String>,
     Query(query): Query<MailboxSearchQuery>,
 ) -> Result<Response, (StatusCode, String)> {
-    let search_fut = state
-        .backend
-        .search_messages(&username, &mailbox, &query.q);
+    let search_fut = state.backend.search_messages(&username, &mailbox, &query.q);
 
     let result = tokio::time::timeout(std::time::Duration::from_secs(10), search_fut)
         .await
