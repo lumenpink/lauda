@@ -1,6 +1,6 @@
 [package]
 name = "lauda-index"
-version = "0.6.0-dev.123+20261123.bef2a57"
+version = "0.6.0-dev.124+20261123.0af2690"
 edition = "2024"
 authors = ["Lumen <lumen@2lp.in>"]
 description = "Motor de busca de e-mails em Rust puro com parser Gmail, BM25 e fuzzy search"
@@ -11,6 +11,14 @@ lauda-types = { path = "../lauda-types" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 urupema = { version = "0.1.2", registry = "gambi" }
+candle-core = { version = "0.11", optional = true }
+candle-nn = { version = "0.11", optional = true }
+candle-transformers = { version = "0.11", optional = true }
+tokenizers = { version = "0.21", default-features = false, features = ["fancy-regex"], optional = true }
+
+[features]
+default = ["candle"]
+candle = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers"]
 
 [dev-dependencies]
 tempfile = "3"

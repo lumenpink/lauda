@@ -81,9 +81,25 @@ impl DynamicEmbeddingProvider {
 
     pub fn from_path_or_fallback<P: AsRef<Path>>(path: P) -> Self {
         let p = path.as_ref();
-        if p.exists() {
-            // Quando modelos ONNX locais forem adicionados, serão instanciados aqui
-            Self::Fallback(SimpleCpuEmbeddingProvider)
+        let (weights, tokenizer) = if p.is_dir() {
+            (p.join("model.safetensors"), p.join("tokenizer.json"))
+        } else {
+            let parent = p.parent().unwrap_or_else(|| Path::new("."));
+            (p.to_path_buf(), parent.join("tokenizer.json"))
+        };
+
+        if weights.exists() && tokenizer.exists() {
+            #[cfg(feature = "candle")]
+            {
+                match crate::candle_provider::CandleEmbeddingProvider::load(p) {
+                    Ok(provider) => Self::Neural(std::sync::Arc::new(provider)),
+                    Err(_) => Self::Fallback(SimpleCpuEmbeddingProvider),
+                }
+            }
+            #[cfg(not(feature = "candle"))]
+            {
+                Self::Fallback(SimpleCpuEmbeddingProvider)
+            }
         } else {
             Self::Fallback(SimpleCpuEmbeddingProvider)
         }

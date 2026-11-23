@@ -339,7 +339,12 @@ impl MaildirBackend {
                             }
 
                             // 2. Indexação em lotes com prioridade decrescente
-                            let provider = lauda_index::SimpleCpuEmbeddingProvider;
+                            let model_path = std::env::var("LAUDA_MODEL_PATH")
+                                .unwrap_or_else(|_| "models/multilingual-e5-small".to_string());
+                            let provider =
+                                lauda_index::DynamicEmbeddingProvider::from_path_or_fallback(
+                                    &model_path,
+                                );
                             for chunk in reconcile.to_index.chunks(25) {
                                 for &uid in chunk {
                                     if let Some(msg) = Self::read_message_static(&dir, uid) {
@@ -1591,7 +1596,10 @@ impl MailBackend for MaildirBackend {
             }
 
             let mut index = lauda_index::MessageIndex::new();
-            let provider = lauda_index::SimpleCpuEmbeddingProvider;
+            let model_path = std::env::var("LAUDA_MODEL_PATH")
+                .unwrap_or_else(|_| "models/multilingual-e5-small".to_string());
+            let provider =
+                lauda_index::DynamicEmbeddingProvider::from_path_or_fallback(&model_path);
 
             for env in &envelopes {
                 if let Ok(msg) = self.get_message(username, mailbox, env.uid).await {
