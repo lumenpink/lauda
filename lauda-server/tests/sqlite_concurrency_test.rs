@@ -179,3 +179,27 @@ fn test_sqlite_read_does_not_block_on_held_write_lock() {
 
     lock_holder_thread.join().expect("join lock holder");
 }
+
+#[test]
+fn test_mutation_sqlite_isolation_and_empty_search() {
+    let dir = tempdir().expect("tempdir");
+    let db_path = dir.path().join("test_mut.db");
+    let store = SqliteIndexStore::open(&db_path).expect("abrir sqlite store");
+
+    // Mutação 1: Busca em caixa postal vazia ou inexistente não trava e retorna vazio
+    let res = store
+        .search_bm25("NONEXISTENT", "lisiane", 10)
+        .expect("busca em caixa inexistente");
+    assert!(res.is_empty());
+
+    let status = store
+        .get_sync_status("NONEXISTENT", 0)
+        .expect("sync status caixa inexistente");
+    assert_eq!(status.indexed_count, 0);
+
+    // Mutação 2: Query vazia deve retornar imediatamente
+    let empty_res = store
+        .search_bm25("INBOX", "", 10)
+        .expect("busca com query vazia");
+    assert!(empty_res.is_empty());
+}
