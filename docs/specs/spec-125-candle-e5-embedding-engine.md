@@ -16,7 +16,7 @@ A usuária solicitou a integração real do modelo E5 e optou pelo framework **C
 - **Alternativa A (Descartada): `fastembed-rs` (ONNX Runtime via bindings C++)**
   - *Motivo do descarte:* Exige bibliotecas C++ compartilhadas (`libonnxruntime.so`), inviabilizando compilação direta para `wasm32-unknown-unknown` no cliente web e complicando o pipeline NDK do Android.
 - **Alternativa B (Descartada): Inferência remota via API externa**
-  - *Motivo do descarte:* Fere a premissa fundamental de soberania, privacidade dos dados de e-mail e operação 100% local/offline do ecossistema Baquara.
+  - *Motivo do descarte:* Fere a premissa fundamental de autonomia dos dados, privacidade e operação 100% local/offline do ecossistema Baquara.
 - **Alternativa C (Escolhida): Motor de inferência neural local em CPU com `candle-core` e `candle-transformers`**
   - *Motivo da escolha:* Rust puro, compilação nativa em qualquer target do workspace, suporte direto a modelos baseados em BERT/E5 (`BertModel`) via `.safetensors`, com extração do token `[CLS]` ou Max/Mean-Pooling e normalização Euclidiana ($L_2$).
 
