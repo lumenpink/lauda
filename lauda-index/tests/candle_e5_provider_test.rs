@@ -60,3 +60,32 @@ fn test_e5_instruction_candle_embedding_contract() {
         "Norma L2 da passagem deve ser unitária: {p_norm}"
     );
 }
+
+#[test]
+fn test_mutation_empty_and_whitespace_strings() {
+    let fallback = DynamicEmbeddingProvider::from_path_or_fallback("/caminho/inexistente");
+    let e5 = E5InstructionProvider::new(fallback);
+
+    let empty = e5.embed_query("");
+    assert_eq!(empty.len(), 384);
+    assert!(!empty.iter().any(|v| v.is_nan()));
+
+    let spaces = e5.embed_passage("    \n\t\r  ");
+    assert_eq!(spaces.len(), 384);
+    assert!(!spaces.iter().any(|v| v.is_nan()));
+}
+
+#[test]
+fn test_mutation_partial_model_files_recalls_fallback() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let model_path = temp_dir.path().join("model.safetensors");
+    std::fs::write(&model_path, b"dummy").unwrap();
+    // Sem tokenizer.json presente
+
+    let provider = DynamicEmbeddingProvider::from_path_or_fallback(temp_dir.path());
+    assert!(
+        provider.is_fallback(),
+        "Diretório sem tokenizer.json deve recair no fallback determinístico"
+    );
+    assert_eq!(provider.embed("busca").len(), 384);
+}
