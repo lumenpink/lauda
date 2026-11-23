@@ -185,7 +185,10 @@ fn test_mismatched_query_and_document_dimensions_does_not_panic() {
     let provider = MockProvider384(vec![0.5f32; 384]);
     // A busca não deve entrar em pânico nem travar: deve usar o canal BM25 ou retornar seguro
     let results = store.search_hybrid_with_provider("INBOX", "contrato", 10, &provider);
-    assert!(results.is_ok(), "Busca híbrida com dimensão divergente deve retornar Ok com canal léxico");
+    assert!(
+        results.is_ok(),
+        "Busca híbrida com dimensão divergente deve retornar Ok com canal léxico"
+    );
     let envs = results.unwrap();
     assert_eq!(envs.len(), 1);
     assert_eq!(envs[0].uid, 42);
