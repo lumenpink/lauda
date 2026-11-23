@@ -15,9 +15,24 @@ pub struct ReconcileResult {
     pub to_remove: Vec<u32>,
 }
 
-/// Codifica vetores de segmentos em um BLOB binário compacto (1 byte tipo + 384 floats little-endian).
+/// Codifica vetores de segmentos em um BLOB binário compacto auto-descritivo (V2).
+/// Layout V2: [b'V', b'2', dim: u16 le] seguido de N * (1 byte kind + dim * 4 floats little-endian).
 pub fn encode_segment_embeddings(embeddings: &[(SegmentKind, Vec<f32>)]) -> Vec<u8> {
-    let mut blob = Vec::with_capacity(embeddings.len() * (1 + 384 * 4));
+    if embeddings.is_empty() {
+        return Vec::new();
+    }
+    let dim = embeddings[0].1.len();
+    if dim == 0 || dim > u16::MAX as usize {
+        return Vec::new();
+    }
+
+    let entry_size = 1 + dim * 4;
+    let mut blob = Vec::with_capacity(4 + embeddings.len() * entry_size);
+    // Prefixo mágico V2: "V2" + dim em u16 little-endian
+    blob.push(b'V');
+    blob.push(b'2');
+    blob.extend_from_slice(&(dim as u16).to_le_bytes());
+
     for (kind, vec) in embeddings {
         let k: u8 = match kind {
             SegmentKind::Header => 0,
@@ -26,18 +41,46 @@ pub fn encode_segment_embeddings(embeddings: &[(SegmentKind, Vec<f32>)]) -> Vec<
             SegmentKind::QuotedThread => 3,
         };
         blob.push(k);
-        for &val in vec {
-            blob.extend_from_slice(&val.to_le_bytes());
+        if vec.len() == dim {
+            for &val in vec {
+                blob.extend_from_slice(&val.to_le_bytes());
+            }
+        } else {
+            // Em caso de segmento com dimensão anômala, preenche com zeros para manter tamanho contíguo consistente
+            for &val in vec.iter().take(dim) {
+                blob.extend_from_slice(&val.to_le_bytes());
+            }
+            for _ in vec.len()..dim {
+                blob.extend_from_slice(&0.0f32.to_le_bytes());
+            }
         }
     }
     blob
 }
 
 /// Decodifica BLOB binário de volta para a lista de segmentos e vetores.
+/// Suporta o formato V2 auto-descritivo (dimensão explícita) e o formato legado V1 (384 dimensões fixas).
 pub fn decode_segment_embeddings(blob: &[u8]) -> Vec<(SegmentKind, Vec<f32>)> {
-    let entry_size = 1 + 384 * 4;
+    if blob.is_empty() {
+        return Vec::new();
+    }
+
+    // Identifica se é formato V2 com cabeçalho mágico
+    let (dim, payload) = if blob.len() >= 4 && blob[0] == b'V' && blob[1] == b'2' {
+        let dim = u16::from_le_bytes([blob[2], blob[3]]) as usize;
+        (dim, &blob[4..])
+    } else {
+        // Formato legado V1 (384 dimensões fixas sem cabeçalho)
+        (384, blob)
+    };
+
+    if dim == 0 {
+        return Vec::new();
+    }
+
+    let entry_size = 1 + dim * 4;
     let mut embeddings = Vec::new();
-    for chunk in blob.chunks_exact(entry_size) {
+    for chunk in payload.chunks_exact(entry_size) {
         let kind = match chunk[0] {
             0 => SegmentKind::Header,
             1 => SegmentKind::Body,
@@ -45,8 +88,8 @@ pub fn decode_segment_embeddings(blob: &[u8]) -> Vec<(SegmentKind, Vec<f32>)> {
             3 => SegmentKind::QuotedThread,
             _ => continue,
         };
-        let mut vec = Vec::with_capacity(384);
-        for i in 0..384 {
+        let mut vec = Vec::with_capacity(dim);
+        for i in 0..dim {
             let start = 1 + i * 4;
             let bytes: [u8; 4] = chunk[start..start + 4].try_into().unwrap_or([0; 4]);
             vec.push(f32::from_le_bytes(bytes));
@@ -206,12 +249,16 @@ impl SqliteIndexStore {
                 continue;
             }
             let segments = decode_segment_embeddings(&blob);
-            if let Some(rep_vec) = extract_representative_vector(&segments)
-                && rep_vec.len() == 384
-            {
-                lock.entry(mailbox)
-                    .or_insert_with(|| FlatVectorIndex::new(384))
-                    .insert(uid, &rep_vec);
+            if let Some(rep_vec) = extract_representative_vector(&segments) {
+                let dim = rep_vec.len();
+                if dim > 0 {
+                    let idx = lock
+                        .entry(mailbox)
+                        .or_insert_with(|| FlatVectorIndex::new(dim));
+                    if idx.dim() == dim {
+                        idx.insert(uid, &rep_vec);
+                    }
+                }
             }
         }
     }
@@ -275,14 +322,18 @@ impl SqliteIndexStore {
         tx.commit()?;
 
         // Atualiza o índice vetorial em RAM
-        if let Some(rep_vec) = extract_representative_vector(&doc.segment_embeddings)
-            && rep_vec.len() == 384
-        {
-            let mut indexes = self.vector_indexes.write().unwrap();
-            indexes
-                .entry(mailbox.to_string())
-                .or_insert_with(|| FlatVectorIndex::new(384))
-                .insert(doc.uid, &rep_vec);
+        if let Some(rep_vec) = extract_representative_vector(&doc.segment_embeddings) {
+            let dim = rep_vec.len();
+            if dim > 0 {
+                let mut indexes = self.vector_indexes.write().unwrap();
+                let idx = indexes
+                    .entry(mailbox.to_string())
+                    .or_insert_with(|| FlatVectorIndex::new(dim));
+                if idx.dim() != dim {
+                    *idx = FlatVectorIndex::new(dim);
+                }
+                idx.insert(doc.uid, &rep_vec);
+            }
         }
 
         Ok(())
