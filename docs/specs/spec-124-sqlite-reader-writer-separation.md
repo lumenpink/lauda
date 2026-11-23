@@ -74,3 +74,7 @@ A investigação do processo revelou:
   - `cargo test -p lauda-server`
 - **Fase 9 (Finish & Close):**
   - Fechar ticket, mergear e atualizar o container `lauda-server`.
+
+## 5. Resolução e Fechamento (Fase 9)
+- **Status:** Concluído com sucesso.
+- **Validação:** Conexões dedicadas `write_conn` e `read_conn` sob modo WAL eliminam qualquer contenção entre o indexador de background e requisições HTTP da API. Testes de concorrência e mutações 100% aprovados em sub-segundo. Timeout preventivo de 10s nas rotas Axum ativo.
