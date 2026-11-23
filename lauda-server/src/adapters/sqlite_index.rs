@@ -255,6 +255,8 @@ impl SqliteIndexStore {
                     let idx = lock
                         .entry(mailbox)
                         .or_insert_with(|| FlatVectorIndex::new(dim));
+                    // Garante que vetores de dimensões heterogêneas (ex: transição de modelo 384 -> 768)
+                    // não causem pânico no índice em RAM homogêneo por mailbox
                     if idx.dim() == dim {
                         idx.insert(uid, &rep_vec);
                     }
