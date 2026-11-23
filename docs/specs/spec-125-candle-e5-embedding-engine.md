@@ -50,9 +50,9 @@ A usuária solicitou a integração real do modelo E5 e optou pelo framework **C
 
 ### Critérios de Aceitação (GOST DD-TDD)
 
-- [ ] **Fase 4 (Red Test):** Teste unitário e de contrato comprovando carregamento de pesos mock/estruturados e inferência de 384 dimensões normalizadas com tolerância a erro.
-- [ ] **Fase 5 (Green Implement):** Implementação de `CandleEmbeddingProvider` e conexão com `DynamicEmbeddingProvider::from_path_or_fallback`.
-- [ ] **Fase 6 (Refactor):** Código modular, idiomático, zero dependências soltas e formatação canônica.
-- [ ] **Fase 7 (Mutation Test):** Testes de mutação validando pooling, normalização $L_2$ e fallback determinístico quando arquivos estão corrompidos ou ausentes.
-- [ ] **Fase 8 (Quality Gate):** `cargo fmt --check`, `cargo clippy --all-targets -p lauda-index -p lauda-server -- -D warnings` e testes de módulo passando 100% offline.
-- [ ] **Fase 9 (Close):** Commit canônico, registro em documentação e fechamento via `cccp close`.
+- [x] **Fase 4 (Red Test):** Teste unitário e de contrato comprovando carregamento de pesos mock/estruturados e inferência de 384 dimensões normalizadas com tolerância a erro.
+- [x] **Fase 5 (Green Implement):** Implementação de `CandleEmbeddingProvider` e conexão com `DynamicEmbeddingProvider::from_path_or_fallback`.
+- [x] **Fase 6 (Refactor):** Código modular, idiomático, zero dependências soltas e formatação canônica.
+- [x] **Fase 7 (Mutation Test):** Testes de mutação validando pooling, normalização $L_2$ e fallback determinístico quando arquivos estão corrompidos ou ausentes.
+- [x] **Fase 8 (Quality Gate):** `cargo fmt --check`, `cargo clippy --all-targets -p lauda-index -p lauda-server -- -D warnings` e testes de módulo passando 100% offline.
+- [x] **Fase 9 (Close):** Commit canônico, registro em documentação e fechamento via `cccp close`.
