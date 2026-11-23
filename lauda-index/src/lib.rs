@@ -1,9 +1,11 @@
+pub mod candle_provider;
 pub mod index;
 pub mod parser;
 pub mod scorer;
 pub mod tokenizer;
 pub mod vector_index;
 
+pub use candle_provider::CandleEmbeddingProvider;
 pub use index::{
     DynamicEmbeddingProvider, E5InstructionProvider, EmbeddingProvider, IndexedDoc, MessageIndex,
     SearchResult, SimpleCpuEmbeddingProvider,
