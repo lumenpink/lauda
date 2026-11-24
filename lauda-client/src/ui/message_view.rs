@@ -104,10 +104,10 @@ pub fn MessageView(
             if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
                 m.is_read = new_read;
             }
-            if let Some(search_list) = search_envelopes.write().as_mut() {
-                if let Some(m) = search_list.iter_mut().find(|m| m.uid == uid) {
-                    m.is_read = new_read;
-                }
+            if let Some(search_list) = search_envelopes.write().as_mut()
+                && let Some(m) = search_list.iter_mut().find(|m| m.uid == uid)
+            {
+                m.is_read = new_read;
             }
             if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name) {
                 if new_read && mb.unread_messages > 0 {
@@ -175,10 +175,10 @@ pub fn MessageView(
             if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
                 m.is_flagged = new_flagged;
             }
-            if let Some(search_list) = search_envelopes.write().as_mut() {
-                if let Some(m) = search_list.iter_mut().find(|m| m.uid == uid) {
-                    m.is_flagged = new_flagged;
-                }
+            if let Some(search_list) = search_envelopes.write().as_mut()
+                && let Some(m) = search_list.iter_mut().find(|m| m.uid == uid)
+            {
+                m.is_flagged = new_flagged;
             }
 
             spawn(async move {
@@ -290,10 +290,8 @@ pub fn MessageView(
     let (prev_uid, next_uid) = {
         let search_guard = search_envelopes.read();
         let msg_guard = messages.read();
-        let candidate_envelopes = crate::domain::view::resolve_navigation_envelopes(
-            search_guard.as_deref(),
-            &msg_guard,
-        );
+        let candidate_envelopes =
+            crate::domain::view::resolve_navigation_envelopes(search_guard.as_deref(), &msg_guard);
         crate::domain::view::find_neighbor_uids(candidate_envelopes, envelope.uid)
     };
 
@@ -323,10 +321,10 @@ pub fn MessageView(
                 if let Some(m) = messages.write().iter_mut().find(|m| m.uid == target_uid) {
                     m.is_read = true;
                 }
-                if let Some(search_list) = search_envelopes.write().as_mut() {
-                    if let Some(m) = search_list.iter_mut().find(|m| m.uid == target_uid) {
-                        m.is_read = true;
-                    }
+                if let Some(search_list) = search_envelopes.write().as_mut()
+                    && let Some(m) = search_list.iter_mut().find(|m| m.uid == target_uid)
+                {
+                    m.is_read = true;
                 }
                 if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name)
                     && mb.unread_messages > 0

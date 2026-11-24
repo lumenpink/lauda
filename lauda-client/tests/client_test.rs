@@ -822,4 +822,3 @@ fn test_resolve_navigation_envelopes_with_search_context() {
     assert_eq!(empty_candidates.len(), 0);
     assert_eq!(find_neighbor_uids(empty_candidates, 400), (None, None));
 }
-

@@ -309,6 +309,9 @@ pub fn InboxView(
         use_effect(move || {
             let q = search_query.read().trim().to_string();
             if crate::domain::is_search_active(&q) {
+                // Rastreia reatividade de busca remota e local para atualizar envelopes da busca
+                let _ = search_resource.read();
+                let _ = fast_local_results.read();
                 search_envelopes.set(Some(current_search_envs.clone()));
             } else {
                 search_envelopes.set(None);
