@@ -645,3 +645,45 @@ pub fn find_neighbor_uids(
         (None, None)
     }
 }
+
+/// Ações acionadas por atalhos universais de teclado no smolclient Lauda.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShortcutAction {
+    NextMessage,
+    PrevMessage,
+    OpenMessage,
+    BackToInbox,
+    Compose,
+    FocusSearch,
+    Reply,
+    ReplyAll,
+    Forward,
+    ToggleMode,
+    ToggleFlag,
+    Archive,
+    Delete,
+}
+
+/// Mapeia tecla digitada para uma `ShortcutAction`, bloqueando estritamente se houver input em foco.
+pub fn parse_shortcut(key: &str, is_input_focused: bool) -> Option<ShortcutAction> {
+    if is_input_focused {
+        return None;
+    }
+
+    match key {
+        "j" | "J" | "ArrowDown" => Some(ShortcutAction::NextMessage),
+        "k" | "K" | "ArrowUp" => Some(ShortcutAction::PrevMessage),
+        "Enter" | "o" | "O" => Some(ShortcutAction::OpenMessage),
+        "u" | "U" | "Escape" => Some(ShortcutAction::BackToInbox),
+        "c" | "C" => Some(ShortcutAction::Compose),
+        "/" => Some(ShortcutAction::FocusSearch),
+        "r" | "R" => Some(ShortcutAction::Reply),
+        "a" | "A" => Some(ShortcutAction::ReplyAll),
+        "f" | "F" => Some(ShortcutAction::Forward),
+        "m" | "M" => Some(ShortcutAction::ToggleMode),
+        "s" | "S" => Some(ShortcutAction::ToggleFlag),
+        "e" | "E" => Some(ShortcutAction::Archive),
+        "#" | "Delete" => Some(ShortcutAction::Delete),
+        _ => None,
+    }
+}

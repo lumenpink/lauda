@@ -43,7 +43,7 @@ pub fn App() -> Element {
     let mut update_notice = use_signal(|| None::<crate::domain::update::UpdateManifest>);
     let mut dismissed_update_version = use_signal(|| None::<String>);
 
-    // Interceptar navegação de histórico / popstate (suporte a gestos Android e botão Voltar)
+    // Interceptar navegação de histórico / popstate e atalhos globais de teclado
     use_effect(move || {
         let mut eval = dioxus::document::eval(
             r#"
@@ -57,6 +57,20 @@ pub fn App() -> Element {
             };
             window.addEventListener('popstate', function() {
                 dioxus.send("back");
+            });
+            window.addEventListener('keydown', function(e) {
+                var target = e.target;
+                var isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+                if (isInput) return;
+                var keys = ['c', 'C', 'u', 'U', 'Escape', '/'];
+                if (keys.indexOf(e.key) !== -1) {
+                    if (e.key === '/') {
+                        e.preventDefault();
+                        var searchInput = document.querySelector('input[type="text"]');
+                        if (searchInput) searchInput.focus();
+                    }
+                    dioxus.send("key:" + e.key);
+                }
             });
         "#,
         );
@@ -73,6 +87,36 @@ pub fn App() -> Element {
                             screen.set(Screen::Inbox);
                         }
                         _ => {}
+                    }
+                } else if let Some(key) = msg.strip_prefix("key:") {
+                    if let Some(action) = crate::domain::view::parse_shortcut(key, false) {
+                        match action {
+                            crate::domain::view::ShortcutAction::BackToInbox => {
+                                let current = screen.read().clone();
+                                match current {
+                                    Screen::MessageDetail(_)
+                                    | Screen::Compose { .. }
+                                    | Screen::Contacts
+                                    | Screen::Calendar
+                                    | Screen::Rules { .. } => {
+                                        screen.set(Screen::Inbox);
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            crate::domain::view::ShortcutAction::Compose => {
+                                let current = screen.read().clone();
+                                if !matches!(current, Screen::Compose { .. } | Screen::Login) {
+                                    screen.set(Screen::Compose {
+                                        reply_to: None,
+                                        reply_cc: None,
+                                        reply_subject: None,
+                                        initial_body: None,
+                                    });
+                                }
+                            }
+                            _ => {}
+                        }
                     }
                 }
             }

@@ -279,10 +279,15 @@ pub fn MessageView(
     let (prev_uid, next_uid) =
         crate::domain::view::find_neighbor_uids(&messages.read(), envelope.uid);
 
-    let handle_navigate = {
+    let handle_navigate: std::rc::Rc<dyn Fn(u32)> = {
         let sess = session.read().clone();
         let box_name = current_mailbox.read().clone();
-        move |target_uid: u32| {
+        std::rc::Rc::new(move |target_uid: u32| {
+            let mut messages = messages;
+            let mut mailboxes = mailboxes;
+            let mut active_message = active_message;
+            let mut screen = screen;
+
             let cache_dir = crate::domain::cache::get_default_cache_dir();
             let cache = crate::domain::cache::LocalMessageCache::new(&cache_dir);
             #[cfg(not(target_arch = "wasm32"))]
@@ -413,8 +418,164 @@ pub fn MessageView(
                     }
                 });
             }
-        }
+        })
     };
+
+    let s_rep_shortcut = sender_for_reply.clone();
+    let cc_rep_shortcut = cc_for_reply.clone();
+    let sub_rep_shortcut = subject_for_reply.clone();
+    let b_rep_shortcut = reply_body.clone();
+    let sub_fwd_shortcut = subject_for_forward.clone();
+    let b_fwd_shortcut = forward_body.clone();
+    let h_nav_shortcut = handle_navigate.clone();
+
+    // Atalhos universais de teclado no leitor de mensagens (Web, GUI e APK)
+    use_effect(move || {
+        let mut eval = dioxus::document::eval(
+            r#"
+            window.__lauda_msg_keys = function(e) {
+                var target = e.target;
+                var isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+                if (isInput) return;
+                var keys = ['j', 'J', 'k', 'K', 'ArrowDown', 'ArrowUp', 'm', 'M', 'r', 'R', 'a', 'A', 'f', 'F', 's', 'S', 'e', 'E', '#', 'Delete', 'u', 'U', 'Escape'];
+                if (keys.indexOf(e.key) !== -1) {
+                    dioxus.send(e.key);
+                }
+            };
+            window.addEventListener('keydown', window.__lauda_msg_keys);
+            "#,
+        );
+        let h_nav = h_nav_shortcut.clone();
+        let s_rep = s_rep_shortcut.clone();
+        let cc_rep = cc_rep_shortcut.clone();
+        let sub_rep = sub_rep_shortcut.clone();
+        let b_rep = b_rep_shortcut.clone();
+        let sub_fwd = sub_fwd_shortcut.clone();
+        let b_fwd = b_fwd_shortcut.clone();
+
+        spawn(async move {
+            while let Ok(key) = eval.recv::<String>().await {
+                if let Some(action) = crate::domain::view::parse_shortcut(&key, false) {
+                    match action {
+                        crate::domain::view::ShortcutAction::NextMessage => {
+                            if let Some(target) = next_uid {
+                                h_nav(target);
+                            }
+                        }
+                        crate::domain::view::ShortcutAction::PrevMessage => {
+                            if let Some(target) = prev_uid {
+                                h_nav(target);
+                            }
+                        }
+                        crate::domain::view::ShortcutAction::ToggleMode => {
+                            let next = current_view_mode.read().next();
+                            current_view_mode.set(next);
+                        }
+                        crate::domain::view::ShortcutAction::Reply => {
+                            screen.set(Screen::Compose {
+                                reply_to: Some(s_rep.clone()),
+                                reply_cc: None,
+                                reply_subject: Some(sub_rep.clone()),
+                                initial_body: Some(b_rep.clone()),
+                            });
+                        }
+                        crate::domain::view::ShortcutAction::ReplyAll => {
+                            screen.set(Screen::Compose {
+                                reply_to: Some(s_rep.clone()),
+                                reply_cc: cc_rep.clone(),
+                                reply_subject: Some(sub_rep.clone()),
+                                initial_body: Some(b_rep.clone()),
+                            });
+                        }
+                        crate::domain::view::ShortcutAction::Forward => {
+                            screen.set(Screen::Compose {
+                                reply_to: None,
+                                reply_cc: None,
+                                reply_subject: Some(sub_fwd.clone()),
+                                initial_body: Some(b_fwd.clone()),
+                            });
+                        }
+                        crate::domain::view::ShortcutAction::ToggleFlag => {
+                            let token_opt = session.read().token.clone();
+                            let current_opt = active_message.read().clone();
+                            if let Some(token) = token_opt
+                                && let Some(current) = current_opt
+                            {
+                                let uid = current.envelope.uid;
+                                let new_flag = !current.envelope.is_flagged;
+                                let mut active_message = active_message;
+                                if let Some(m) = active_message.write().as_mut() {
+                                    m.envelope.is_flagged = new_flag;
+                                }
+                                let mut messages = messages;
+                                if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
+                                    m.is_flagged = new_flag;
+                                }
+                                let s_url = session.read().server_url.clone();
+                                let b_name = current_mailbox.read().clone();
+                                spawn(async move {
+                                    let client = HttpApiClient::new(s_url);
+                                    let _ = client.mark_flagged(&token, &b_name, uid, new_flag).await;
+                                });
+                            }
+                        }
+                        crate::domain::view::ShortcutAction::Archive => {
+                            let token_opt = session.read().token.clone();
+                            let current_opt = active_message.read().clone();
+                            if let Some(token) = token_opt
+                                && let Some(current) = current_opt
+                            {
+                                let uid = current.envelope.uid;
+                                let s_url = session.read().server_url.clone();
+                                let b_name = current_mailbox.read().clone();
+                                let mut messages = messages;
+                                let mut active_message = active_message;
+                                let mut mailboxes = mailboxes;
+                                let mut screen = screen;
+                                spawn(async move {
+                                    let client = HttpApiClient::new(s_url);
+                                    if client.move_message(&token, uid, &b_name, "Archive").await.is_ok() {
+                                        messages.write().retain(|m| m.uid != uid);
+                                        active_message.set(None);
+                                        if let Ok(boxes) = client.list_mailboxes(&token).await {
+                                            mailboxes.set(boxes);
+                                        }
+                                        screen.set(Screen::Inbox);
+                                    }
+                                });
+                            }
+                        }
+                        crate::domain::view::ShortcutAction::Delete => {
+                            let token_opt = session.read().token.clone();
+                            let current_opt = active_message.read().clone();
+                            if let Some(token) = token_opt
+                                && let Some(current) = current_opt
+                            {
+                                let uid = current.envelope.uid;
+                                let s_url = session.read().server_url.clone();
+                                let b_name = current_mailbox.read().clone();
+                                let mut messages = messages;
+                                let mut active_message = active_message;
+                                let mut screen = screen;
+                                spawn(async move {
+                                    let client = HttpApiClient::new(s_url);
+                                    if client.delete_message(&token, &b_name, uid).await.is_ok() {
+                                        messages.write().retain(|m| m.uid != uid);
+                                        active_message.set(None);
+                                        screen.set(Screen::Inbox);
+                                    }
+                                });
+                            }
+                        }
+                        crate::domain::view::ShortcutAction::BackToInbox => {
+                            screen.set(Screen::Inbox);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        });
+    });
 
     rsx! {
         div {
@@ -438,7 +599,7 @@ pub fn MessageView(
                             "background: #f5f5f5; color: #9e9e9e; border: 1px solid #ccc; padding: 0.4rem 0.8rem; font-weight: bold; cursor: not-allowed; opacity: 0.5;"
                         },
                         onclick: {
-                            let mut h = handle_navigate.clone();
+                            let h = handle_navigate.clone();
                             move |_| {
                                 if let Some(target) = prev_uid {
                                     h(target);
@@ -455,7 +616,7 @@ pub fn MessageView(
                             "background: #f5f5f5; color: #9e9e9e; border: 1px solid #ccc; padding: 0.4rem 0.8rem; font-weight: bold; cursor: not-allowed; opacity: 0.5;"
                         },
                         onclick: {
-                            let mut h = handle_navigate.clone();
+                            let h = handle_navigate.clone();
                             move |_| {
                                 if let Some(target) = next_uid {
                                     h(target);
