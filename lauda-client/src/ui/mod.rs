@@ -88,35 +88,35 @@ pub fn App() -> Element {
                         }
                         _ => {}
                     }
-                } else if let Some(key) = msg.strip_prefix("key:") {
-                    if let Some(action) = crate::domain::view::parse_shortcut(key, false) {
-                        match action {
-                            crate::domain::view::ShortcutAction::BackToInbox => {
-                                let current = screen.read().clone();
-                                match current {
-                                    Screen::MessageDetail(_)
-                                    | Screen::Compose { .. }
-                                    | Screen::Contacts
-                                    | Screen::Calendar
-                                    | Screen::Rules { .. } => {
-                                        screen.set(Screen::Inbox);
-                                    }
-                                    _ => {}
+                } else if let Some(key) = msg.strip_prefix("key:")
+                    && let Some(action) = crate::domain::view::parse_shortcut(key, false)
+                {
+                    match action {
+                        crate::domain::view::ShortcutAction::BackToInbox => {
+                            let current = screen.read().clone();
+                            match current {
+                                Screen::MessageDetail(_)
+                                | Screen::Compose { .. }
+                                | Screen::Contacts
+                                | Screen::Calendar
+                                | Screen::Rules { .. } => {
+                                    screen.set(Screen::Inbox);
                                 }
+                                _ => {}
                             }
-                            crate::domain::view::ShortcutAction::Compose => {
-                                let current = screen.read().clone();
-                                if !matches!(current, Screen::Compose { .. } | Screen::Login) {
-                                    screen.set(Screen::Compose {
-                                        reply_to: None,
-                                        reply_cc: None,
-                                        reply_subject: None,
-                                        initial_body: None,
-                                    });
-                                }
-                            }
-                            _ => {}
                         }
+                        crate::domain::view::ShortcutAction::Compose => {
+                            let current = screen.read().clone();
+                            if !matches!(current, Screen::Compose { .. } | Screen::Login) {
+                                screen.set(Screen::Compose {
+                                    reply_to: None,
+                                    reply_cc: None,
+                                    reply_subject: None,
+                                    initial_body: None,
+                                });
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
