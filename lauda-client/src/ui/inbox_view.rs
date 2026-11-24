@@ -45,7 +45,12 @@ fn enqueue_and_dispatch_batch(
         let queue = ActionsQueue::new(&cache_dir);
         for act in actions_list {
             let final_id = queue
-                .enqueue(act.uid, &act.mailbox, act.action.clone(), act.created_at_unix)
+                .enqueue(
+                    act.uid,
+                    &act.mailbox,
+                    act.action.clone(),
+                    act.created_at_unix,
+                )
                 .map(|q| q.id)
                 .unwrap_or_else(|_| act.id.clone());
             queued_ids.push((act, final_id));
@@ -71,24 +76,22 @@ fn enqueue_and_dispatch_batch(
 
             for (act, act_id) in queued_ids {
                 let ok = match &act.action {
-                    ActionType::Delete => {
-                        client.delete_message(&token, &act.mailbox, act.uid).await.is_ok()
-                    }
-                    ActionType::Move { dest_box } => {
-                        client
-                            .move_message(&token, act.uid, &act.mailbox, dest_box)
-                            .await
-                            .is_ok()
-                    }
-                    ActionType::MarkRead { read } => {
-                        client.mark_read(&token, &act.mailbox, act.uid, *read).await.is_ok()
-                    }
-                    ActionType::MarkFlagged { flagged } => {
-                        client
-                            .mark_flagged(&token, &act.mailbox, act.uid, *flagged)
-                            .await
-                            .is_ok()
-                    }
+                    ActionType::Delete => client
+                        .delete_message(&token, &act.mailbox, act.uid)
+                        .await
+                        .is_ok(),
+                    ActionType::Move { dest_box } => client
+                        .move_message(&token, act.uid, &act.mailbox, dest_box)
+                        .await
+                        .is_ok(),
+                    ActionType::MarkRead { read } => client
+                        .mark_read(&token, &act.mailbox, act.uid, *read)
+                        .await
+                        .is_ok(),
+                    ActionType::MarkFlagged { flagged } => client
+                        .mark_flagged(&token, &act.mailbox, act.uid, *flagged)
+                        .await
+                        .is_ok(),
                 };
 
                 if ok {

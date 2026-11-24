@@ -1166,12 +1166,8 @@ fn test_batch_offline_actions_contracts() {
     assert!(search.is_empty());
 
     // 2. create_batch_queued_actions
-    let actions = create_batch_queued_actions(
-        &[10, 20],
-        "INBOX",
-        |_| ActionType::Delete,
-        1795000000,
-    );
+    let actions =
+        create_batch_queued_actions(&[10, 20], "INBOX", |_| ActionType::Delete, 1795000000);
     assert_eq!(actions.len(), 2);
     assert_eq!(actions[0].uid, 10);
     assert_eq!(actions[0].action, ActionType::Delete);
@@ -1211,4 +1207,3 @@ fn test_batch_offline_actions_contracts() {
     assert!(!msgs[1].is_flagged);
     assert!(msgs[2].is_flagged);
 }
-
