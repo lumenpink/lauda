@@ -563,3 +563,41 @@ fn test_view_mode_default_and_serde_mutation_coverage() {
     let invalid = serde_json::from_str::<ViewMode>("\"invalido\"");
     assert!(invalid.is_err(), "Valor inexistente deve falhar no parse");
 }
+
+#[test]
+fn test_find_neighbor_uids_navigation_contract() {
+    use lauda_client::domain::view::find_neighbor_uids;
+
+    let envs = vec![
+        MessageEnvelope {
+            uid: 300,
+            subject: "Msg 300".to_string(),
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 200,
+            subject: "Msg 200".to_string(),
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 100,
+            subject: "Msg 100".to_string(),
+            ..Default::default()
+        },
+    ];
+
+    // Elemento intermediário (uid 200): anterior é 300, próximo é 100
+    let (prev, next) = find_neighbor_uids(&envs, 200);
+    assert_eq!(prev, Some(300));
+    assert_eq!(next, Some(100));
+
+    // Primeiro elemento (uid 300): anterior é None, próximo é 200
+    let (prev_first, next_first) = find_neighbor_uids(&envs, 300);
+    assert_eq!(prev_first, None);
+    assert_eq!(next_first, Some(200));
+
+    // Último elemento (uid 100): anterior é 200, próximo é None
+    let (prev_last, next_last) = find_neighbor_uids(&envs, 100);
+    assert_eq!(prev_last, Some(200));
+    assert_eq!(next_last, None);
+}
