@@ -533,3 +533,32 @@ fn test_session_default_server_url_mutation_resilience() {
         }
     }
 }
+
+#[test]
+fn test_view_mode_default_and_serde_mutation_coverage() {
+    // 1. O modo padrão universal deve ser impreterivelmente TxtAuto (SIMPLIFICADO)
+    let default_mode = ViewMode::default();
+    assert_eq!(default_mode, ViewMode::TxtAuto);
+    assert_eq!(default_mode.label(), "SIMPLIFICADO ⟳");
+
+    // 2. Cobertura de mutação do ciclo de estados
+    let first = ViewMode::TxtAuto;
+    let second = first.next();
+    let third = second.next();
+    let loop_back = third.next();
+    assert_eq!(second, ViewMode::Html);
+    assert_eq!(third, ViewMode::TxtOriginal);
+    assert_eq!(loop_back, ViewMode::TxtAuto);
+
+    // 3. Desserialização serde de todas as variantes snake_case
+    let parsed_auto: ViewMode = serde_json::from_str("\"txt_auto\"").expect("txt_auto valido");
+    let parsed_html: ViewMode = serde_json::from_str("\"html\"").expect("html valido");
+    let parsed_orig: ViewMode = serde_json::from_str("\"txt_original\"").expect("txt_original valido");
+    assert_eq!(parsed_auto, ViewMode::TxtAuto);
+    assert_eq!(parsed_html, ViewMode::Html);
+    assert_eq!(parsed_orig, ViewMode::TxtOriginal);
+
+    // 4. Rejeição de valores espúrios
+    let invalid = serde_json::from_str::<ViewMode>("\"invalido\"");
+    assert!(invalid.is_err(), "Valor inexistente deve falhar no parse");
+}
