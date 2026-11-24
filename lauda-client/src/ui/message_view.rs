@@ -326,11 +326,19 @@ pub fn MessageView(
                     let server_url = sess.server_url.clone();
                     let b_name = box_name.clone();
                     wasm_bindgen_futures::spawn_local(async move {
-                        let _ = crate::domain::cache::LocalMessageCache::enqueue_action_idb(&act).await;
+                        let _ =
+                            crate::domain::cache::LocalMessageCache::enqueue_action_idb(&act).await;
                         if let Some(t) = token_opt {
                             let client = HttpApiClient::new(server_url);
-                            if client.mark_read(&t, &b_name, target_uid, true).await.is_ok() {
-                                let _ = crate::domain::cache::LocalMessageCache::remove_action_idb(&act.id).await;
+                            if client
+                                .mark_read(&t, &b_name, target_uid, true)
+                                .await
+                                .is_ok()
+                            {
+                                let _ = crate::domain::cache::LocalMessageCache::remove_action_idb(
+                                    &act.id,
+                                )
+                                .await;
                             }
                         }
                     });
@@ -355,7 +363,10 @@ pub fn MessageView(
                 let server_url = sess.server_url.clone();
                 wasm_bindgen_futures::spawn_local(async move {
                     if let Ok(Some(mut idb_msg)) =
-                        crate::domain::cache::LocalMessageCache::load_message_idb(&b_name, target_uid).await
+                        crate::domain::cache::LocalMessageCache::load_message_idb(
+                            &b_name, target_uid,
+                        )
+                        .await
                     {
                         if was_unread {
                             idb_msg.envelope.is_read = true;
@@ -370,8 +381,10 @@ pub fn MessageView(
                             if was_unread {
                                 msg.envelope.is_read = true;
                             }
-                            let _ =
-                                crate::domain::cache::LocalMessageCache::save_message_idb(&b_name, &msg).await;
+                            let _ = crate::domain::cache::LocalMessageCache::save_message_idb(
+                                &b_name, &msg,
+                            )
+                            .await;
                             active_message.set(Some(msg));
                             screen.set(Screen::MessageDetail(target_uid));
                         }
