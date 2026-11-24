@@ -1072,3 +1072,55 @@ fn test_selection_contracts_and_range_logic() {
     clear_selection(&mut selected);
     assert!(selected.is_empty());
 }
+
+#[test]
+fn test_selection_and_range_mutation_coverage() {
+    use lauda_client::domain::view::{clear_selection, select_all, select_range, toggle_selection};
+    use lauda_types::MessageEnvelope;
+    use std::collections::HashSet;
+
+    let mut selected = HashSet::new();
+
+    // 1. Lista vazia
+    let empty_list: Vec<MessageEnvelope> = Vec::new();
+    select_range(&empty_list, 10, 20, &mut selected);
+    assert!(selected.is_empty());
+
+    select_all(&empty_list, &mut selected);
+    assert!(selected.is_empty());
+
+    // 2. Ambos UIDs inexistentes em lista populada
+    let envelopes = vec![
+        MessageEnvelope {
+            uid: 100,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 200,
+            ..Default::default()
+        },
+    ];
+    select_range(&envelopes, 998, 999, &mut selected);
+    assert!(selected.is_empty());
+
+    // 3. from_uid existente e to_uid inexistente
+    select_range(&envelopes, 100, 999, &mut selected);
+    assert_eq!(selected.len(), 1);
+    assert!(selected.contains(&100));
+
+    // 4. from_uid == to_uid (item único)
+    clear_selection(&mut selected);
+    select_range(&envelopes, 200, 200, &mut selected);
+    assert_eq!(selected.len(), 1);
+    assert!(selected.contains(&200));
+
+    // 5. Idempotência do range
+    select_range(&envelopes, 200, 200, &mut selected);
+    assert_eq!(selected.len(), 1);
+
+    // 6. Idempotência e alternância consecutiva do toggle
+    assert!(!toggle_selection(&mut selected, 200));
+    assert!(!selected.contains(&200));
+    assert!(toggle_selection(&mut selected, 200));
+    assert!(selected.contains(&200));
+}
