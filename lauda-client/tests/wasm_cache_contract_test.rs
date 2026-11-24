@@ -131,8 +131,10 @@ fn test_queued_action_idb_serde_contract() {
         created_at_unix: 1700000000,
     };
 
-    let json_str = serde_json::to_string(&action).expect("Serialização da QueuedAction deve ter sucesso");
-    let deserialized: QueuedAction = serde_json::from_str(&json_str).expect("Desserialização deve ter sucesso");
+    let json_str =
+        serde_json::to_string(&action).expect("Serialização da QueuedAction deve ter sucesso");
+    let deserialized: QueuedAction =
+        serde_json::from_str(&json_str).expect("Desserialização deve ter sucesso");
 
     assert_eq!(deserialized.id, action.id);
     assert_eq!(deserialized.uid, 42);
@@ -145,6 +147,12 @@ fn test_queued_action_idb_serde_contract() {
 fn test_cache_mailbox_slug_sanitization() {
     assert_eq!(LocalMessageCache::sanitize_slug("INBOX"), "INBOX");
     assert_eq!(LocalMessageCache::sanitize_slug("Sent Items"), "Sent_Items");
-    assert_eq!(LocalMessageCache::sanitize_slug("Archive/2026"), "Archive_2026");
-    assert_eq!(LocalMessageCache::sanitize_slug("Caixa de Entrada!"), "Caixa_de_Entrada_");
+    assert_eq!(
+        LocalMessageCache::sanitize_slug("Archive/2026"),
+        "Archive_2026"
+    );
+    assert_eq!(
+        LocalMessageCache::sanitize_slug("Caixa de Entrada!"),
+        "Caixa_de_Entrada_"
+    );
 }
