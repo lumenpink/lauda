@@ -25,3 +25,6 @@ Esta fricção prejudica fluxos diários de triagem rápida de caixa de entrada 
 - **Green Implement:** Implementar `find_neighbor_uids` e integrar os botões na barra de ferramentas de `MessageView`.
 - **Mutation Test:** Testes de mutação para lista vazia, UID não encontrado, lista de tamanho 1, e lista com múltiplos itens.
 - **Quality Gate:** `cargo fmt --check`, `clippy -D warnings` e verificação WebAssembly.
+
+## 4. Status de Resolução
+- Concluído e verificado em 2026-11-23. Integrado com sucesso no leitor de mensagens.
