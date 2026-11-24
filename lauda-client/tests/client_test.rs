@@ -883,10 +883,7 @@ fn test_resolve_navigation_envelopes_mutation_coverage() {
 
 #[test]
 fn test_optimistic_removal_and_queued_action_contract() {
-    use lauda_client::domain::{
-        apply_optimistic_removal, create_queued_action,
-        sync::ActionType,
-    };
+    use lauda_client::domain::{apply_optimistic_removal, create_queued_action, sync::ActionType};
     use lauda_types::MessageEnvelope;
 
     let mut mailbox = vec![
@@ -950,5 +947,45 @@ fn test_optimistic_removal_and_queued_action_contract() {
             dest_box: "Archive".to_string()
         }
     );
+}
+
+#[test]
+fn test_optimistic_removal_mutation_coverage() {
+    use lauda_client::domain::{
+        apply_optimistic_removal, create_queued_action,
+        sync::ActionType,
+    };
+    use lauda_types::MessageEnvelope;
+
+    // 1. Remover com search_envelopes = None
+    let mut mailbox = vec![
+        MessageEnvelope {
+            uid: 101,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 102,
+            ..Default::default()
+        },
+    ];
+    let removed = apply_optimistic_removal(101, &mut mailbox, None);
+    assert!(removed);
+    assert_eq!(mailbox.len(), 1);
+    assert_eq!(mailbox[0].uid, 102);
+
+    // 2. Remoção em lista vazia
+    let mut empty_box: Vec<MessageEnvelope> = Vec::new();
+    let not_removed = apply_optimistic_removal(101, &mut empty_box, None);
+    assert!(!not_removed);
+    assert_eq!(empty_box.len(), 0);
+
+    // 3. create_queued_action com diferentes tipos de mutação
+    let flag_action = create_queued_action(102, "Sent", ActionType::MarkFlagged { flagged: true }, 1795123456);
+    assert_eq!(flag_action.id, "Sent_102_1795123456");
+    assert_eq!(flag_action.action, ActionType::MarkFlagged { flagged: true });
+
+    let unread_action = create_queued_action(102, "Archive", ActionType::MarkRead { read: false }, 1795123457);
+    assert_eq!(unread_action.id, "Archive_102_1795123457");
+    assert_eq!(unread_action.action, ActionType::MarkRead { read: false });
 }
 
