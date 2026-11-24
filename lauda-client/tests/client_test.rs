@@ -880,3 +880,75 @@ fn test_resolve_navigation_envelopes_mutation_coverage() {
         0
     );
 }
+
+#[test]
+fn test_optimistic_removal_and_queued_action_contract() {
+    use lauda_client::domain::{
+        apply_optimistic_removal, create_queued_action,
+        sync::ActionType,
+    };
+    use lauda_types::MessageEnvelope;
+
+    let mut mailbox = vec![
+        MessageEnvelope {
+            uid: 10,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 20,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 30,
+            ..Default::default()
+        },
+    ];
+
+    let mut search_subset = vec![
+        MessageEnvelope {
+            uid: 20,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 30,
+            ..Default::default()
+        },
+    ];
+
+    // 1. Remover UID 20 de forma otimista da lista e da busca ativa
+    let removed = apply_optimistic_removal(20, &mut mailbox, Some(&mut search_subset));
+    assert!(removed);
+    assert_eq!(mailbox.len(), 2);
+    assert!(!mailbox.iter().any(|m| m.uid == 20));
+    assert_eq!(search_subset.len(), 1);
+    assert!(!search_subset.iter().any(|m| m.uid == 20));
+
+    // 2. Tentar remover UID inexistente
+    let not_removed = apply_optimistic_removal(999, &mut mailbox, Some(&mut search_subset));
+    assert!(!not_removed);
+    assert_eq!(mailbox.len(), 2);
+
+    // 3. Criar registro de ação para exclusão e arquivamento offline
+    let delete_action = create_queued_action(20, "INBOX", ActionType::Delete, 1795000000);
+    assert_eq!(delete_action.uid, 20);
+    assert_eq!(delete_action.mailbox, "INBOX");
+    assert_eq!(delete_action.action, ActionType::Delete);
+    assert_eq!(delete_action.id, "INBOX_20_1795000000");
+
+    let archive_action = create_queued_action(
+        20,
+        "INBOX",
+        ActionType::Move {
+            dest_box: "Archive".to_string(),
+        },
+        1795000001,
+    );
+    assert_eq!(archive_action.uid, 20);
+    assert_eq!(
+        archive_action.action,
+        ActionType::Move {
+            dest_box: "Archive".to_string()
+        }
+    );
+}
+
