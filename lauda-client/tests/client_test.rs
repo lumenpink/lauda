@@ -553,7 +553,8 @@ fn test_view_mode_default_and_serde_mutation_coverage() {
     // 3. Desserialização serde de todas as variantes snake_case
     let parsed_auto: ViewMode = serde_json::from_str("\"txt_auto\"").expect("txt_auto valido");
     let parsed_html: ViewMode = serde_json::from_str("\"html\"").expect("html valido");
-    let parsed_orig: ViewMode = serde_json::from_str("\"txt_original\"").expect("txt_original valido");
+    let parsed_orig: ViewMode =
+        serde_json::from_str("\"txt_original\"").expect("txt_original valido");
     assert_eq!(parsed_auto, ViewMode::TxtAuto);
     assert_eq!(parsed_html, ViewMode::Html);
     assert_eq!(parsed_orig, ViewMode::TxtOriginal);
