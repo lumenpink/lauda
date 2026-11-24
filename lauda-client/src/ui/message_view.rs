@@ -508,14 +508,16 @@ pub fn MessageView(
                                     m.envelope.is_flagged = new_flag;
                                 }
                                 let mut messages = messages;
-                                if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
+                                if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid)
+                                {
                                     m.is_flagged = new_flag;
                                 }
                                 let s_url = session.read().server_url.clone();
                                 let b_name = current_mailbox.read().clone();
                                 spawn(async move {
                                     let client = HttpApiClient::new(s_url);
-                                    let _ = client.mark_flagged(&token, &b_name, uid, new_flag).await;
+                                    let _ =
+                                        client.mark_flagged(&token, &b_name, uid, new_flag).await;
                                 });
                             }
                         }
@@ -534,7 +536,11 @@ pub fn MessageView(
                                 let mut screen = screen;
                                 spawn(async move {
                                     let client = HttpApiClient::new(s_url);
-                                    if client.move_message(&token, uid, &b_name, "Archive").await.is_ok() {
+                                    if client
+                                        .move_message(&token, uid, &b_name, "Archive")
+                                        .await
+                                        .is_ok()
+                                    {
                                         messages.write().retain(|m| m.uid != uid);
                                         active_message.set(None);
                                         if let Ok(boxes) = client.list_mailboxes(&token).await {
