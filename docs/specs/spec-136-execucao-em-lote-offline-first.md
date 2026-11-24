@@ -84,4 +84,11 @@ pub fn apply_batch_flag_status(
 ---
 
 ## 6. Laudo de Fechamento e Homologação
-*(A preencher na Fase 8 - Quality Gate)*
+- **Status:** Concluído e Aprovado no Quality Gate (Fase 8).
+- **Implementação:**
+  - Funções puras em lote em `domain/sync.rs`: `apply_batch_removal`, `create_batch_queued_actions`, `apply_batch_read_status` e `apply_batch_flag_status`.
+  - Helper centralizado `enqueue_and_dispatch_batch` no `InboxView` para persistência atômica na `ActionsQueue`/IndexedDB e despacho assíncrono sem rollback.
+  - Ações da Barra de Ações Contextual (`🗑 EXCLUIR`, `📦 ARQUIVAR`, `✉ LIDA/NÃO LIDA`, `★ FAVORITAR`) operando com 0ms na UI e atualização de contadores de pastas e busca ativa.
+- **Validação:** 26/26 testes aprovados em `client_test.rs`, `cargo fmt --check` e `cargo clippy --all-targets -- -D warnings` aprovados sem alertas.
+- **Data:** 2026-11-24
+
