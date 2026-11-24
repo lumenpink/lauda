@@ -117,41 +117,58 @@ pub fn MessageView(
                 }
             }
 
-            // Persiste no cache SQLite/Storage local e enfileira na fila offline
-            let cache_dir = crate::domain::cache::get_default_cache_dir();
-            let cache = crate::domain::cache::LocalMessageCache::new(&cache_dir);
-            let _ = cache.mark_envelope_read(&box_name, uid, new_read);
-
-            let actions = crate::domain::sync::ActionsQueue::new(&cache_dir);
+            // Persiste no cache e enfileira na fila offline (Desktop e WASM)
             let now_unix = crate::domain::time::current_unix_timestamp();
-            let _ = actions.enqueue(
-                uid,
-                &box_name,
-                crate::domain::sync::ActionType::MarkRead { read: new_read },
-                now_unix,
-            );
+            let mut act_id = format!("{}_{}_{}", box_name, uid, now_unix);
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let cache_dir = crate::domain::cache::get_default_cache_dir();
+                let cache = crate::domain::cache::LocalMessageCache::new(&cache_dir);
+                let _ = cache.mark_envelope_read(&box_name, uid, new_read);
 
+                let actions = crate::domain::sync::ActionsQueue::new(&cache_dir);
+                if let Ok(queued) = actions.enqueue(
+                    uid,
+                    &box_name,
+                    crate::domain::sync::ActionType::MarkRead { read: new_read },
+                    now_unix,
+                ) {
+                    act_id = queued.id;
+                }
+            }
+
+            #[cfg(target_arch = "wasm32")]
+            {
+                let act = crate::domain::create_queued_action(
+                    uid,
+                    &box_name,
+                    crate::domain::sync::ActionType::MarkRead { read: new_read },
+                    now_unix,
+                );
+                act_id = act.id.clone();
+                wasm_bindgen_futures::spawn_local(async move {
+                    let _ = crate::domain::cache::LocalMessageCache::enqueue_action_idb(&act).await;
+                });
+            }
+
+            let server_url = sess.server_url.clone();
+            let b_name = box_name.clone();
             spawn(async move {
-                let client = HttpApiClient::new(sess.server_url);
+                let client = HttpApiClient::new(server_url);
                 if client
-                    .mark_read(&token, &box_name, uid, new_read)
+                    .mark_read(&token, &b_name, uid, new_read)
                     .await
-                    .is_err()
+                    .is_ok()
                 {
-                    // Rollback se falhar
-                    let rollback_read = !new_read;
-                    if let Some(m) = active_message.write().as_mut() {
-                        m.envelope.is_read = rollback_read;
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        let cache_dir = crate::domain::cache::get_default_cache_dir();
+                        let actions = crate::domain::sync::ActionsQueue::new(&cache_dir);
+                        let _ = actions.remove(&act_id);
                     }
-                    if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
-                        m.is_read = rollback_read;
-                    }
-                    if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name) {
-                        if rollback_read && mb.unread_messages > 0 {
-                            mb.unread_messages -= 1;
-                        } else if !rollback_read {
-                            mb.unread_messages += 1;
-                        }
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        let _ = crate::domain::cache::LocalMessageCache::remove_action_idb(&act_id).await;
                     }
                 }
             });
@@ -167,8 +184,9 @@ pub fn MessageView(
         {
             let uid = current.envelope.uid;
             let new_flagged = !current.envelope.is_flagged;
+            let now_unix = crate::domain::time::current_unix_timestamp();
 
-            // Reatividade imediata (optimistic update)
+            // 1. Reatividade imediata (optimistic update 0ms)
             if let Some(m) = active_message.write().as_mut() {
                 m.envelope.is_flagged = new_flagged;
             }
@@ -181,20 +199,55 @@ pub fn MessageView(
                 m.is_flagged = new_flagged;
             }
 
+            // 2. Persistência e enfileiramento offline (Desktop e WASM)
+            let mut act_id = format!("{}_{}_{}", box_name, uid, now_unix);
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let cache_dir = crate::domain::cache::get_default_cache_dir();
+                let actions = crate::domain::sync::ActionsQueue::new(&cache_dir);
+                if let Ok(queued) = actions.enqueue(
+                    uid,
+                    &box_name,
+                    crate::domain::sync::ActionType::MarkFlagged { flagged: new_flagged },
+                    now_unix,
+                ) {
+                    act_id = queued.id;
+                }
+            }
+
+            #[cfg(target_arch = "wasm32")]
+            {
+                let act = crate::domain::create_queued_action(
+                    uid,
+                    &box_name,
+                    crate::domain::sync::ActionType::MarkFlagged { flagged: new_flagged },
+                    now_unix,
+                );
+                act_id = act.id.clone();
+                wasm_bindgen_futures::spawn_local(async move {
+                    let _ = crate::domain::cache::LocalMessageCache::enqueue_action_idb(&act).await;
+                });
+            }
+
+            // 3. Tentativa oportunista de sincronização sem rollback em offline
+            let server_url = sess.server_url.clone();
+            let b_name = box_name.clone();
             spawn(async move {
-                let client = HttpApiClient::new(sess.server_url);
+                let client = HttpApiClient::new(server_url);
                 if client
-                    .mark_flagged(&token, &box_name, uid, new_flagged)
+                    .mark_flagged(&token, &b_name, uid, new_flagged)
                     .await
-                    .is_err()
+                    .is_ok()
                 {
-                    // Rollback se falhar
-                    let rollback_flagged = !new_flagged;
-                    if let Some(m) = active_message.write().as_mut() {
-                        m.envelope.is_flagged = rollback_flagged;
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        let cache_dir = crate::domain::cache::get_default_cache_dir();
+                        let actions = crate::domain::sync::ActionsQueue::new(&cache_dir);
+                        let _ = actions.remove(&act_id);
                     }
-                    if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
-                        m.is_flagged = rollback_flagged;
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        let _ = crate::domain::cache::LocalMessageCache::remove_action_idb(&act_id).await;
                     }
                 }
             });
@@ -204,23 +257,86 @@ pub fn MessageView(
     let handle_archive = move |_| {
         let sess = session.read().clone();
         let box_name = current_mailbox.read().clone();
+        let current_opt = active_message.read().clone();
         if let Some(token) = sess.token
-            && let Some(current) = active_message.read().clone()
+            && let Some(current) = current_opt
         {
             let uid = current.envelope.uid;
+            let now_unix = crate::domain::time::current_unix_timestamp();
+
+            // 1. Reatividade imediata (0ms)
+            crate::domain::apply_optimistic_removal(
+                uid,
+                &mut messages.write(),
+                search_envelopes.write().as_mut(),
+            );
+            if !current.envelope.is_read {
+                if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name) {
+                    if mb.unread_messages > 0 {
+                        mb.unread_messages -= 1;
+                    }
+                }
+            }
+            active_message.set(None);
+            screen.set(Screen::Inbox);
+
+            // 2. Persistência e enfileiramento offline (Desktop e WASM)
+            let mut act_id = format!("{}_{}_{}", box_name, uid, now_unix);
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let cache_dir = crate::domain::cache::get_default_cache_dir();
+                let actions = crate::domain::sync::ActionsQueue::new(&cache_dir);
+                if let Ok(queued) = actions.enqueue(
+                    uid,
+                    &box_name,
+                    crate::domain::sync::ActionType::Move {
+                        dest_box: "Archive".to_string(),
+                    },
+                    now_unix,
+                ) {
+                    act_id = queued.id;
+                }
+            }
+
+            #[cfg(target_arch = "wasm32")]
+            {
+                let act = crate::domain::create_queued_action(
+                    uid,
+                    &box_name,
+                    crate::domain::sync::ActionType::Move {
+                        dest_box: "Archive".to_string(),
+                    },
+                    now_unix,
+                );
+                act_id = act.id.clone();
+                wasm_bindgen_futures::spawn_local(async move {
+                    let _ = crate::domain::cache::LocalMessageCache::enqueue_action_idb(&act).await;
+                });
+            }
+
+            // 3. Sincronização em background com remoção da fila após confirmação
+            let server_url = sess.server_url.clone();
+            let b_name = box_name.clone();
             spawn(async move {
-                let client = HttpApiClient::new(sess.server_url.clone());
+                let client = HttpApiClient::new(server_url);
                 if client
-                    .move_message(&token, uid, &box_name, "Archive")
+                    .move_message(&token, uid, &b_name, "Archive")
                     .await
                     .is_ok()
                 {
-                    messages.write().retain(|m| m.uid != uid);
-                    active_message.set(None);
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        let cache_dir = crate::domain::cache::get_default_cache_dir();
+                        let actions = crate::domain::sync::ActionsQueue::new(&cache_dir);
+                        let _ = actions.remove(&act_id);
+                    }
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        let _ = crate::domain::cache::LocalMessageCache::remove_action_idb(&act_id).await;
+                    }
                     if let Ok(boxes) = client.list_mailboxes(&token).await {
                         mailboxes.set(boxes);
                     }
-                    screen.set(Screen::Inbox);
                 }
             });
         }
@@ -229,16 +345,75 @@ pub fn MessageView(
     let handle_delete = move |_| {
         let sess = session.read().clone();
         let box_name = current_mailbox.read().clone();
+        let current_opt = active_message.read().clone();
         if let Some(token) = sess.token
-            && let Some(current) = active_message.read().clone()
+            && let Some(current) = current_opt
         {
             let uid = current.envelope.uid;
+            let now_unix = crate::domain::time::current_unix_timestamp();
+
+            // 1. Reatividade imediata (0ms de transição)
+            crate::domain::apply_optimistic_removal(
+                uid,
+                &mut messages.write(),
+                search_envelopes.write().as_mut(),
+            );
+            if !current.envelope.is_read {
+                if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name) {
+                    if mb.unread_messages > 0 {
+                        mb.unread_messages -= 1;
+                    }
+                }
+            }
+            active_message.set(None);
+            screen.set(Screen::Inbox);
+
+            // 2. Persistência local e enfileiramento offline (Desktop e WASM)
+            let mut act_id = format!("{}_{}_{}", box_name, uid, now_unix);
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let cache_dir = crate::domain::cache::get_default_cache_dir();
+                let actions = crate::domain::sync::ActionsQueue::new(&cache_dir);
+                if let Ok(queued) = actions.enqueue(
+                    uid,
+                    &box_name,
+                    crate::domain::sync::ActionType::Delete,
+                    now_unix,
+                ) {
+                    act_id = queued.id;
+                }
+            }
+
+            #[cfg(target_arch = "wasm32")]
+            {
+                let act = crate::domain::create_queued_action(
+                    uid,
+                    &box_name,
+                    crate::domain::sync::ActionType::Delete,
+                    now_unix,
+                );
+                act_id = act.id.clone();
+                wasm_bindgen_futures::spawn_local(async move {
+                    let _ = crate::domain::cache::LocalMessageCache::enqueue_action_idb(&act).await;
+                });
+            }
+
+            // 3. Sincronização em background com remoção da fila após confirmação
+            let server_url = sess.server_url.clone();
+            let b_name = box_name.clone();
             spawn(async move {
-                let client = HttpApiClient::new(sess.server_url);
-                if client.delete_message(&token, &box_name, uid).await.is_ok() {
-                    messages.write().retain(|m| m.uid != uid);
-                    active_message.set(None);
-                    screen.set(Screen::Inbox);
+                let client = HttpApiClient::new(server_url);
+                if client.delete_message(&token, &b_name, uid).await.is_ok() {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        let cache_dir = crate::domain::cache::get_default_cache_dir();
+                        let actions = crate::domain::sync::ActionsQueue::new(&cache_dir);
+                        let _ = actions.remove(&act_id);
+                    }
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        let _ = crate::domain::cache::LocalMessageCache::remove_action_idb(&act_id).await;
+                    }
                 }
             });
         }

@@ -82,6 +82,37 @@ pub struct QueuedAction {
     pub created_at_unix: u64,
 }
 
+/// Aplica remoção otimista de um UID em mensagens gerais e mensagens de busca ativa.
+pub fn apply_optimistic_removal(
+    uid: u32,
+    messages: &mut Vec<lauda_types::MessageEnvelope>,
+    search_envelopes: Option<&mut Vec<lauda_types::MessageEnvelope>>,
+) -> bool {
+    let before = messages.len();
+    messages.retain(|m| m.uid != uid);
+    let removed = messages.len() < before;
+    if let Some(search_list) = search_envelopes {
+        search_list.retain(|m| m.uid != uid);
+    }
+    removed
+}
+
+/// Cria o registro de ação para a fila offline com timestamp e ID determinístico.
+pub fn create_queued_action(
+    uid: u32,
+    mailbox: &str,
+    action: ActionType,
+    now_unix: u64,
+) -> QueuedAction {
+    QueuedAction {
+        id: format!("{}_{}_{}", mailbox, uid, now_unix),
+        uid,
+        mailbox: mailbox.to_string(),
+        action,
+        created_at_unix: now_unix,
+    }
+}
+
 /// Gerenciador de persistência para reconciliação de ações locais.
 #[derive(Clone, Debug)]
 pub struct ActionsQueue {
