@@ -874,13 +874,9 @@ fn test_resolve_navigation_envelopes_mutation_coverage() {
 
     // Ambos vazios
     let empty_mailbox: Vec<MessageEnvelope> = Vec::new();
-    assert_eq!(
-        resolve_navigation_envelopes(None, &empty_mailbox).len(),
-        0
-    );
+    assert_eq!(resolve_navigation_envelopes(None, &empty_mailbox).len(), 0);
     assert_eq!(
         resolve_navigation_envelopes(Some(&[]), &empty_mailbox).len(),
         0
     );
 }
-
