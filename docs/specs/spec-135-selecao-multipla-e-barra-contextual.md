@@ -88,4 +88,6 @@ pub fn clear_selection(selected: &mut HashSet<u32>);
   - Reset de seleção na troca de pasta/caixa postal (`current_mailbox`).
 - **Validação:** 24/24 testes aprovados em `client_test.rs`, `cargo fmt --check` e `cargo clippy --all-targets -- -D warnings` sem alertas.
 - **Data:** 2026-11-24
+- **Fechamento:** Fase 9 concluída com sucesso.
+
 
