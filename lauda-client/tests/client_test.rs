@@ -633,3 +633,32 @@ fn test_find_neighbor_uids_edge_cases_mutation() {
     assert_eq!(find_neighbor_uids(&duo, 2), (None, Some(1)));
     assert_eq!(find_neighbor_uids(&duo, 1), (Some(2), None));
 }
+
+#[test]
+fn test_keyboard_shortcuts_contract() {
+    use lauda_client::domain::view::{ShortcutAction, parse_shortcut};
+
+    // Quando input está focado, NENHUM atalho deve disparar
+    assert_eq!(parse_shortcut("j", true), None);
+    assert_eq!(parse_shortcut("Enter", true), None);
+    assert_eq!(parse_shortcut("r", true), None);
+
+    // Quando input NÃO está focado:
+    assert_eq!(parse_shortcut("j", false), Some(ShortcutAction::NextMessage));
+    assert_eq!(parse_shortcut("ArrowDown", false), Some(ShortcutAction::NextMessage));
+    assert_eq!(parse_shortcut("k", false), Some(ShortcutAction::PrevMessage));
+    assert_eq!(parse_shortcut("ArrowUp", false), Some(ShortcutAction::PrevMessage));
+    assert_eq!(parse_shortcut("Enter", false), Some(ShortcutAction::OpenMessage));
+    assert_eq!(parse_shortcut("o", false), Some(ShortcutAction::OpenMessage));
+    assert_eq!(parse_shortcut("u", false), Some(ShortcutAction::BackToInbox));
+    assert_eq!(parse_shortcut("Escape", false), Some(ShortcutAction::BackToInbox));
+    assert_eq!(parse_shortcut("c", false), Some(ShortcutAction::Compose));
+    assert_eq!(parse_shortcut("r", false), Some(ShortcutAction::Reply));
+    assert_eq!(parse_shortcut("a", false), Some(ShortcutAction::ReplyAll));
+    assert_eq!(parse_shortcut("f", false), Some(ShortcutAction::Forward));
+    assert_eq!(parse_shortcut("m", false), Some(ShortcutAction::ToggleMode));
+    assert_eq!(parse_shortcut("s", false), Some(ShortcutAction::ToggleFlag));
+    assert_eq!(parse_shortcut("e", false), Some(ShortcutAction::Archive));
+    assert_eq!(parse_shortcut("#", false), Some(ShortcutAction::Delete));
+    assert_eq!(parse_shortcut("Delete", false), Some(ShortcutAction::Delete));
+}
