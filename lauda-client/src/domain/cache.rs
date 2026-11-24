@@ -887,7 +887,9 @@ impl LocalMessageCache {
             .version(Self::IDB_VERSION)
             .add_object_store(rexie::ObjectStore::new(Self::IDB_STORE_MAILBOXES).key_path("name"))
             .add_object_store(rexie::ObjectStore::new(Self::IDB_STORE_ENVELOPES).key_path("key"))
-            .add_object_store(rexie::ObjectStore::new(Self::IDB_STORE_INDEX_SLICES).key_path("mailbox"))
+            .add_object_store(
+                rexie::ObjectStore::new(Self::IDB_STORE_INDEX_SLICES).key_path("mailbox"),
+            )
             .add_object_store(rexie::ObjectStore::new(Self::IDB_STORE_MESSAGES).key_path("key"))
             .add_object_store(rexie::ObjectStore::new(Self::IDB_STORE_ACTIONS).key_path("id"))
             .build()
@@ -900,15 +902,18 @@ impl LocalMessageCache {
     pub async fn save_message_idb(mailbox: &str, msg: &Message) -> std::io::Result<()> {
         let rexie = Self::open_rexie().await?;
         let tx = rexie
-            .transaction(&[Self::IDB_STORE_MESSAGES], rexie::TransactionMode::ReadWrite)
+            .transaction(
+                &[Self::IDB_STORE_MESSAGES],
+                rexie::TransactionMode::ReadWrite,
+            )
             .map_err(|e| std::io::Error::other(e.to_string()))?;
         let store = tx
             .store(Self::IDB_STORE_MESSAGES)
             .map_err(|e| std::io::Error::other(e.to_string()))?;
 
         let key = format!("{}/{}", Self::sanitize_slug(mailbox), msg.envelope.uid);
-        let msg_json = serde_json::to_string(msg)
-            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        let msg_json =
+            serde_json::to_string(msg).map_err(|e| std::io::Error::other(e.to_string()))?;
 
         #[derive(serde::Serialize)]
         struct Record<'a> {
@@ -925,10 +930,10 @@ impl LocalMessageCache {
             message_json: &msg_json,
         };
 
-        let json_str = serde_json::to_string(&record)
-            .map_err(|e| std::io::Error::other(e.to_string()))?;
-        let js_val = js_sys::JSON::parse(&json_str)
-            .map_err(|e| std::io::Error::other(format!("{e:?}")))?;
+        let json_str =
+            serde_json::to_string(&record).map_err(|e| std::io::Error::other(e.to_string()))?;
+        let js_val =
+            js_sys::JSON::parse(&json_str).map_err(|e| std::io::Error::other(format!("{e:?}")))?;
 
         store
             .put(&js_val, None)
@@ -945,7 +950,10 @@ impl LocalMessageCache {
     pub async fn load_message_idb(mailbox: &str, uid: u32) -> std::io::Result<Option<Message>> {
         let rexie = Self::open_rexie().await?;
         let tx = rexie
-            .transaction(&[Self::IDB_STORE_MESSAGES], rexie::TransactionMode::ReadOnly)
+            .transaction(
+                &[Self::IDB_STORE_MESSAGES],
+                rexie::TransactionMode::ReadOnly,
+            )
             .map_err(|e| std::io::Error::other(e.to_string()))?;
         let store = tx
             .store(Self::IDB_STORE_MESSAGES)
@@ -983,19 +991,24 @@ impl LocalMessageCache {
 
     /// Enfileira uma ação offline-first na store "actions" do IndexedDB (WASM).
     #[cfg(target_arch = "wasm32")]
-    pub async fn enqueue_action_idb(action: &crate::domain::sync::QueuedAction) -> std::io::Result<()> {
+    pub async fn enqueue_action_idb(
+        action: &crate::domain::sync::QueuedAction,
+    ) -> std::io::Result<()> {
         let rexie = Self::open_rexie().await?;
         let tx = rexie
-            .transaction(&[Self::IDB_STORE_ACTIONS], rexie::TransactionMode::ReadWrite)
+            .transaction(
+                &[Self::IDB_STORE_ACTIONS],
+                rexie::TransactionMode::ReadWrite,
+            )
             .map_err(|e| std::io::Error::other(e.to_string()))?;
         let store = tx
             .store(Self::IDB_STORE_ACTIONS)
             .map_err(|e| std::io::Error::other(e.to_string()))?;
 
-        let json_str = serde_json::to_string(action)
-            .map_err(|e| std::io::Error::other(e.to_string()))?;
-        let js_val = js_sys::JSON::parse(&json_str)
-            .map_err(|e| std::io::Error::other(format!("{e:?}")))?;
+        let json_str =
+            serde_json::to_string(action).map_err(|e| std::io::Error::other(e.to_string()))?;
+        let js_val =
+            js_sys::JSON::parse(&json_str).map_err(|e| std::io::Error::other(format!("{e:?}")))?;
 
         store
             .put(&js_val, None)
@@ -1018,7 +1031,10 @@ impl LocalMessageCache {
             .store(Self::IDB_STORE_ACTIONS)
             .map_err(|e| std::io::Error::other(e.to_string()))?;
 
-        let all = store.get_all(None, None).await.map_err(|e| std::io::Error::other(e.to_string()))?;
+        let all = store
+            .get_all(None, None)
+            .await
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
         let mut list = Vec::new();
         for js_val in all {
             if let Ok(json_str) = js_sys::JSON::stringify(&js_val) {
@@ -1036,14 +1052,20 @@ impl LocalMessageCache {
     pub async fn remove_action_idb(id: &str) -> std::io::Result<()> {
         let rexie = Self::open_rexie().await?;
         let tx = rexie
-            .transaction(&[Self::IDB_STORE_ACTIONS], rexie::TransactionMode::ReadWrite)
+            .transaction(
+                &[Self::IDB_STORE_ACTIONS],
+                rexie::TransactionMode::ReadWrite,
+            )
             .map_err(|e| std::io::Error::other(e.to_string()))?;
         let store = tx
             .store(Self::IDB_STORE_ACTIONS)
             .map_err(|e| std::io::Error::other(e.to_string()))?;
 
         let key = web_sys::wasm_bindgen::JsValue::from_str(id);
-        store.delete(key).await.map_err(|e| std::io::Error::other(e.to_string()))?;
+        store
+            .delete(key)
+            .await
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
         tx.done()
             .await
             .map_err(|e| std::io::Error::other(e.to_string()))?;

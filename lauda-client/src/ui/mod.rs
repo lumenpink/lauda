@@ -365,7 +365,9 @@ pub fn App() -> Element {
 
                     #[cfg(target_arch = "wasm32")]
                     {
-                        if let Ok(pending_actions) = crate::domain::cache::LocalMessageCache::list_actions_idb().await {
+                        if let Ok(pending_actions) =
+                            crate::domain::cache::LocalMessageCache::list_actions_idb().await
+                        {
                             for act in pending_actions {
                                 let res = match act.action {
                                     crate::domain::sync::ActionType::MarkRead { read } => {
@@ -386,7 +388,11 @@ pub fn App() -> Element {
                                     }
                                 };
                                 if res.is_ok() {
-                                    let _ = crate::domain::cache::LocalMessageCache::remove_action_idb(&act.id).await;
+                                    let _ =
+                                        crate::domain::cache::LocalMessageCache::remove_action_idb(
+                                            &act.id,
+                                        )
+                                        .await;
                                 }
                             }
                         }
