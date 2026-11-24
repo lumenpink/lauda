@@ -26,7 +26,7 @@ rusqlite = { version = "0.33", features = ["bundled"] }
 base64 = "0.22"
 html2text = "0.12"
 lauda-index = { path = "../lauda-index" }
-urupema = { version = "0.1.2", registry = "gambi" }
+urupema = { version = "0.1.3-dev.4", registry = "gambi" }
 notify = "8.0"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 
@@ -40,7 +40,7 @@ minijinja = "2"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 tempfile = "3.10"
 tokio-tungstenite = "0.29"
-urupema = { version = "0.1.2", registry = "gambi" }
+urupema = { version = "0.1.3-dev.4", registry = "gambi" }
 
 
 [lints]
