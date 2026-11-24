@@ -601,3 +601,35 @@ fn test_find_neighbor_uids_navigation_contract() {
     assert_eq!(prev_last, Some(200));
     assert_eq!(next_last, None);
 }
+
+#[test]
+fn test_find_neighbor_uids_edge_cases_mutation() {
+    use lauda_client::domain::view::find_neighbor_uids;
+
+    // 1. Lista completamente vazia
+    assert_eq!(find_neighbor_uids(&[], 42), (None, None));
+
+    // 2. UID não existente na lista
+    let single = vec![MessageEnvelope {
+        uid: 10,
+        ..Default::default()
+    }];
+    assert_eq!(find_neighbor_uids(&single, 999), (None, None));
+
+    // 3. Lista de tamanho único contendo o elemento (não há anterior nem próximo)
+    assert_eq!(find_neighbor_uids(&single, 10), (None, None));
+
+    // 4. Lista de 2 elementos
+    let duo = vec![
+        MessageEnvelope {
+            uid: 2,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 1,
+            ..Default::default()
+        },
+    ];
+    assert_eq!(find_neighbor_uids(&duo, 2), (None, Some(1)));
+    assert_eq!(find_neighbor_uids(&duo, 1), (Some(2), None));
+}
