@@ -168,7 +168,8 @@ pub fn MessageView(
                     }
                     #[cfg(target_arch = "wasm32")]
                     {
-                        let _ = crate::domain::cache::LocalMessageCache::remove_action_idb(&act_id).await;
+                        let _ = crate::domain::cache::LocalMessageCache::remove_action_idb(&act_id)
+                            .await;
                     }
                 }
             });
@@ -208,7 +209,9 @@ pub fn MessageView(
                 if let Ok(queued) = actions.enqueue(
                     uid,
                     &box_name,
-                    crate::domain::sync::ActionType::MarkFlagged { flagged: new_flagged },
+                    crate::domain::sync::ActionType::MarkFlagged {
+                        flagged: new_flagged,
+                    },
                     now_unix,
                 ) {
                     act_id = queued.id;
@@ -220,7 +223,9 @@ pub fn MessageView(
                 let act = crate::domain::create_queued_action(
                     uid,
                     &box_name,
-                    crate::domain::sync::ActionType::MarkFlagged { flagged: new_flagged },
+                    crate::domain::sync::ActionType::MarkFlagged {
+                        flagged: new_flagged,
+                    },
                     now_unix,
                 );
                 act_id = act.id.clone();
@@ -247,7 +252,8 @@ pub fn MessageView(
                     }
                     #[cfg(target_arch = "wasm32")]
                     {
-                        let _ = crate::domain::cache::LocalMessageCache::remove_action_idb(&act_id).await;
+                        let _ = crate::domain::cache::LocalMessageCache::remove_action_idb(&act_id)
+                            .await;
                     }
                 }
             });
@@ -270,12 +276,11 @@ pub fn MessageView(
                 &mut messages.write(),
                 search_envelopes.write().as_mut(),
             );
-            if !current.envelope.is_read {
-                if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name) {
-                    if mb.unread_messages > 0 {
-                        mb.unread_messages -= 1;
-                    }
-                }
+            if !current.envelope.is_read
+                && let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name)
+                && mb.unread_messages > 0
+            {
+                mb.unread_messages -= 1;
             }
             active_message.set(None);
             screen.set(Screen::Inbox);
@@ -332,7 +337,8 @@ pub fn MessageView(
                     }
                     #[cfg(target_arch = "wasm32")]
                     {
-                        let _ = crate::domain::cache::LocalMessageCache::remove_action_idb(&act_id).await;
+                        let _ = crate::domain::cache::LocalMessageCache::remove_action_idb(&act_id)
+                            .await;
                     }
                     if let Ok(boxes) = client.list_mailboxes(&token).await {
                         mailboxes.set(boxes);
@@ -358,12 +364,11 @@ pub fn MessageView(
                 &mut messages.write(),
                 search_envelopes.write().as_mut(),
             );
-            if !current.envelope.is_read {
-                if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name) {
-                    if mb.unread_messages > 0 {
-                        mb.unread_messages -= 1;
-                    }
-                }
+            if !current.envelope.is_read
+                && let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name)
+                && mb.unread_messages > 0
+            {
+                mb.unread_messages -= 1;
             }
             active_message.set(None);
             screen.set(Screen::Inbox);
@@ -412,7 +417,8 @@ pub fn MessageView(
                     }
                     #[cfg(target_arch = "wasm32")]
                     {
-                        let _ = crate::domain::cache::LocalMessageCache::remove_action_idb(&act_id).await;
+                        let _ = crate::domain::cache::LocalMessageCache::remove_action_idb(&act_id)
+                            .await;
                     }
                 }
             });
