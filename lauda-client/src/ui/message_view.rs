@@ -276,6 +276,133 @@ pub fn MessageView(
         })
         .collect();
 
+    let (prev_uid, next_uid) =
+        crate::domain::view::find_neighbor_uids(&messages.read(), envelope.uid);
+
+    let handle_navigate = {
+        let sess = session.read().clone();
+        let box_name = current_mailbox.read().clone();
+        move |target_uid: u32| {
+            let cache_dir = crate::domain::cache::get_default_cache_dir();
+            let cache = crate::domain::cache::LocalMessageCache::new(&cache_dir);
+            #[cfg(not(target_arch = "wasm32"))]
+            let actions = crate::domain::sync::ActionsQueue::new(&cache_dir);
+            let now_unix = crate::domain::time::current_unix_timestamp();
+
+            let was_unread = messages
+                .read()
+                .iter()
+                .find(|m| m.uid == target_uid)
+                .map(|m| !m.is_read)
+                .unwrap_or(false);
+            if was_unread {
+                if let Some(m) = messages.write().iter_mut().find(|m| m.uid == target_uid) {
+                    m.is_read = true;
+                }
+                if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name)
+                    && mb.unread_messages > 0
+                {
+                    mb.unread_messages -= 1;
+                }
+                let _ = cache.mark_envelope_read(&box_name, target_uid, true);
+                #[cfg(not(target_arch = "wasm32"))]
+                let _ = actions.enqueue(
+                    target_uid,
+                    &box_name,
+                    crate::domain::sync::ActionType::MarkRead { read: true },
+                    now_unix,
+                );
+
+                #[cfg(target_arch = "wasm32")]
+                {
+                    let act = crate::domain::sync::QueuedAction {
+                        id: format!("{}_{}_{}", box_name, target_uid, now_unix),
+                        uid: target_uid,
+                        mailbox: box_name.clone(),
+                        action: crate::domain::sync::ActionType::MarkRead { read: true },
+                        created_at_unix: now_unix,
+                    };
+                    let token_opt = sess.token.clone();
+                    let server_url = sess.server_url.clone();
+                    let b_name = box_name.clone();
+                    wasm_bindgen_futures::spawn_local(async move {
+                        let _ = crate::domain::cache::LocalMessageCache::enqueue_action_idb(&act).await;
+                        if let Some(t) = token_opt {
+                            let client = HttpApiClient::new(server_url);
+                            if client.mark_read(&t, &b_name, target_uid, true).await.is_ok() {
+                                let _ = crate::domain::cache::LocalMessageCache::remove_action_idb(&act.id).await;
+                            }
+                        }
+                    });
+                }
+            }
+
+            // 1. Tentar cache síncrono
+            if let Ok(Some(mut cached_msg)) = cache.load_message(&box_name, target_uid) {
+                if was_unread {
+                    cached_msg.envelope.is_read = true;
+                }
+                active_message.set(Some(cached_msg));
+                screen.set(Screen::MessageDetail(target_uid));
+                return;
+            }
+
+            // 2. Se WASM, tenta IndexedDB
+            #[cfg(target_arch = "wasm32")]
+            {
+                let b_name = box_name.clone();
+                let token_opt = sess.token.clone();
+                let server_url = sess.server_url.clone();
+                wasm_bindgen_futures::spawn_local(async move {
+                    if let Ok(Some(mut idb_msg)) =
+                        crate::domain::cache::LocalMessageCache::load_message_idb(&b_name, target_uid).await
+                    {
+                        if was_unread {
+                            idb_msg.envelope.is_read = true;
+                        }
+                        active_message.set(Some(idb_msg));
+                        screen.set(Screen::MessageDetail(target_uid));
+                        return;
+                    }
+                    if let Some(token) = token_opt {
+                        let client = HttpApiClient::new(server_url);
+                        if let Ok(mut msg) = client.get_message(&token, &b_name, target_uid).await {
+                            if was_unread {
+                                msg.envelope.is_read = true;
+                            }
+                            let _ =
+                                crate::domain::cache::LocalMessageCache::save_message_idb(&b_name, &msg).await;
+                            active_message.set(Some(msg));
+                            screen.set(Screen::MessageDetail(target_uid));
+                        }
+                    }
+                });
+                return;
+            }
+
+            // 3. Fallback de rede Desktop/Mobile
+            #[cfg(not(target_arch = "wasm32"))]
+            if let Some(token) = sess.token.clone() {
+                let s_url = sess.server_url.clone();
+                let b_name = box_name.clone();
+                spawn(async move {
+                    let client = HttpApiClient::new(s_url);
+                    if let Ok(mut msg) = client.get_message(&token, &b_name, target_uid).await {
+                        if was_unread {
+                            msg.envelope.is_read = true;
+                        }
+                        let cache = crate::domain::cache::LocalMessageCache::new(
+                            crate::domain::cache::get_default_cache_dir(),
+                        );
+                        let _ = cache.save_message(&b_name, &msg);
+                        active_message.set(Some(msg));
+                        screen.set(Screen::MessageDetail(target_uid));
+                    }
+                });
+            }
+        }
+    };
+
     rsx! {
         div {
             style: "{MESSAGE_VIEW_ROOT_STYLE}",
@@ -289,6 +416,40 @@ pub fn MessageView(
                         style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer;",
                         onclick: move |_| screen.set(Screen::Inbox),
                         "← VOLTAR"
+                    }
+                    button {
+                        disabled: prev_uid.is_none(),
+                        style: if prev_uid.is_some() {
+                            "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer;"
+                        } else {
+                            "background: #f5f5f5; color: #9e9e9e; border: 1px solid #ccc; padding: 0.4rem 0.8rem; font-weight: bold; cursor: not-allowed; opacity: 0.5;"
+                        },
+                        onclick: {
+                            let mut h = handle_navigate.clone();
+                            move |_| {
+                                if let Some(target) = prev_uid {
+                                    h(target);
+                                }
+                            }
+                        },
+                        "◀ ANTERIOR"
+                    }
+                    button {
+                        disabled: next_uid.is_none(),
+                        style: if next_uid.is_some() {
+                            "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer;"
+                        } else {
+                            "background: #f5f5f5; color: #9e9e9e; border: 1px solid #ccc; padding: 0.4rem 0.8rem; font-weight: bold; cursor: not-allowed; opacity: 0.5;"
+                        },
+                        onclick: {
+                            let mut h = handle_navigate.clone();
+                            move |_| {
+                                if let Some(target) = next_uid {
+                                    h(target);
+                                }
+                            }
+                        },
+                        "PRÓXIMO ▶"
                     }
                     button {
                         style: "background: #dc143c; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",

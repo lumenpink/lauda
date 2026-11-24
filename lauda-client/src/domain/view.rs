@@ -622,3 +622,26 @@ pub fn merge_search_results(
         .filter_map(|(uid, _)| envelopes.remove(&uid))
         .collect()
 }
+
+/// Retorna os UIDs do envelope anterior (mais recente na lista) e próximo (mais antigo na lista)
+/// a partir da lista ordenada de envelopes e do UID atual.
+pub fn find_neighbor_uids(
+    envelopes: &[MessageEnvelope],
+    current_uid: u32,
+) -> (Option<u32>, Option<u32>) {
+    if let Some(pos) = envelopes.iter().position(|m| m.uid == current_uid) {
+        let prev_uid = if pos > 0 {
+            Some(envelopes[pos - 1].uid)
+        } else {
+            None
+        };
+        let next_uid = if pos + 1 < envelopes.len() {
+            Some(envelopes[pos + 1].uid)
+        } else {
+            None
+        };
+        (prev_uid, next_uid)
+    } else {
+        (None, None)
+    }
+}
