@@ -59,3 +59,12 @@ screen.set(Screen::Inbox);
 3. Uma ação `ActionType::Delete` é registrada na `ActionsQueue` correspondente.
 4. Clicar em "📦 ARQUIVAR" remove a mensagem e retorna à Inbox imediatamente, gerando a ação na fila.
 5. Em cenário desconectado / falha de rede simulada, as ações permanecem enfileiradas e a UI não trava nem reverte.
+
+---
+
+## 5. Laudo de Fechamento e Homologação
+- **Status:** Concluído e Aprovado no Quality Gate (Fase 8).
+- **Implementação:** Transição de tela instantânea (0ms), remoção otimista em `apply_optimistic_removal` e enfileiramento em `ActionsQueue`/IDB sem rollback em `message_view.rs`.
+- **Validação:** 22/22 testes aprovados em `client_test.rs`, clippy e fmt validados sem alertas.
+- **Data:** 2026-11-24
+
