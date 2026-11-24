@@ -689,3 +689,32 @@ fn test_keyboard_shortcuts_contract() {
         Some(ShortcutAction::Delete)
     );
 }
+
+#[test]
+fn test_keyboard_shortcuts_mutation_coverage() {
+    use lauda_client::domain::view::{ShortcutAction, parse_shortcut};
+
+    // 1. Variantes em caixa alta (Shift acidental ou CapsLock)
+    assert_eq!(parse_shortcut("J", false), Some(ShortcutAction::NextMessage));
+    assert_eq!(parse_shortcut("K", false), Some(ShortcutAction::PrevMessage));
+    assert_eq!(parse_shortcut("O", false), Some(ShortcutAction::OpenMessage));
+    assert_eq!(parse_shortcut("U", false), Some(ShortcutAction::BackToInbox));
+    assert_eq!(parse_shortcut("C", false), Some(ShortcutAction::Compose));
+    assert_eq!(parse_shortcut("R", false), Some(ShortcutAction::Reply));
+    assert_eq!(parse_shortcut("A", false), Some(ShortcutAction::ReplyAll));
+    assert_eq!(parse_shortcut("F", false), Some(ShortcutAction::Forward));
+    assert_eq!(parse_shortcut("M", false), Some(ShortcutAction::ToggleMode));
+    assert_eq!(parse_shortcut("S", false), Some(ShortcutAction::ToggleFlag));
+    assert_eq!(parse_shortcut("E", false), Some(ShortcutAction::Archive));
+
+    // 2. Teclas não vinculadas devem retornar rigorosamente None
+    assert_eq!(parse_shortcut("x", false), None);
+    assert_eq!(parse_shortcut("1", false), None);
+    assert_eq!(parse_shortcut("Tab", false), None);
+    assert_eq!(parse_shortcut("", false), None);
+
+    // 3. Quando focado em input, absolutamente NENHUM caractere pode acionar ação
+    for k in ["J", "K", "O", "U", "C", "R", "A", "F", "M", "S", "E", "/", "#", "Delete", "ArrowDown"] {
+        assert_eq!(parse_shortcut(k, true), None, "Tecla {} nao deve acionar atalho em input", k);
+    }
+}
