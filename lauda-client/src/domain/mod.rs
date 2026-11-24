@@ -34,5 +34,6 @@ pub use update::{UpdateManifest, UpdateStatus, check_update, fetch_remote_manife
 pub use view::{
     MIN_SEARCH_QUERY_LEN, ShortcutAction, ViewMode, fast_filter_envelopes, filter_aliases,
     filter_identities, find_neighbor_uids, format_search_hint, is_search_active, parse_identity,
+    resolve_navigation_envelopes,
     parse_markdown_to_html, parse_shortcut, should_show_search_hint,
 };

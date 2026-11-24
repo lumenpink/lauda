@@ -28,19 +28,26 @@ pub fn InboxView(
     mut current_mailbox: Signal<String>,
     mut messages: Signal<Vec<MessageEnvelope>>,
     mut active_message: Signal<Option<Message>>,
+    mut search_query: Signal<String>,
+    mut search_envelopes: Signal<Option<Vec<MessageEnvelope>>>,
 ) -> Element {
     let mut is_refreshing = use_signal(|| false);
     let mut is_loading_more = use_signal(|| false);
     let mut has_more = use_signal(|| true);
-    let mut search_query = use_signal(String::new);
     let mut active_filter = use_signal(|| InboxFilter::All);
     let mut is_drawer_open = use_signal(|| false);
     let mut error_msg = use_signal(|| None::<String>);
     let mut loading_uid = use_signal(|| None::<u32>);
 
+    let mut last_mailbox = use_signal(|| current_mailbox.read().clone());
     use_effect(move || {
-        let _ = current_mailbox.read();
-        has_more.set(true);
+        let current = current_mailbox.read().clone();
+        if *last_mailbox.read() != current {
+            last_mailbox.set(current);
+            search_query.set(String::new());
+            search_envelopes.set(None);
+            has_more.set(true);
+        }
     });
 
     let handle_refresh = move |_| {
@@ -296,6 +303,19 @@ pub fn InboxView(
             .collect()
     };
 
+    // Sincronizar envelopes de busca com o signal elevado para governar navegacao sequencial
+    {
+        let current_search_envs = filtered_messages.clone();
+        use_effect(move || {
+            let q = search_query.read().trim().to_string();
+            if crate::domain::is_search_active(&q) {
+                search_envelopes.set(Some(current_search_envs.clone()));
+            } else {
+                search_envelopes.set(None);
+            }
+        });
+    }
+
     rsx! {
             div {
                 style: "display: flex; flex-direction: column; gap: 1rem;",
@@ -471,6 +491,7 @@ pub fn InboxView(
                                     style: "background: none; border: none; cursor: pointer; color: #888; font-weight: bold; font-family: monospace;",
                                     onclick: move |_| {
                                         search_query.set(String::new());
+                                        search_envelopes.set(None);
                                         fast_local_results.set(Vec::new());
                                         is_remote_searching.set(false);
                                     },

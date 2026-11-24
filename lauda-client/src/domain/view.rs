@@ -646,6 +646,16 @@ pub fn find_neighbor_uids(
     }
 }
 
+/// Resolve a lista candidata de envelopes para navegação sequencial (anterior / próximo).
+/// Quando há uma busca ativa (`search_envelopes = Some(...)`), essa lista tem precedência
+/// absoluta sobre a listagem geral da caixa (`mailbox_envelopes`).
+pub fn resolve_navigation_envelopes<'a>(
+    search_envelopes: Option<&'a [MessageEnvelope]>,
+    mailbox_envelopes: &'a [MessageEnvelope],
+) -> &'a [MessageEnvelope] {
+    search_envelopes.unwrap_or(mailbox_envelopes)
+}
+
 /// Ações acionadas por atalhos universais de teclado no smolclient Lauda.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShortcutAction {

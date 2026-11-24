@@ -42,6 +42,8 @@ pub fn App() -> Element {
     let mut active_message = use_signal(|| None::<Message>);
     let mut update_notice = use_signal(|| None::<crate::domain::update::UpdateManifest>);
     let mut dismissed_update_version = use_signal(|| None::<String>);
+    let search_query = use_signal(String::new);
+    let search_envelopes = use_signal(|| None::<Vec<MessageEnvelope>>);
 
     // Interceptar navegação de histórico / popstate e atalhos globais de teclado
     use_effect(move || {
@@ -586,6 +588,8 @@ pub fn App() -> Element {
                             current_mailbox,
                             messages,
                             active_message,
+                            search_query,
+                            search_envelopes,
                         }
                     },
                     Screen::MessageDetail(_uid) => rsx! {
@@ -596,6 +600,7 @@ pub fn App() -> Element {
                             messages,
                             mailboxes,
                             active_message,
+                            search_envelopes,
                         }
                     },
                     Screen::Compose {

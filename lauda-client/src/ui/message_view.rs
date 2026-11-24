@@ -20,6 +20,7 @@ pub fn MessageView(
     mut messages: Signal<Vec<MessageEnvelope>>,
     mut mailboxes: Signal<Vec<MailboxInfo>>,
     mut active_message: Signal<Option<Message>>,
+    mut search_envelopes: Signal<Option<Vec<MessageEnvelope>>>,
 ) -> Element {
     let msg = active_message.read().clone();
     let mut current_view_mode = use_signal(|| ViewMode::TxtAuto);
@@ -103,6 +104,11 @@ pub fn MessageView(
             if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
                 m.is_read = new_read;
             }
+            if let Some(search_list) = search_envelopes.write().as_mut() {
+                if let Some(m) = search_list.iter_mut().find(|m| m.uid == uid) {
+                    m.is_read = new_read;
+                }
+            }
             if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name) {
                 if new_read && mb.unread_messages > 0 {
                     mb.unread_messages -= 1;
@@ -168,6 +174,11 @@ pub fn MessageView(
             }
             if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
                 m.is_flagged = new_flagged;
+            }
+            if let Some(search_list) = search_envelopes.write().as_mut() {
+                if let Some(m) = search_list.iter_mut().find(|m| m.uid == uid) {
+                    m.is_flagged = new_flagged;
+                }
             }
 
             spawn(async move {
@@ -276,8 +287,15 @@ pub fn MessageView(
         })
         .collect();
 
-    let (prev_uid, next_uid) =
-        crate::domain::view::find_neighbor_uids(&messages.read(), envelope.uid);
+    let (prev_uid, next_uid) = {
+        let search_guard = search_envelopes.read();
+        let msg_guard = messages.read();
+        let candidate_envelopes = crate::domain::view::resolve_navigation_envelopes(
+            search_guard.as_deref(),
+            &msg_guard,
+        );
+        crate::domain::view::find_neighbor_uids(candidate_envelopes, envelope.uid)
+    };
 
     let handle_navigate: std::rc::Rc<dyn Fn(u32)> = {
         let sess = session.read().clone();
@@ -287,6 +305,7 @@ pub fn MessageView(
             let mut mailboxes = mailboxes;
             let mut active_message = active_message;
             let mut screen = screen;
+            let mut search_envelopes = search_envelopes;
 
             let cache_dir = crate::domain::cache::get_default_cache_dir();
             let cache = crate::domain::cache::LocalMessageCache::new(&cache_dir);
@@ -303,6 +322,11 @@ pub fn MessageView(
             if was_unread {
                 if let Some(m) = messages.write().iter_mut().find(|m| m.uid == target_uid) {
                     m.is_read = true;
+                }
+                if let Some(search_list) = search_envelopes.write().as_mut() {
+                    if let Some(m) = search_list.iter_mut().find(|m| m.uid == target_uid) {
+                        m.is_read = true;
+                    }
                 }
                 if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name)
                     && mb.unread_messages > 0
