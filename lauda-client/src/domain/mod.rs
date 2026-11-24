@@ -25,8 +25,9 @@ pub use session::{
 };
 pub use sync::{
     ActionType, ActionsQueue, BackgroundSyncWorker, NewMessageNotification, QueuedAction,
-    SyncCycleResult, SyncWorkerConfig, SyncWorkerHandle, apply_optimistic_removal,
-    calculate_next_backoff, create_queued_action, detect_new_unread_messages,
+    SyncCycleResult, SyncWorkerConfig, SyncWorkerHandle, apply_batch_flag_status,
+    apply_batch_read_status, apply_batch_removal, apply_optimistic_removal, calculate_next_backoff,
+    create_batch_queued_actions, create_queued_action, detect_new_unread_messages,
     prefetch_missing_bodies, prefetch_missing_bodies_with_progress, reconcile_ui_messages,
     sync_all_cycle, sync_all_cycle_with_progress,
 };

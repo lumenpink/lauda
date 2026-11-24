@@ -21,6 +21,91 @@ pub enum InboxFilter {
     Attachments,
 }
 
+/// Enfileira um lote de ações offline e dispara a sincronização oportunista em background.
+fn enqueue_and_dispatch_batch(
+    sess: SessionConfig,
+    actions_list: Vec<crate::domain::sync::QueuedAction>,
+) {
+    if actions_list.is_empty() {
+        return;
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    let mut queued_ids: Vec<(crate::domain::sync::QueuedAction, String)> =
+        Vec::with_capacity(actions_list.len());
+    #[cfg(target_arch = "wasm32")]
+    let queued_ids: Vec<(crate::domain::sync::QueuedAction, String)> = actions_list
+        .iter()
+        .map(|a| (a.clone(), a.id.clone()))
+        .collect();
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let cache_dir = get_default_cache_dir();
+        let queue = ActionsQueue::new(&cache_dir);
+        for act in actions_list {
+            let final_id = queue
+                .enqueue(act.uid, &act.mailbox, act.action.clone(), act.created_at_unix)
+                .map(|q| q.id)
+                .unwrap_or_else(|_| act.id.clone());
+            queued_ids.push((act, final_id));
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        let to_idb = actions_list.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            for act in to_idb {
+                let _ = LocalMessageCache::enqueue_action_idb(&act).await;
+            }
+        });
+    }
+
+    if let Some(token) = sess.token {
+        let server_url = sess.server_url;
+        spawn(async move {
+            let client = HttpApiClient::new(server_url);
+            #[cfg(not(target_arch = "wasm32"))]
+            let queue = ActionsQueue::new(get_default_cache_dir());
+
+            for (act, act_id) in queued_ids {
+                let ok = match &act.action {
+                    ActionType::Delete => {
+                        client.delete_message(&token, &act.mailbox, act.uid).await.is_ok()
+                    }
+                    ActionType::Move { dest_box } => {
+                        client
+                            .move_message(&token, act.uid, &act.mailbox, dest_box)
+                            .await
+                            .is_ok()
+                    }
+                    ActionType::MarkRead { read } => {
+                        client.mark_read(&token, &act.mailbox, act.uid, *read).await.is_ok()
+                    }
+                    ActionType::MarkFlagged { flagged } => {
+                        client
+                            .mark_flagged(&token, &act.mailbox, act.uid, *flagged)
+                            .await
+                            .is_ok()
+                    }
+                };
+
+                if ok {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        let _ = queue.remove(&act_id);
+                    }
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        let _ = LocalMessageCache::remove_action_idb(&act_id).await;
+                    }
+                }
+            }
+        });
+    }
+}
+
 #[component]
 pub fn InboxView(
     mut screen: Signal<Screen>,
@@ -520,11 +605,36 @@ pub fn InboxView(
                                         style: "background: #dc143c; color: #fff; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
                                         onclick: move |_| {
                                             let uids: Vec<u32> = selected_uids.read().iter().copied().collect();
-                                            for uid in uids {
-                                                crate::domain::sync::apply_optimistic_removal(uid, &mut messages.write(), search_envelopes.write().as_mut());
+                                            let box_name = current_mailbox.read().clone();
+                                            let sess = session.read().clone();
+                                            let now_unix = current_unix_timestamp();
+
+                                            let unread_removed = messages
+                                                .read()
+                                                .iter()
+                                                .filter(|m| uids.contains(&m.uid) && !m.is_read)
+                                                .count() as u32;
+                                            if unread_removed > 0
+                                                && let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name)
+                                            {
+                                                mb.unread_messages = mb.unread_messages.saturating_sub(unread_removed);
                                             }
+
+                                            crate::domain::sync::apply_batch_removal(
+                                                &uids,
+                                                &mut messages.write(),
+                                                search_envelopes.write().as_mut(),
+                                            );
                                             selected_uids.write().clear();
                                             last_interacted_uid.set(None);
+
+                                            let batch = crate::domain::sync::create_batch_queued_actions(
+                                                &uids,
+                                                &box_name,
+                                                |_| ActionType::Delete,
+                                                now_unix,
+                                            );
+                                            enqueue_and_dispatch_batch(sess, batch);
                                         },
                                         "🗑 EXCLUIR"
                                     }
@@ -532,11 +642,38 @@ pub fn InboxView(
                                         style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
                                         onclick: move |_| {
                                             let uids: Vec<u32> = selected_uids.read().iter().copied().collect();
-                                            for uid in uids {
-                                                crate::domain::sync::apply_optimistic_removal(uid, &mut messages.write(), search_envelopes.write().as_mut());
+                                            let box_name = current_mailbox.read().clone();
+                                            let sess = session.read().clone();
+                                            let now_unix = current_unix_timestamp();
+
+                                            let unread_removed = messages
+                                                .read()
+                                                .iter()
+                                                .filter(|m| uids.contains(&m.uid) && !m.is_read)
+                                                .count() as u32;
+                                            if unread_removed > 0
+                                                && let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name)
+                                            {
+                                                mb.unread_messages = mb.unread_messages.saturating_sub(unread_removed);
                                             }
+
+                                            crate::domain::sync::apply_batch_removal(
+                                                &uids,
+                                                &mut messages.write(),
+                                                search_envelopes.write().as_mut(),
+                                            );
                                             selected_uids.write().clear();
                                             last_interacted_uid.set(None);
+
+                                            let batch = crate::domain::sync::create_batch_queued_actions(
+                                                &uids,
+                                                &box_name,
+                                                |_| ActionType::Move {
+                                                    dest_box: "Archive".to_string(),
+                                                },
+                                                now_unix,
+                                            );
+                                            enqueue_and_dispatch_batch(sess, batch);
                                         },
                                         "📦 ARQUIVAR"
                                     }
@@ -544,13 +681,51 @@ pub fn InboxView(
                                         style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
                                         onclick: move |_| {
                                             let uids: Vec<u32> = selected_uids.read().iter().copied().collect();
-                                            for uid in uids {
-                                                if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
-                                                    m.is_read = !m.is_read;
+                                            let box_name = current_mailbox.read().clone();
+                                            let sess = session.read().clone();
+                                            let now_unix = current_unix_timestamp();
+
+                                            let target_read = messages
+                                                .read()
+                                                .iter()
+                                                .any(|m| uids.contains(&m.uid) && !m.is_read);
+                                            let changed = crate::domain::sync::apply_batch_read_status(
+                                                &uids,
+                                                &mut messages.write(),
+                                                target_read,
+                                            ) as u32;
+                                            if let Some(search_list) = search_envelopes.write().as_mut() {
+                                                crate::domain::sync::apply_batch_read_status(
+                                                    &uids,
+                                                    search_list,
+                                                    target_read,
+                                                );
+                                            }
+                                            if changed > 0
+                                                && let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == box_name)
+                                            {
+                                                if target_read {
+                                                    mb.unread_messages = mb.unread_messages.saturating_sub(changed);
+                                                } else {
+                                                    mb.unread_messages += changed;
                                                 }
                                             }
+
+                                            let cache = LocalMessageCache::new(get_default_cache_dir());
+                                            for &uid in &uids {
+                                                let _ = cache.mark_envelope_read(&box_name, uid, target_read);
+                                            }
+
                                             selected_uids.write().clear();
                                             last_interacted_uid.set(None);
+
+                                            let batch = crate::domain::sync::create_batch_queued_actions(
+                                                &uids,
+                                                &box_name,
+                                                |_| ActionType::MarkRead { read: target_read },
+                                                now_unix,
+                                            );
+                                            enqueue_and_dispatch_batch(sess, batch);
                                         },
                                         "✉ LIDA/NÃO LIDA"
                                     }
@@ -558,13 +733,39 @@ pub fn InboxView(
                                         style: "background: #fff; color: #dc143c; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
                                         onclick: move |_| {
                                             let uids: Vec<u32> = selected_uids.read().iter().copied().collect();
-                                            for uid in uids {
-                                                if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
-                                                    m.is_flagged = !m.is_flagged;
-                                                }
+                                            let box_name = current_mailbox.read().clone();
+                                            let sess = session.read().clone();
+                                            let now_unix = current_unix_timestamp();
+
+                                            let target_flagged = messages
+                                                .read()
+                                                .iter()
+                                                .any(|m| uids.contains(&m.uid) && !m.is_flagged);
+                                            crate::domain::sync::apply_batch_flag_status(
+                                                &uids,
+                                                &mut messages.write(),
+                                                target_flagged,
+                                            );
+                                            if let Some(search_list) = search_envelopes.write().as_mut() {
+                                                crate::domain::sync::apply_batch_flag_status(
+                                                    &uids,
+                                                    search_list,
+                                                    target_flagged,
+                                                );
                                             }
+
                                             selected_uids.write().clear();
                                             last_interacted_uid.set(None);
+
+                                            let batch = crate::domain::sync::create_batch_queued_actions(
+                                                &uids,
+                                                &box_name,
+                                                |_| ActionType::MarkFlagged {
+                                                    flagged: target_flagged,
+                                                },
+                                                now_unix,
+                                            );
+                                            enqueue_and_dispatch_batch(sess, batch);
                                         },
                                         "★ FAVORITAR"
                                     }

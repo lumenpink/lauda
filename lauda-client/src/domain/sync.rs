@@ -113,6 +113,74 @@ pub fn create_queued_action(
     }
 }
 
+/// Aplica remoção em lote otimista na lista da caixa postal e na busca ativa.
+/// Retorna a quantidade de mensagens efetivamente removidas da caixa principal.
+pub fn apply_batch_removal(
+    uids: &[u32],
+    messages: &mut Vec<lauda_types::MessageEnvelope>,
+    search_envelopes: Option<&mut Vec<lauda_types::MessageEnvelope>>,
+) -> usize {
+    if uids.is_empty() {
+        return 0;
+    }
+    let before = messages.len();
+    messages.retain(|m| !uids.contains(&m.uid));
+    let removed = before.saturating_sub(messages.len());
+    if let Some(search_list) = search_envelopes {
+        search_list.retain(|m| !uids.contains(&m.uid));
+    }
+    removed
+}
+
+/// Cria um vetor de `QueuedAction` a partir de um lote de UIDs e gerador de ação.
+pub fn create_batch_queued_actions<F>(
+    uids: &[u32],
+    mailbox: &str,
+    action_fn: F,
+    now_unix: u64,
+) -> Vec<QueuedAction>
+where
+    F: Fn(u32) -> ActionType,
+{
+    uids.iter()
+        .map(|&uid| create_queued_action(uid, mailbox, action_fn(uid), now_unix))
+        .collect()
+}
+
+/// Aplica alteração em lote do status de leitura nos envelopes em memória.
+/// Retorna quantas mensagens tiveram seu status alterado.
+pub fn apply_batch_read_status(
+    uids: &[u32],
+    messages: &mut [lauda_types::MessageEnvelope],
+    read: bool,
+) -> usize {
+    let mut changed = 0;
+    for msg in messages.iter_mut() {
+        if uids.contains(&msg.uid) && msg.is_read != read {
+            msg.is_read = read;
+            changed += 1;
+        }
+    }
+    changed
+}
+
+/// Aplica alteração em lote do status de destaque (estrela) nos envelopes em memória.
+/// Retorna quantas mensagens tiveram seu status alterado.
+pub fn apply_batch_flag_status(
+    uids: &[u32],
+    messages: &mut [lauda_types::MessageEnvelope],
+    flagged: bool,
+) -> usize {
+    let mut changed = 0;
+    for msg in messages.iter_mut() {
+        if uids.contains(&msg.uid) && msg.is_flagged != flagged {
+            msg.is_flagged = flagged;
+            changed += 1;
+        }
+    }
+    changed
+}
+
 /// Gerenciador de persistência para reconciliação de ações locais.
 #[derive(Clone, Debug)]
 pub struct ActionsQueue {
