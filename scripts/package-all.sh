@@ -170,8 +170,8 @@ fi
 # 7. Publicação na Cloudflare Workers (lauda.2lp.in)
 if [ "$DO_DEPLOY_CLOUDFLARE" = true ]; then
     echo "-> Verificando deploy na Cloudflare Workers (lauda.2lp.in)..."
-    if npx wrangler whoami >/dev/null 2>&1 || [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
-        npx wrangler deploy || echo "Aviso: wrangler deploy falhou ou foi abortado."
+    if npx --yes wrangler whoami >/dev/null 2>&1 || [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
+        npx --yes wrangler deploy || echo "Aviso: wrangler deploy falhou ou foi abortado."
         echo "✓ lauda.2lp.in publicado via Cloudflare Workers."
     else
         echo "Aviso: Credenciais Cloudflare não detectadas para deploy."
