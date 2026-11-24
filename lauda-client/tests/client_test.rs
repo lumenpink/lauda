@@ -822,3 +822,65 @@ fn test_resolve_navigation_envelopes_with_search_context() {
     assert_eq!(empty_candidates.len(), 0);
     assert_eq!(find_neighbor_uids(empty_candidates, 400), (None, None));
 }
+
+#[test]
+fn test_resolve_navigation_envelopes_mutation_coverage() {
+    use lauda_client::domain::view::{find_neighbor_uids, resolve_navigation_envelopes};
+
+    let mailbox = vec![
+        MessageEnvelope {
+            uid: 50,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 30,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 10,
+            ..Default::default()
+        },
+    ];
+
+    // Ordem personalizada de relevância da busca (diferente da caixa)
+    let ranked_search = vec![
+        MessageEnvelope {
+            uid: 10,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 50,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 30,
+            ..Default::default()
+        },
+    ];
+
+    let candidates = resolve_navigation_envelopes(Some(&ranked_search), &mailbox);
+    assert_eq!(find_neighbor_uids(candidates, 10), (None, Some(50)));
+    assert_eq!(find_neighbor_uids(candidates, 50), (Some(10), Some(30)));
+    assert_eq!(find_neighbor_uids(candidates, 30), (Some(50), None));
+
+    // UID que existe na caixa (uid 30) mas não está no resultado da busca
+    let filtered_subset = vec![MessageEnvelope {
+        uid: 10,
+        ..Default::default()
+    }];
+    let subset_candidates = resolve_navigation_envelopes(Some(&filtered_subset), &mailbox);
+    // Como 30 não está no resultado da busca, não pode vazar vizinhança da caixa
+    assert_eq!(find_neighbor_uids(subset_candidates, 30), (None, None));
+
+    // Ambos vazios
+    let empty_mailbox: Vec<MessageEnvelope> = Vec::new();
+    assert_eq!(
+        resolve_navigation_envelopes(None, &empty_mailbox).len(),
+        0
+    );
+    assert_eq!(
+        resolve_navigation_envelopes(Some(&[]), &empty_mailbox).len(),
+        0
+    );
+}
+
