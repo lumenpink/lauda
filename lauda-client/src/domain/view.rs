@@ -697,3 +697,60 @@ pub fn parse_shortcut(key: &str, is_input_focused: bool) -> Option<ShortcutActio
         _ => None,
     }
 }
+
+/// Alterna a presença de um UID no conjunto de selecionados.
+/// Retorna true se o UID passou a estar selecionado, ou false se foi removido.
+pub fn toggle_selection(selected: &mut std::collections::HashSet<u32>, uid: u32) -> bool {
+    if selected.contains(&uid) {
+        selected.remove(&uid);
+        false
+    } else {
+        selected.insert(uid);
+        true
+    }
+}
+
+/// Seleciona o intervalo contíguo entre from_uid e to_uid baseado na ordem de exibição em `messages`.
+/// Se from_uid ou to_uid não existirem na lista, seleciona apenas to_uid se ele existir.
+pub fn select_range(
+    messages: &[MessageEnvelope],
+    from_uid: u32,
+    to_uid: u32,
+    selected: &mut std::collections::HashSet<u32>,
+) {
+    let from_idx = messages.iter().position(|m| m.uid == from_uid);
+    let to_idx = messages.iter().position(|m| m.uid == to_uid);
+
+    match (from_idx, to_idx) {
+        (Some(start), Some(end)) => {
+            let min_idx = start.min(end);
+            let max_idx = start.max(end);
+            for m in &messages[min_idx..=max_idx] {
+                selected.insert(m.uid);
+            }
+        }
+        (None, Some(end)) => {
+            selected.insert(messages[end].uid);
+        }
+        (Some(start), None) => {
+            selected.insert(messages[start].uid);
+        }
+        (None, None) => {}
+    }
+}
+
+/// Seleciona todas as mensagens visíveis da lista fornecida.
+pub fn select_all(
+    messages: &[MessageEnvelope],
+    selected: &mut std::collections::HashSet<u32>,
+) {
+    for m in messages {
+        selected.insert(m.uid);
+    }
+}
+
+/// Limpa todas as mensagens selecionadas.
+pub fn clear_selection(selected: &mut std::collections::HashSet<u32>) {
+    selected.clear();
+}
+

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use dioxus::prelude::*;
 use lauda_types::{MailboxInfo, Message, MessageEnvelope, message::SignatureStatus};
 
@@ -38,6 +39,8 @@ pub fn InboxView(
     let mut is_drawer_open = use_signal(|| false);
     let mut error_msg = use_signal(|| None::<String>);
     let mut loading_uid = use_signal(|| None::<u32>);
+    let mut selected_uids = use_signal(HashSet::<u32>::new);
+    let mut last_interacted_uid = use_signal(|| None::<u32>);
 
     let mut last_mailbox = use_signal(|| current_mailbox.read().clone());
     use_effect(move || {
@@ -47,6 +50,8 @@ pub fn InboxView(
             search_query.set(String::new());
             search_envelopes.set(None);
             has_more.set(true);
+            selected_uids.write().clear();
+            last_interacted_uid.set(None);
         }
     });
 
@@ -319,6 +324,21 @@ pub fn InboxView(
         });
     }
 
+    let filtered_rc = std::rc::Rc::new(filtered_messages);
+    let selection_count = selected_uids.read().len();
+    let is_selection_active = selection_count > 0;
+    let all_count = filtered_rc.len();
+    let is_all_selected = all_count > 0
+        && filtered_rc
+            .iter()
+            .all(|m| selected_uids.read().contains(&m.uid));
+    let selection_label = if selection_count == 1 {
+        "1 SELECIONADA".to_string()
+    } else {
+        format!("{} SELECIONADAS", selection_count)
+    };
+    let msgs_cab = filtered_rc.clone();
+
     rsx! {
             div {
                 style: "display: flex; flex-direction: column; gap: 1rem;",
@@ -464,41 +484,129 @@ pub fn InboxView(
                             }}
                             "#
                         }
-                        div {
-                            style: "border: 2px solid #0a0a0a; background: #fff; padding: 0.6rem 0.8rem; box-shadow: 3px 3px 0 #0a0a0a; display: flex; align-items: center; gap: 0.5rem;",
-                            span { style: "color: #dc143c; font-weight: bold;", "🔍" }
-                            input {
-                                style: "border: none; outline: none; width: 100%; font-family: monospace; font-size: 0.95rem; background: transparent; color: #0a0a0a;",
-                                placeholder: "Pesquisar por assunto, remetente ou em linguagem natural...",
-                                value: "{search_query.read()}",
-                                oninput: move |e| search_query.set(e.value()),
-                            }
-                            if is_searching {
-                                if *is_remote_searching.read() {
-                                    span {
-                                        class: "lauda-spin",
-                                        title: "Buscando no servidor...",
-                                        style: "font-size: 0.95rem; cursor: wait; margin-right: 0.2rem;",
-                                        "🌐"
+                        if is_selection_active {
+                            div {
+                                style: "border: 2px solid #0a0a0a; background: #fff5f5; padding: 0.6rem 0.8rem; box-shadow: 3px 3px 0 #dc143c; display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap;",
+                                div {
+                                    style: "display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;",
+                                    button {
+                                        style: "background: #0a0a0a; color: #fff; border: 1px solid #0a0a0a; padding: 0.3rem 0.6rem; font-weight: bold; cursor: pointer; font-size: 0.85rem;",
+                                        title: "Limpar seleção (Esc)",
+                                        onclick: move |_| {
+                                            selected_uids.write().clear();
+                                            last_interacted_uid.set(None);
+                                        },
+                                        "✕"
                                     }
-                                } else {
                                     span {
-                                        title: "Resultados sincronizados",
-                                        style: "font-size: 0.85rem; color: #2e7d32; font-weight: bold; margin-right: 0.2rem;",
-                                        "⚡"
+                                        style: "font-family: monospace; font-weight: bold; font-size: 0.9rem; color: #0a0a0a;",
+                                        "{selection_label}"
+                                    }
+                                    button {
+                                        style: "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: bold; cursor: pointer;",
+                                        onclick: move |_| {
+                                            if is_all_selected {
+                                                selected_uids.write().clear();
+                                            } else {
+                                                crate::domain::view::select_all(&msgs_cab, &mut selected_uids.write());
+                                            }
+                                        },
+                                        if is_all_selected { "DESMARCAR TODAS" } else { "SELECIONAR TODAS ({all_count})" }
+                                    }
+                                }
+                                div {
+                                    style: "display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;",
+                                    button {
+                                        style: "background: #dc143c; color: #fff; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                                        onclick: move |_| {
+                                            let uids: Vec<u32> = selected_uids.read().iter().copied().collect();
+                                            for uid in uids {
+                                                crate::domain::sync::apply_optimistic_removal(uid, &mut messages.write(), search_envelopes.write().as_mut());
+                                            }
+                                            selected_uids.write().clear();
+                                            last_interacted_uid.set(None);
+                                        },
+                                        "🗑 EXCLUIR"
+                                    }
+                                    button {
+                                        style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                                        onclick: move |_| {
+                                            let uids: Vec<u32> = selected_uids.read().iter().copied().collect();
+                                            for uid in uids {
+                                                crate::domain::sync::apply_optimistic_removal(uid, &mut messages.write(), search_envelopes.write().as_mut());
+                                            }
+                                            selected_uids.write().clear();
+                                            last_interacted_uid.set(None);
+                                        },
+                                        "📦 ARQUIVAR"
+                                    }
+                                    button {
+                                        style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                                        onclick: move |_| {
+                                            let uids: Vec<u32> = selected_uids.read().iter().copied().collect();
+                                            for uid in uids {
+                                                if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
+                                                    m.is_read = !m.is_read;
+                                                }
+                                            }
+                                            selected_uids.write().clear();
+                                            last_interacted_uid.set(None);
+                                        },
+                                        "✉ LIDA/NÃO LIDA"
+                                    }
+                                    button {
+                                        style: "background: #fff; color: #dc143c; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                                        onclick: move |_| {
+                                            let uids: Vec<u32> = selected_uids.read().iter().copied().collect();
+                                            for uid in uids {
+                                                if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
+                                                    m.is_flagged = !m.is_flagged;
+                                                }
+                                            }
+                                            selected_uids.write().clear();
+                                            last_interacted_uid.set(None);
+                                        },
+                                        "★ FAVORITAR"
                                     }
                                 }
                             }
-                            if !search_query.read().is_empty() {
-                                button {
-                                    style: "background: none; border: none; cursor: pointer; color: #888; font-weight: bold; font-family: monospace;",
-                                    onclick: move |_| {
-                                        search_query.set(String::new());
-                                        search_envelopes.set(None);
-                                        fast_local_results.set(Vec::new());
-                                        is_remote_searching.set(false);
-                                    },
-                                    "✕"
+                        } else {
+                            div {
+                                style: "border: 2px solid #0a0a0a; background: #fff; padding: 0.6rem 0.8rem; box-shadow: 3px 3px 0 #0a0a0a; display: flex; align-items: center; gap: 0.5rem;",
+                                span { style: "color: #dc143c; font-weight: bold;", "🔍" }
+                                input {
+                                    style: "border: none; outline: none; width: 100%; font-family: monospace; font-size: 0.95rem; background: transparent; color: #0a0a0a;",
+                                    placeholder: "Pesquisar por assunto, remetente ou em linguagem natural...",
+                                    value: "{search_query.read()}",
+                                    oninput: move |e| search_query.set(e.value()),
+                                }
+                                if is_searching {
+                                    if *is_remote_searching.read() {
+                                        span {
+                                            class: "lauda-spin",
+                                            title: "Buscando no servidor...",
+                                            style: "font-size: 0.95rem; cursor: wait; margin-right: 0.2rem;",
+                                            "🌐"
+                                        }
+                                    } else {
+                                        span {
+                                            title: "Resultados sincronizados",
+                                            style: "font-size: 0.85rem; color: #2e7d32; font-weight: bold; margin-right: 0.2rem;",
+                                            "⚡"
+                                        }
+                                    }
+                                }
+                                if !search_query.read().is_empty() {
+                                    button {
+                                        style: "background: none; border: none; cursor: pointer; color: #888; font-weight: bold; font-family: monospace;",
+                                        onclick: move |_| {
+                                            search_query.set(String::new());
+                                            search_envelopes.set(None);
+                                            fast_local_results.set(Vec::new());
+                                            is_remote_searching.set(false);
+                                        },
+                                        "✕"
+                                    }
                                 }
                             }
                         }
@@ -594,7 +702,7 @@ pub fn InboxView(
                 // Lista de Mensagens
                 div {
                     style: "display: flex; flex-direction: column; gap: 0.6rem;",
-                    if filtered_messages.is_empty() {
+                    if filtered_rc.is_empty() {
                         div {
                             style: "border: 2px dashed #666; background: #fff; padding: 2rem; text-align: center; color: #555;",
                             if let Some(hint_msg) = crate::domain::format_search_hint(&query_str) {
@@ -608,7 +716,7 @@ pub fn InboxView(
                             }
                         }
                     }
-                    for env in filtered_messages.iter() {
+                    for env in filtered_rc.iter() {
                         {
                             let uid = env.uid;
                             let unread = !env.is_read;
@@ -618,12 +726,48 @@ pub fn InboxView(
                             let subject = env.subject.clone();
                             let date = crate::domain::time::format_local_date_display(&env.date);
                             let font_weight = if unread { "bold" } else { "normal" };
+                            let is_selected = selected_uids.read().contains(&uid);
+                            let msgs_card = filtered_rc.clone();
+                            let msgs_bullet = filtered_rc.clone();
 
                             rsx! {
                                 div {
                                     key: "{uid}",
-                                    style: if unread { "border: 2px solid #0a0a0a; background: #fff; padding: 1rem; box-shadow: 4px 4px 0 #dc143c; cursor: pointer; display: flex; flex-direction: column; gap: 0.3rem;" } else { "border: 1px solid #0a0a0a; background: #faf9f6; padding: 1rem; cursor: pointer; display: flex; flex-direction: column; gap: 0.3rem;" },
-                                    onclick: move |_| {
+                                    style: if is_selected {
+                                        "border: 2px solid #dc143c; background: #fff5f5; padding: 1rem; box-shadow: 4px 4px 0 #0a0a0a; cursor: pointer; display: flex; flex-direction: column; gap: 0.3rem;"
+                                    } else if unread {
+                                        "border: 2px solid #0a0a0a; background: #fff; padding: 1rem; box-shadow: 4px 4px 0 #dc143c; cursor: pointer; display: flex; flex-direction: column; gap: 0.3rem;"
+                                    } else {
+                                        "border: 1px solid #0a0a0a; background: #faf9f6; padding: 1rem; cursor: pointer; display: flex; flex-direction: column; gap: 0.3rem;"
+                                    },
+                                    oncontextmenu: move |e| {
+                                        e.prevent_default();
+                                        crate::domain::view::toggle_selection(&mut selected_uids.write(), uid);
+                                        last_interacted_uid.set(Some(uid));
+                                    },
+                                    onclick: move |e| {
+                                        let has_selection = !selected_uids.read().is_empty();
+                                        let is_shift = e.modifiers().shift();
+
+                                        if has_selection || is_shift {
+                                            if is_shift {
+                                                if let Some(last_uid) = *last_interacted_uid.read() {
+                                                    crate::domain::view::select_range(
+                                                        &msgs_card,
+                                                        last_uid,
+                                                        uid,
+                                                        &mut selected_uids.write(),
+                                                    );
+                                                } else {
+                                                    crate::domain::view::toggle_selection(&mut selected_uids.write(), uid);
+                                                }
+                                            } else {
+                                                crate::domain::view::toggle_selection(&mut selected_uids.write(), uid);
+                                            }
+                                            last_interacted_uid.set(Some(uid));
+                                            return;
+                                        }
+
                                         let sess = session.read().clone();
                                         let box_name = current_mailbox.read().clone();
                                         let cache_dir = get_default_cache_dir();
@@ -775,8 +919,28 @@ pub fn InboxView(
                                     div {
                                         style: "display: flex; justify-content: space-between; align-items: center;",
                                         div {
-                                            style: "display: flex; align-items: center; gap: 0.5rem;",
-                                            if unread {
+                                            style: "display: flex; align-items: center; gap: 0.5rem; cursor: pointer;",
+                                            onclick: move |e| {
+                                                e.stop_propagation();
+                                                if e.modifiers().shift() {
+                                                    if let Some(last_uid) = *last_interacted_uid.read() {
+                                                        crate::domain::view::select_range(
+                                                            &msgs_bullet,
+                                                            last_uid,
+                                                            uid,
+                                                            &mut selected_uids.write(),
+                                                        );
+                                                    } else {
+                                                        crate::domain::view::toggle_selection(&mut selected_uids.write(), uid);
+                                                    }
+                                                } else {
+                                                    crate::domain::view::toggle_selection(&mut selected_uids.write(), uid);
+                                                }
+                                                last_interacted_uid.set(Some(uid));
+                                            },
+                                            if is_selected {
+                                                span { style: "color: #dc143c; font-size: 1.1rem; font-weight: bold;", "[✓]" }
+                                            } else if unread {
                                                 span { style: "color: #dc143c; font-size: 1.1rem;", "●" }
                                             } else {
                                                 span { style: "color: #999; font-size: 1.1rem;", "○" }
@@ -824,7 +988,7 @@ pub fn InboxView(
                             }
                         }
                     }
-                    if !is_searching && *has_more.read() && !filtered_messages.is_empty() {
+                    if !is_searching && *has_more.read() && !filtered_rc.is_empty() {
                         button {
                             style: "width: 100%; padding: 0.8rem; margin-top: 1rem; border: 2px solid #0a0a0a; background: #faf9f6; color: #0a0a0a; font-family: monospace; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #dc143c; text-align: center; text-transform: uppercase;",
                             disabled: *is_loading_more.read(),
