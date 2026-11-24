@@ -751,3 +751,75 @@ fn test_keyboard_shortcuts_mutation_coverage() {
         );
     }
 }
+
+#[test]
+fn test_resolve_navigation_envelopes_with_search_context() {
+    use lauda_client::domain::view::{find_neighbor_uids, resolve_navigation_envelopes};
+
+    let mailbox = vec![
+        MessageEnvelope {
+            uid: 500,
+            subject: "Msg 500".to_string(),
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 400,
+            subject: "Importante: Alvo da busca 400".to_string(),
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 300,
+            subject: "Msg 300".to_string(),
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 200,
+            subject: "Msg 200".to_string(),
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 100,
+            subject: "Importante: Alvo da busca 100".to_string(),
+            ..Default::default()
+        },
+    ];
+
+    let search_results = vec![
+        MessageEnvelope {
+            uid: 400,
+            subject: "Importante: Alvo da busca 400".to_string(),
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 100,
+            subject: "Importante: Alvo da busca 100".to_string(),
+            ..Default::default()
+        },
+    ];
+
+    // 1. Sem busca ativa: navegação deve usar mailbox completa
+    let normal_candidates = resolve_navigation_envelopes(None, &mailbox);
+    assert_eq!(normal_candidates.len(), 5);
+    let (prev_norm, next_norm) = find_neighbor_uids(normal_candidates, 400);
+    assert_eq!(prev_norm, Some(500));
+    assert_eq!(next_norm, Some(300));
+
+    // 2. Com busca ativa: navegação deve usar estritamente os resultados da busca
+    let search_candidates = resolve_navigation_envelopes(Some(&search_results), &mailbox);
+    assert_eq!(search_candidates.len(), 2);
+
+    let (prev_search_400, next_search_400) = find_neighbor_uids(search_candidates, 400);
+    assert_eq!(prev_search_400, None);
+    assert_eq!(next_search_400, Some(100)); // Salta o 300 e 200!
+
+    let (prev_search_100, next_search_100) = find_neighbor_uids(search_candidates, 100);
+    assert_eq!(prev_search_100, Some(400)); // Volta direto para o 400!
+    assert_eq!(next_search_100, None);
+
+    // 3. Busca vazia (zero resultados): deve retornar slice vazio de busca
+    let empty_search: Vec<MessageEnvelope> = Vec::new();
+    let empty_candidates = resolve_navigation_envelopes(Some(&empty_search), &mailbox);
+    assert_eq!(empty_candidates.len(), 0);
+    assert_eq!(find_neighbor_uids(empty_candidates, 400), (None, None));
+}
+
