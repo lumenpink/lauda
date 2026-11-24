@@ -54,7 +54,7 @@ fn test_markdown_preserves_single_line_breaks_and_paragraphs() {
 fn test_view_mode_switching() {
     let mut mode = ViewMode::TxtAuto;
     assert_eq!(mode, ViewMode::TxtAuto);
-    assert_eq!(mode.label(), "TXT AUTO ⟳");
+    assert_eq!(mode.label(), "SIMPLIFICADO ⟳");
 
     mode = mode.next();
     assert_eq!(mode, ViewMode::Html);
