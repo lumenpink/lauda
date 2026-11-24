@@ -1207,3 +1207,58 @@ fn test_batch_offline_actions_contracts() {
     assert!(!msgs[1].is_flagged);
     assert!(msgs[2].is_flagged);
 }
+
+#[test]
+fn test_batch_offline_actions_mutation_coverage() {
+    use lauda_client::domain::sync::{
+        ActionType, apply_batch_flag_status, apply_batch_read_status, apply_batch_removal,
+        create_batch_queued_actions,
+    };
+    use lauda_types::MessageEnvelope;
+
+    // 1. apply_batch_removal com lista de uids vazia e search = None
+    let mut mailbox = vec![MessageEnvelope {
+        uid: 42,
+        ..Default::default()
+    }];
+    assert_eq!(apply_batch_removal(&[], &mut mailbox, None), 0);
+    assert_eq!(mailbox.len(), 1);
+
+    // 2. apply_batch_removal com UIDs inexistentes
+    assert_eq!(apply_batch_removal(&[999, 1000], &mut mailbox, None), 0);
+    assert_eq!(mailbox.len(), 1);
+
+    // 3. create_batch_queued_actions com lista vazia e Move
+    let empty_batch = create_batch_queued_actions(&[], "INBOX", |_| ActionType::Delete, 1795000000);
+    assert!(empty_batch.is_empty());
+
+    let move_batch = create_batch_queued_actions(
+        &[42],
+        "INBOX",
+        |_| ActionType::Move {
+            dest_box: "Archive".to_string(),
+        },
+        1795000005,
+    );
+    assert_eq!(move_batch.len(), 1);
+    assert_eq!(
+        move_batch[0].action,
+        ActionType::Move {
+            dest_box: "Archive".to_string()
+        }
+    );
+
+    // 4. Idempotência e contagem exata de leitura/destaque
+    let mut msgs = vec![MessageEnvelope {
+        uid: 42,
+        is_read: false,
+        is_flagged: false,
+        ..Default::default()
+    }];
+    assert_eq!(apply_batch_read_status(&[42], &mut msgs, false), 0);
+    assert_eq!(apply_batch_flag_status(&[42], &mut msgs, false), 0);
+    assert_eq!(apply_batch_read_status(&[42], &mut msgs, true), 1);
+    assert_eq!(apply_batch_flag_status(&[42], &mut msgs, true), 1);
+    assert_eq!(apply_batch_read_status(&[42], &mut msgs, false), 1);
+    assert_eq!(apply_batch_flag_status(&[42], &mut msgs, false), 1);
+}
