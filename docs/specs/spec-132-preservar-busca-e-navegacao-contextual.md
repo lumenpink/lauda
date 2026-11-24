@@ -51,3 +51,11 @@ pub fn resolve_navigation_envelopes<'a>(
 3. No `MessageView`, os botões `◀ ANTERIOR`, `PRÓXIMO ▶` e atalhos `j`/`k` pulam diretamente para os itens da busca ativa.
 4. Ao navegar de volta de `MessageView` para `InboxView`, o input e os resultados da busca permanecem intactos.
 5. Ao limpar a busca no `InboxView`, `search_envelopes` volta para `None`.
+
+---
+
+## 5. Laudo de Fechamento e Validação
+- **Status:** Concluído e Aprovado no Quality Gate.
+- **Implementação:** Realizada no commit `b13749b` com refatoração em `8d1f166`.
+- **Testes & Cobertura:** Suíte unitária e testes de mutação cobrindo contratos de navegação e busca em `client_test.rs`. Linters (`cargo clippy --all-targets -- -D warnings`) e formatador (`cargo fmt`) aprovados sem pendências.
+
