@@ -91,4 +91,5 @@ pub fn apply_batch_flag_status(
   - Ações da Barra de Ações Contextual (`🗑 EXCLUIR`, `📦 ARQUIVAR`, `✉ LIDA/NÃO LIDA`, `★ FAVORITAR`) operando com 0ms na UI e atualização de contadores de pastas e busca ativa.
 - **Validação:** 26/26 testes aprovados em `client_test.rs`, `cargo fmt --check` e `cargo clippy --all-targets -- -D warnings` aprovados sem alertas.
 - **Data:** 2026-11-24
+- **Fechamento:** Fase 9 concluída com sucesso.
 
