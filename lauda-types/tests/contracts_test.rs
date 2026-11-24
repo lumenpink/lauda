@@ -162,7 +162,7 @@ fn test_view_mode_cycle() {
     assert_eq!(ViewMode::Html.next(), ViewMode::TxtOriginal);
     assert_eq!(ViewMode::TxtOriginal.next(), ViewMode::TxtAuto);
 
-    assert_eq!(ViewMode::TxtAuto.label(), "TXT AUTO ⟳");
+    assert_eq!(ViewMode::TxtAuto.label(), "SIMPLIFICADO ⟳");
     assert_eq!(ViewMode::Html.label(), "HTML ⟳");
     assert_eq!(ViewMode::TxtOriginal.label(), "ORIGINAL ⟳");
 }

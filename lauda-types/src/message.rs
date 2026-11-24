@@ -26,7 +26,7 @@ impl ViewMode {
     /// Rótulo conciso com glifo rotativo para botões compactos Trash Polka.
     pub fn label(&self) -> &'static str {
         match self {
-            Self::TxtAuto => "TXT AUTO ⟳",
+            Self::TxtAuto => "SIMPLIFICADO ⟳",
             Self::Html => "HTML ⟳",
             Self::TxtOriginal => "ORIGINAL ⟳",
         }

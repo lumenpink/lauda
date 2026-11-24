@@ -20,9 +20,9 @@ pub fn MessageView(
     mut messages: Signal<Vec<MessageEnvelope>>,
     mut mailboxes: Signal<Vec<MailboxInfo>>,
     mut active_message: Signal<Option<Message>>,
-    mut current_view_mode: Signal<ViewMode>,
 ) -> Element {
     let msg = active_message.read().clone();
+    let mut current_view_mode = use_signal(|| ViewMode::TxtAuto);
     let mut download_status = use_signal(|| None::<(usize, String)>);
     let mut crypto_drawer_open = use_signal(|| false);
     let mut rsvp_feedback = use_signal(|| None::<String>);
@@ -367,6 +367,17 @@ pub fn MessageView(
                             }
                         },
                         "⚡ CRIAR REGRA"
+                    }
+                }
+                div {
+                    style: "display: flex; align-items: center; gap: 0.5rem;",
+                    button {
+                        style: "background: #0a0a0a; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #dc143c; white-space: nowrap;",
+                        onclick: move |_| {
+                            let next_mode = current_view_mode.read().next();
+                            current_view_mode.set(next_mode);
+                        },
+                        "{current_view_mode.read().label()}"
                     }
                 }
             }

@@ -1,5 +1,5 @@
 use dioxus::prelude::*;
-use lauda_types::{MailboxInfo, Message, MessageEnvelope, ViewMode};
+use lauda_types::{MailboxInfo, Message, MessageEnvelope};
 
 pub mod calendar_view;
 pub mod compose_view;
@@ -40,8 +40,6 @@ pub fn App() -> Element {
     let current_mailbox = use_signal(|| "INBOX".to_string());
     let mut messages = use_signal(Vec::<MessageEnvelope>::new);
     let mut active_message = use_signal(|| None::<Message>);
-    let mut current_view_mode = use_signal(|| ViewMode::TxtAuto);
-
     let mut update_notice = use_signal(|| None::<crate::domain::update::UpdateManifest>);
     let mut dismissed_update_version = use_signal(|| None::<String>);
 
@@ -490,16 +488,6 @@ pub fn App() -> Element {
                             }
                         }
                     }
-
-                    // Alternador Trifásico Global (Botão Único Rotativo)
-                    button {
-                        style: "background: #0a0a0a; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #dc143c; white-space: nowrap;",
-                        onclick: move |_| {
-                            let next_mode = current_view_mode.read().next();
-                            current_view_mode.set(next_mode);
-                        },
-                        "{current_view_mode.read().label()}"
-                    }
                 }
             }
 
@@ -564,7 +552,6 @@ pub fn App() -> Element {
                             messages,
                             mailboxes,
                             active_message,
-                            current_view_mode,
                         }
                     },
                     Screen::Compose {

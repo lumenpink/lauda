@@ -1,6 +1,6 @@
 [package]
 name = "lauda-server"
-version = "0.6.0-dev.150+20261123.a391cb8"
+version = "0.6.0-dev.151+20261123.82c8511"
 edition = "2024"
 authors = ["Lumen <lumen@2lp.in>"]
 description = "Micro-daemon HTTP gateway e ponte Dovecot/Postfix para o ecossistema Lauda"
