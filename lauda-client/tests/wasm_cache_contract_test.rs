@@ -118,3 +118,33 @@ fn test_wasm_local_search_bm25_mutation_ranking_and_terms() {
     );
     assert_eq!(ranked[1], 502, "Documento com menor TF deve vir em segundo");
 }
+
+#[test]
+fn test_queued_action_idb_serde_contract() {
+    use lauda_client::domain::sync::{ActionType, QueuedAction};
+
+    let action = QueuedAction {
+        id: "INBOX_42_1700000000".to_string(),
+        uid: 42,
+        mailbox: "INBOX".to_string(),
+        action: ActionType::MarkRead { read: true },
+        created_at_unix: 1700000000,
+    };
+
+    let json_str = serde_json::to_string(&action).expect("Serialização da QueuedAction deve ter sucesso");
+    let deserialized: QueuedAction = serde_json::from_str(&json_str).expect("Desserialização deve ter sucesso");
+
+    assert_eq!(deserialized.id, action.id);
+    assert_eq!(deserialized.uid, 42);
+    assert_eq!(deserialized.mailbox, "INBOX");
+    assert_eq!(deserialized.action, ActionType::MarkRead { read: true });
+    assert_eq!(deserialized.created_at_unix, 1700000000);
+}
+
+#[test]
+fn test_cache_mailbox_slug_sanitization() {
+    assert_eq!(LocalMessageCache::sanitize_slug("INBOX"), "INBOX");
+    assert_eq!(LocalMessageCache::sanitize_slug("Sent Items"), "Sent_Items");
+    assert_eq!(LocalMessageCache::sanitize_slug("Archive/2026"), "Archive_2026");
+    assert_eq!(LocalMessageCache::sanitize_slug("Caixa de Entrada!"), "Caixa_de_Entrada_");
+}

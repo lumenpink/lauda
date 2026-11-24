@@ -141,7 +141,7 @@ impl LocalMessageCache {
 
     /// Sanitiza o nome da caixa de correio para uso seguro como chave.
     #[allow(dead_code)]
-    fn sanitize_slug(mailbox: &str) -> String {
+    pub fn sanitize_slug(mailbox: &str) -> String {
         let mut slug = String::with_capacity(mailbox.len());
         for c in mailbox.chars() {
             if c.is_alphanumeric() || c == '-' || c == '_' {
