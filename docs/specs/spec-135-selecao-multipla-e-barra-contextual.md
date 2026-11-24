@@ -79,4 +79,13 @@ pub fn clear_selection(selected: &mut HashSet<u32>);
 ---
 
 ## 6. Laudo de Fechamento e Homologação
-*(A preencher na Fase 8 - Quality Gate)*
+- **Status:** Concluído e Aprovado no Quality Gate (Fase 8).
+- **Implementação:**
+  - Funções puras em `domain/view.rs`: `toggle_selection`, `select_range`, `select_all` e `clear_selection`.
+  - Reatividade no `InboxView`: `selected_uids: Signal<HashSet<u32>>` e `last_interacted_uid: Signal<Option<u32>>`.
+  - Substituição da barra de busca pela Barra de Ações Contextual (CAB) com contador de mensagens selecionadas, ações em lote e botão de limpar seleção `✕`.
+  - Suporte a seleção por clique no marcador de status, clique com tecla `Shift` para intervalo contíguo, toque longo via `oncontextmenu`, e clique simples quando em modo de seleção ativa.
+  - Reset de seleção na troca de pasta/caixa postal (`current_mailbox`).
+- **Validação:** 24/24 testes aprovados em `client_test.rs`, `cargo fmt --check` e `cargo clippy --all-targets -- -D warnings` sem alertas.
+- **Data:** 2026-11-24
+
