@@ -3607,7 +3607,7 @@ dependencies = [
 
 [[package]]
 name = "lauda-client"
-version = "0.6.0-dev.139+20261123.8009f95"
+version = "0.6.0-dev.146+20261123.73ec9cd"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3638,7 +3638,7 @@ dependencies = [
 
 [[package]]
 name = "lauda-index"
-version = "0.6.0-dev.139+20261123.8009f95"
+version = "0.6.0-dev.146+20261123.73ec9cd"
 dependencies = [
  "candle-core",
  "candle-nn",
@@ -3653,7 +3653,7 @@ dependencies = [
 
 [[package]]
 name = "lauda-server"
-version = "0.6.0-dev.139+20261123.8009f95"
+version = "0.6.0-dev.146+20261123.73ec9cd"
 dependencies = [
  "async-trait",
  "axum",
@@ -3687,7 +3687,7 @@ dependencies = [
 
 [[package]]
 name = "lauda-types"
-version = "0.6.0-dev.139+20261123.8009f95"
+version = "0.6.0-dev.146+20261123.73ec9cd"
 dependencies = [
  "serde",
  "serde_json",
