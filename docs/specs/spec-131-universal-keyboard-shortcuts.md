@@ -24,3 +24,6 @@ A ausência de atalhos de teclado forçava o uso constante de ponteiro/toque par
 - **Green Implement:** Implementação do parser e dos handlers reativos.
 - **Mutation Test:** Eliminação de mutantes em case-insensitivity (`J` vs `j`), variantes de teclas e bloqueio estrito em input focado.
 - **Quality Gate:** `cargo fmt --check`, `clippy -D warnings` e verificação WebAssembly.
+
+## 4. Status de Resolução
+- Concluído e verificado em 2026-11-23. Atalhos universais implementados no leitor de mensagens e navegação global.
