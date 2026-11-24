@@ -1124,3 +1124,91 @@ fn test_selection_and_range_mutation_coverage() {
     assert!(toggle_selection(&mut selected, 200));
     assert!(selected.contains(&200));
 }
+
+#[test]
+fn test_batch_offline_actions_contracts() {
+    use lauda_client::domain::sync::{
+        ActionType, apply_batch_flag_status, apply_batch_read_status, apply_batch_removal,
+        create_batch_queued_actions,
+    };
+    use lauda_types::MessageEnvelope;
+
+    // 1. apply_batch_removal
+    let mut mailbox = vec![
+        MessageEnvelope {
+            uid: 1,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 2,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 3,
+            ..Default::default()
+        },
+    ];
+    let mut search = vec![
+        MessageEnvelope {
+            uid: 1,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 3,
+            ..Default::default()
+        },
+    ];
+
+    let removed = apply_batch_removal(&[1, 3], &mut mailbox, Some(&mut search));
+    assert_eq!(removed, 2);
+    assert_eq!(mailbox.len(), 1);
+    assert_eq!(mailbox[0].uid, 2);
+    assert!(search.is_empty());
+
+    // 2. create_batch_queued_actions
+    let actions = create_batch_queued_actions(
+        &[10, 20],
+        "INBOX",
+        |_| ActionType::Delete,
+        1795000000,
+    );
+    assert_eq!(actions.len(), 2);
+    assert_eq!(actions[0].uid, 10);
+    assert_eq!(actions[0].action, ActionType::Delete);
+    assert_eq!(actions[0].id, "INBOX_10_1795000000");
+    assert_eq!(actions[1].uid, 20);
+    assert_eq!(actions[1].action, ActionType::Delete);
+    assert_eq!(actions[1].id, "INBOX_20_1795000000");
+
+    // 3. apply_batch_read_status
+    let mut msgs = vec![
+        MessageEnvelope {
+            uid: 10,
+            is_read: false,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 20,
+            is_read: true,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 30,
+            is_read: false,
+            ..Default::default()
+        },
+    ];
+    let changed = apply_batch_read_status(&[10, 20], &mut msgs, true);
+    assert_eq!(changed, 1);
+    assert!(msgs[0].is_read);
+    assert!(msgs[1].is_read);
+    assert!(!msgs[2].is_read);
+
+    // 4. apply_batch_flag_status
+    let flag_changed = apply_batch_flag_status(&[10, 30], &mut msgs, true);
+    assert_eq!(flag_changed, 2);
+    assert!(msgs[0].is_flagged);
+    assert!(!msgs[1].is_flagged);
+    assert!(msgs[2].is_flagged);
+}
+
