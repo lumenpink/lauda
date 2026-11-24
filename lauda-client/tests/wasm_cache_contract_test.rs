@@ -5,6 +5,10 @@ use std::collections::{HashMap, HashSet};
 #[test]
 fn test_wasm_cache_has_rexie_store_contract() {
     assert_eq!(LocalMessageCache::IDB_DATABASE_NAME, "lauda_messages");
+    assert_eq!(LocalMessageCache::IDB_VERSION, 2);
+    assert_eq!(LocalMessageCache::IDB_STORE_MESSAGES, "messages");
+    assert_eq!(LocalMessageCache::IDB_STORE_ACTIONS, "actions");
+    assert_eq!(LocalMessageCache::IDB_STORE_INDEX_SLICES, "index_slices");
 }
 
 #[test]
