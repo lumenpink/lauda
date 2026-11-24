@@ -998,3 +998,65 @@ fn test_optimistic_removal_mutation_coverage() {
     assert_eq!(unread_action.id, "Archive_102_1795123457");
     assert_eq!(unread_action.action, ActionType::MarkRead { read: false });
 }
+
+#[test]
+fn test_selection_contracts_and_range_logic() {
+    use std::collections::HashSet;
+    use lauda_client::domain::view::{
+        clear_selection, select_all, select_range, toggle_selection,
+    };
+    use lauda_types::MessageEnvelope;
+
+    let mut selected = HashSet::new();
+
+    // 1. Toggle selection
+    assert!(toggle_selection(&mut selected, 10));
+    assert!(selected.contains(&10));
+    assert!(!toggle_selection(&mut selected, 10));
+    assert!(!selected.contains(&10));
+
+    // 2. Select range contíguo
+    let envelopes = vec![
+        MessageEnvelope { uid: 1, ..Default::default() },
+        MessageEnvelope { uid: 2, ..Default::default() },
+        MessageEnvelope { uid: 3, ..Default::default() },
+        MessageEnvelope { uid: 4, ..Default::default() },
+        MessageEnvelope { uid: 5, ..Default::default() },
+    ];
+
+    // Range de 2 a 4
+    select_range(&envelopes, 2, 4, &mut selected);
+    assert_eq!(selected.len(), 3);
+    assert!(selected.contains(&2));
+    assert!(selected.contains(&3));
+    assert!(selected.contains(&4));
+    assert!(!selected.contains(&1));
+    assert!(!selected.contains(&5));
+
+    // Range invertido (de 4 a 2)
+    clear_selection(&mut selected);
+    assert!(selected.is_empty());
+    select_range(&envelopes, 4, 2, &mut selected);
+    assert_eq!(selected.len(), 3);
+    assert!(selected.contains(&2));
+    assert!(selected.contains(&3));
+    assert!(selected.contains(&4));
+
+    // Range com from_uid inexistente mas to_uid existente
+    clear_selection(&mut selected);
+    select_range(&envelopes, 999, 3, &mut selected);
+    assert_eq!(selected.len(), 1);
+    assert!(selected.contains(&3));
+
+    // 3. Select all
+    select_all(&envelopes, &mut selected);
+    assert_eq!(selected.len(), 5);
+    for uid in 1..=5 {
+        assert!(selected.contains(&uid));
+    }
+
+    // 4. Clear selection
+    clear_selection(&mut selected);
+    assert!(selected.is_empty());
+}
+
