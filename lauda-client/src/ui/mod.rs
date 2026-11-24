@@ -364,7 +364,34 @@ pub fn App() -> Element {
                     }
 
                     #[cfg(target_arch = "wasm32")]
-                    crate::domain::time::async_sleep(std::time::Duration::from_secs(10)).await;
+                    {
+                        if let Ok(pending_actions) = crate::domain::cache::LocalMessageCache::list_actions_idb().await {
+                            for act in pending_actions {
+                                let res = match act.action {
+                                    crate::domain::sync::ActionType::MarkRead { read } => {
+                                        client.mark_read(&token, &act.mailbox, act.uid, read).await
+                                    }
+                                    crate::domain::sync::ActionType::MarkFlagged { flagged } => {
+                                        client
+                                            .mark_flagged(&token, &act.mailbox, act.uid, flagged)
+                                            .await
+                                    }
+                                    crate::domain::sync::ActionType::Move { ref dest_box } => {
+                                        client
+                                            .move_message(&token, act.uid, &act.mailbox, dest_box)
+                                            .await
+                                    }
+                                    crate::domain::sync::ActionType::Delete => {
+                                        client.delete_message(&token, &act.mailbox, act.uid).await
+                                    }
+                                };
+                                if res.is_ok() {
+                                    let _ = crate::domain::cache::LocalMessageCache::remove_action_idb(&act.id).await;
+                                }
+                            }
+                        }
+                        crate::domain::time::async_sleep(std::time::Duration::from_secs(10)).await;
+                    }
                     if session.read().token.is_none() {
                         break;
                     }

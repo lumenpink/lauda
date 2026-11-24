@@ -5,7 +5,9 @@ use crate::adapters::HttpApiClient;
 use crate::domain::cache::{LocalMessageCache, get_default_cache_dir};
 use crate::domain::ports::MailApiClient;
 use crate::domain::session::SessionConfig;
-use crate::domain::sync::{ActionType, ActionsQueue};
+use crate::domain::sync::ActionType;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::domain::sync::ActionsQueue;
 use crate::domain::time::current_unix_timestamp;
 use crate::ui::state::Screen;
 
@@ -602,6 +604,7 @@ pub fn InboxView(
                                         let box_name = current_mailbox.read().clone();
                                         let cache_dir = get_default_cache_dir();
                                         let cache = LocalMessageCache::new(&cache_dir);
+                                        #[cfg(not(target_arch = "wasm32"))]
                                         let actions = ActionsQueue::new(&cache_dir);
                                         let now_unix = current_unix_timestamp();
 
@@ -619,10 +622,34 @@ pub fn InboxView(
                                             // Persiste imediatamente no cache local (SQLite / Storage)
                                             let _ = cache.mark_envelope_read(&box_name, uid, true);
                                             // Enfileira na fila offline para garantir resiliência
+                                            #[cfg(not(target_arch = "wasm32"))]
                                             let _ = actions.enqueue(uid, &box_name, ActionType::MarkRead { read: true }, now_unix);
+
+                                            #[cfg(target_arch = "wasm32")]
+                                            {
+                                                let act = crate::domain::sync::QueuedAction {
+                                                    id: format!("{}_{}_{}", box_name, uid, now_unix),
+                                                    uid,
+                                                    mailbox: box_name.clone(),
+                                                    action: ActionType::MarkRead { read: true },
+                                                    created_at_unix: now_unix,
+                                                };
+                                                let token_opt = sess.token.clone();
+                                                let server_url = sess.server_url.clone();
+                                                let b_name = box_name.clone();
+                                                wasm_bindgen_futures::spawn_local(async move {
+                                                    let _ = LocalMessageCache::enqueue_action_idb(&act).await;
+                                                    if let Some(t) = token_opt {
+                                                        let client = HttpApiClient::new(server_url);
+                                                        if client.mark_read(&t, &b_name, uid, true).await.is_ok() {
+                                                            let _ = LocalMessageCache::remove_action_idb(&act.id).await;
+                                                        }
+                                                    }
+                                                });
+                                            }
                                         }
 
-                                        // 1. Abertura atômica imediata via cache local (0ms de latência)
+                                        // 1. Abertura atômica imediata via cache local síncrono (0ms de latência)
                                         if let Ok(Some(mut cached_msg)) = cache.load_message(&box_name, uid) {
                                             if was_unread {
                                                 cached_msg.envelope.is_read = true;
@@ -632,7 +659,60 @@ pub fn InboxView(
                                             return;
                                         }
 
-                                        // 2. Se não estiver no cache local, busca na rede
+                                        // 2. Se for WASM, tenta buscar no IndexedDB antes de bater na rede
+                                        #[cfg(target_arch = "wasm32")]
+                                        {
+                                            let b_name = box_name.clone();
+                                            let token_opt = sess.token.clone();
+                                            let server_url = sess.server_url.clone();
+                                            loading_uid.set(Some(uid));
+                                            error_msg.set(None);
+
+                                            wasm_bindgen_futures::spawn_local(async move {
+                                                if let Ok(Some(mut idb_msg)) = LocalMessageCache::load_message_idb(&b_name, uid).await {
+                                                    if was_unread {
+                                                        idb_msg.envelope.is_read = true;
+                                                    }
+                                                    active_message.set(Some(idb_msg));
+                                                    screen.set(Screen::MessageDetail(uid));
+                                                    loading_uid.set(None);
+                                                    return;
+                                                }
+
+                                                // 3. Se não estiver no IndexedDB, busca na rede
+                                                if let Some(token) = token_opt {
+                                                    let client = HttpApiClient::new(server_url);
+                                                    match client.get_message(&token, &b_name, uid).await {
+                                                        Ok(mut msg) => {
+                                                            if was_unread {
+                                                                msg.envelope.is_read = true;
+                                                            }
+                                                            let _ = LocalMessageCache::save_message_idb(&b_name, &msg).await;
+                                                            active_message.set(Some(msg));
+                                                            screen.set(Screen::MessageDetail(uid));
+                                                        }
+                                                        Err(e) => {
+                                                            if was_unread {
+                                                                if let Some(m) = messages.write().iter_mut().find(|m| m.uid == uid) {
+                                                                    m.is_read = false;
+                                                                }
+                                                                if let Some(mb) = mailboxes.write().iter_mut().find(|mb| mb.name == b_name) {
+                                                                    mb.unread_messages += 1;
+                                                                }
+                                                                let cache = LocalMessageCache::new(get_default_cache_dir());
+                                                                let _ = cache.mark_envelope_read(&b_name, uid, false);
+                                                            }
+                                                            error_msg.set(Some(format!("Falha ao abrir mensagem #{}: {}", uid, e)));
+                                                        }
+                                                    }
+                                                }
+                                                loading_uid.set(None);
+                                            });
+                                            return;
+                                        }
+
+                                        // 4. Se não estiver no cache local desktop/mobile, busca na rede
+                                        #[cfg(not(target_arch = "wasm32"))]
                                         if let Some(token) = sess.token.clone() {
                                             loading_uid.set(Some(uid));
                                             error_msg.set(None);

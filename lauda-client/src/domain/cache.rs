@@ -30,6 +30,13 @@ impl std::fmt::Debug for LocalMessageCache {
 impl LocalMessageCache {
     /// Nome canônico do banco de dados no IndexedDB para clientes web (WASM).
     pub const IDB_DATABASE_NAME: &str = "lauda_messages";
+    /// Versão do esquema IndexedDB.
+    pub const IDB_VERSION: u32 = 2;
+    pub const IDB_STORE_MAILBOXES: &str = "mailboxes";
+    pub const IDB_STORE_ENVELOPES: &str = "envelopes";
+    pub const IDB_STORE_INDEX_SLICES: &str = "index_slices";
+    pub const IDB_STORE_MESSAGES: &str = "messages";
+    pub const IDB_STORE_ACTIONS: &str = "actions";
     /// Abre ou cria o banco de cache SQLite no diretório base especificado.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn open<P: AsRef<Path>>(base_dir: P) -> std::io::Result<Self> {
@@ -455,6 +462,12 @@ impl LocalMessageCache {
     pub fn save_message(&self, mailbox: &str, msg: &Message) -> std::io::Result<()> {
         #[cfg(target_arch = "wasm32")]
         {
+            let mailbox_str = mailbox.to_string();
+            let msg_clone = msg.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                let _ = Self::save_message_idb(&mailbox_str, &msg_clone).await;
+            });
+
             let key = format!(
                 "lauda_cache_msg_{}_{}",
                 Self::sanitize_slug(mailbox),
@@ -871,13 +884,170 @@ impl LocalMessageCache {
     #[cfg(target_arch = "wasm32")]
     pub async fn open_rexie() -> Result<rexie::Rexie, std::io::Error> {
         rexie::Rexie::builder(Self::IDB_DATABASE_NAME)
-            .version(1)
-            .add_object_store(rexie::ObjectStore::new("mailboxes").key_path("name"))
-            .add_object_store(rexie::ObjectStore::new("envelopes").key_path("key"))
-            .add_object_store(rexie::ObjectStore::new("index_slices").key_path("mailbox"))
+            .version(Self::IDB_VERSION)
+            .add_object_store(rexie::ObjectStore::new(Self::IDB_STORE_MAILBOXES).key_path("name"))
+            .add_object_store(rexie::ObjectStore::new(Self::IDB_STORE_ENVELOPES).key_path("key"))
+            .add_object_store(rexie::ObjectStore::new(Self::IDB_STORE_INDEX_SLICES).key_path("mailbox"))
+            .add_object_store(rexie::ObjectStore::new(Self::IDB_STORE_MESSAGES).key_path("key"))
+            .add_object_store(rexie::ObjectStore::new(Self::IDB_STORE_ACTIONS).key_path("id"))
             .build()
             .await
             .map_err(|e| std::io::Error::other(e.to_string()))
+    }
+
+    /// Salva o corpo completo da mensagem de forma estruturada no IndexedDB (WASM).
+    #[cfg(target_arch = "wasm32")]
+    pub async fn save_message_idb(mailbox: &str, msg: &Message) -> std::io::Result<()> {
+        let rexie = Self::open_rexie().await?;
+        let tx = rexie
+            .transaction(&[Self::IDB_STORE_MESSAGES], rexie::TransactionMode::ReadWrite)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        let store = tx
+            .store(Self::IDB_STORE_MESSAGES)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+        let key = format!("{}/{}", Self::sanitize_slug(mailbox), msg.envelope.uid);
+        let msg_json = serde_json::to_string(msg)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+        #[derive(serde::Serialize)]
+        struct Record<'a> {
+            key: &'a str,
+            mailbox: &'a str,
+            uid: u32,
+            message_json: &'a str,
+        }
+
+        let record = Record {
+            key: &key,
+            mailbox,
+            uid: msg.envelope.uid,
+            message_json: &msg_json,
+        };
+
+        let json_str = serde_json::to_string(&record)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        let js_val = js_sys::JSON::parse(&json_str)
+            .map_err(|e| std::io::Error::other(format!("{e:?}")))?;
+
+        store
+            .put(&js_val, None)
+            .await
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        tx.done()
+            .await
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Carrega o corpo completo da mensagem diretamente do IndexedDB (WASM) com 0ms de latência.
+    #[cfg(target_arch = "wasm32")]
+    pub async fn load_message_idb(mailbox: &str, uid: u32) -> std::io::Result<Option<Message>> {
+        let rexie = Self::open_rexie().await?;
+        let tx = rexie
+            .transaction(&[Self::IDB_STORE_MESSAGES], rexie::TransactionMode::ReadOnly)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        let store = tx
+            .store(Self::IDB_STORE_MESSAGES)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+        let key_str = format!("{}/{}", Self::sanitize_slug(mailbox), uid);
+        let key = web_sys::wasm_bindgen::JsValue::from_str(&key_str);
+        let val = match store.get(key).await {
+            Ok(Some(v)) => v,
+            _ => return Ok(None),
+        };
+
+        if val.is_undefined() || val.is_null() {
+            return Ok(None);
+        }
+
+        let json_str: String = match js_sys::JSON::stringify(&val) {
+            Ok(s) => s.into(),
+            Err(_) => return Ok(None),
+        };
+
+        #[derive(serde::Deserialize)]
+        struct Record {
+            message_json: String,
+        }
+
+        if let Ok(rec) = serde_json::from_str::<Record>(&json_str)
+            && let Ok(msg) = serde_json::from_str::<Message>(&rec.message_json)
+        {
+            return Ok(Some(msg));
+        }
+
+        Ok(None)
+    }
+
+    /// Enfileira uma ação offline-first na store "actions" do IndexedDB (WASM).
+    #[cfg(target_arch = "wasm32")]
+    pub async fn enqueue_action_idb(action: &crate::domain::sync::QueuedAction) -> std::io::Result<()> {
+        let rexie = Self::open_rexie().await?;
+        let tx = rexie
+            .transaction(&[Self::IDB_STORE_ACTIONS], rexie::TransactionMode::ReadWrite)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        let store = tx
+            .store(Self::IDB_STORE_ACTIONS)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+        let json_str = serde_json::to_string(action)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        let js_val = js_sys::JSON::parse(&json_str)
+            .map_err(|e| std::io::Error::other(format!("{e:?}")))?;
+
+        store
+            .put(&js_val, None)
+            .await
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        tx.done()
+            .await
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Recupera todas as ações pendentes no IndexedDB (WASM).
+    #[cfg(target_arch = "wasm32")]
+    pub async fn list_actions_idb() -> std::io::Result<Vec<crate::domain::sync::QueuedAction>> {
+        let rexie = Self::open_rexie().await?;
+        let tx = rexie
+            .transaction(&[Self::IDB_STORE_ACTIONS], rexie::TransactionMode::ReadOnly)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        let store = tx
+            .store(Self::IDB_STORE_ACTIONS)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+        let all = store.get_all(None, None).await.map_err(|e| std::io::Error::other(e.to_string()))?;
+        let mut list = Vec::new();
+        for js_val in all {
+            if let Ok(json_str) = js_sys::JSON::stringify(&js_val) {
+                let s: String = json_str.into();
+                if let Ok(act) = serde_json::from_str::<crate::domain::sync::QueuedAction>(&s) {
+                    list.push(act);
+                }
+            }
+        }
+        Ok(list)
+    }
+
+    /// Remove uma ação completada da store "actions" do IndexedDB (WASM).
+    #[cfg(target_arch = "wasm32")]
+    pub async fn remove_action_idb(id: &str) -> std::io::Result<()> {
+        let rexie = Self::open_rexie().await?;
+        let tx = rexie
+            .transaction(&[Self::IDB_STORE_ACTIONS], rexie::TransactionMode::ReadWrite)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        let store = tx
+            .store(Self::IDB_STORE_ACTIONS)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+        let key = web_sys::wasm_bindgen::JsValue::from_str(id);
+        store.delete(key).await.map_err(|e| std::io::Error::other(e.to_string()))?;
+        tx.done()
+            .await
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        Ok(())
     }
 
     /// Salva assincronamente a fatia de documentos pré-indexados no IndexedDB (WASM).
