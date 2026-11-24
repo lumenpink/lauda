@@ -1,6 +1,6 @@
-use std::collections::HashSet;
 use dioxus::prelude::*;
 use lauda_types::{MailboxInfo, Message, MessageEnvelope, message::SignatureStatus};
+use std::collections::HashSet;
 
 use crate::adapters::HttpApiClient;
 use crate::domain::cache::{LocalMessageCache, get_default_cache_dir};

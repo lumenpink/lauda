@@ -1001,11 +1001,9 @@ fn test_optimistic_removal_mutation_coverage() {
 
 #[test]
 fn test_selection_contracts_and_range_logic() {
-    use std::collections::HashSet;
-    use lauda_client::domain::view::{
-        clear_selection, select_all, select_range, toggle_selection,
-    };
+    use lauda_client::domain::view::{clear_selection, select_all, select_range, toggle_selection};
     use lauda_types::MessageEnvelope;
+    use std::collections::HashSet;
 
     let mut selected = HashSet::new();
 
@@ -1017,11 +1015,26 @@ fn test_selection_contracts_and_range_logic() {
 
     // 2. Select range contíguo
     let envelopes = vec![
-        MessageEnvelope { uid: 1, ..Default::default() },
-        MessageEnvelope { uid: 2, ..Default::default() },
-        MessageEnvelope { uid: 3, ..Default::default() },
-        MessageEnvelope { uid: 4, ..Default::default() },
-        MessageEnvelope { uid: 5, ..Default::default() },
+        MessageEnvelope {
+            uid: 1,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 2,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 3,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 4,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 5,
+            ..Default::default()
+        },
     ];
 
     // Range de 2 a 4
@@ -1059,4 +1072,3 @@ fn test_selection_contracts_and_range_logic() {
     clear_selection(&mut selected);
     assert!(selected.is_empty());
 }
-

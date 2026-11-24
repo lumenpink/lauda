@@ -740,10 +740,7 @@ pub fn select_range(
 }
 
 /// Seleciona todas as mensagens visíveis da lista fornecida.
-pub fn select_all(
-    messages: &[MessageEnvelope],
-    selected: &mut std::collections::HashSet<u32>,
-) {
+pub fn select_all(messages: &[MessageEnvelope], selected: &mut std::collections::HashSet<u32>) {
     for m in messages {
         selected.insert(m.uid);
     }
@@ -753,4 +750,3 @@ pub fn select_all(
 pub fn clear_selection(selected: &mut std::collections::HashSet<u32>) {
     selected.clear();
 }
-
