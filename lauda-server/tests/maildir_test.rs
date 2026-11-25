@@ -708,3 +708,13 @@ async fn test_maildir_search_does_not_perform_blocking_reconcile() {
         "Busca vazia deve listar os envelopes físicos disponíveis"
     );
 }
+
+#[test]
+fn test_maildir_perf_budget_contract() {
+    let budget = maildir_perf_budget();
+    if cfg!(debug_assertions) {
+        assert_eq!(budget, std::time::Duration::from_secs(5));
+    } else {
+        assert_eq!(budget, std::time::Duration::from_millis(500));
+    }
+}
