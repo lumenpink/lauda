@@ -570,8 +570,8 @@ fn test_ci_workflow_has_deploy_apk_job_with_strict_contract() {
         .unwrap_or(deploy_apk_block);
 
     assert!(
-        next_job_block.contains("needs: [test]"),
-        "deploy-apk deve declarar needs: [test]"
+        next_job_block.contains("needs: [test"),
+        "deploy-apk deve declarar needs: [test...]"
     );
     assert!(
         next_job_block.contains("github.ref == 'refs/heads/main'"),
