@@ -10,6 +10,6 @@ Em `scripts/package-all.sh`, quando `--apk` era passado em um ambiente sem `dx`,
   - *Motivo:* Reutilizar um APK antigo sob um rótulo de versão novo quebra a integridade da entrega na Pratilera.
 
 ### 3. Critérios de Aceite
-- [ ] `scripts/package-all.sh` não possui fallback `"mantendo APK existente"`.
-- [ ] `scripts/package-all.sh` aborta com `exit 1` caso `dx`, `aarch64-linux-android` ou NDK falte.
-- [ ] Teste automatizado valida a ausência do fallback e o fail-fast.
+- [x] `scripts/package-all.sh` não possui fallback `"mantendo APK existente"`.
+- [x] `scripts/package-all.sh` aborta com `exit 1` caso `dx`, `aarch64-linux-android` ou NDK falte.
+- [x] Teste automatizado valida a ausência do fallback e o fail-fast.
