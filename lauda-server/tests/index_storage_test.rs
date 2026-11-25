@@ -171,3 +171,46 @@ fn test_purge_mismatched_dimensions_contract() {
     assert!(remaining.contains(&10));
     assert!(!remaining.contains(&20));
 }
+
+#[test]
+fn test_purge_mismatched_dimensions_mutation_coverage() {
+    let temp = tempdir().expect("tempdir");
+    let db_path = temp.path().join("test_purge_mut.db");
+    let store = SqliteIndexStore::open(&db_path).expect("abrir sqlite index");
+
+    // 1. Banco vazio retorna 0 sem erros
+    assert_eq!(store.purge_mismatched_dimensions(384).unwrap(), 0);
+
+    // 2. Documento ja na dimensao esperada nao deve ser expurgado
+    struct MockProvider384;
+    impl lauda_index::EmbeddingProvider for MockProvider384 {
+        fn embed(&self, _text: &str) -> Vec<f32> {
+            vec![0.5; 384]
+        }
+    }
+    let msg = Message {
+        envelope: MessageEnvelope {
+            uid: 55,
+            subject: "Preservado".to_string(),
+            sender: "c@2lp.in".to_string(),
+            date: "2026-11-24T12:00:00Z".to_string(),
+            cc: None,
+            has_attachments: false,
+            is_read: true,
+            is_flagged: false,
+            crypto_meta: None,
+        },
+        attachments: vec![],
+        txt_auto: Some("Texto preservado".to_string()),
+        txt_original: None,
+        html_sanitized: None,
+    };
+    let mut idx = MessageIndex::new();
+    idx.index_message_semantic("INBOX", &msg, &MockProvider384);
+    for doc in idx.documents().values() {
+        store.save_document("INBOX", doc, 200).unwrap();
+    }
+
+    assert_eq!(store.purge_mismatched_dimensions(384).unwrap(), 0);
+    assert!(store.get_indexed_uids("INBOX").unwrap().contains(&55));
+}
