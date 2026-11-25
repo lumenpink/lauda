@@ -1126,6 +1126,33 @@ fn test_selection_and_range_mutation_coverage() {
 }
 
 #[test]
+fn test_mobile_responsive_layout_contracts() {
+    use lauda_client::domain::view::{
+        MOBILE_SAFE_BUTTON_NOWRAP, MOBILE_SAFE_ELLIPSIS_TEXT, MOBILE_SAFE_FLEX_ROW,
+        mobile_card_style,
+    };
+
+    assert!(MOBILE_SAFE_FLEX_ROW.contains("flex-wrap: wrap"));
+    assert!(MOBILE_SAFE_ELLIPSIS_TEXT.contains("min-width: 0"));
+    assert!(MOBILE_SAFE_ELLIPSIS_TEXT.contains("text-overflow: ellipsis"));
+    assert!(MOBILE_SAFE_ELLIPSIS_TEXT.contains("white-space: nowrap"));
+    assert!(MOBILE_SAFE_BUTTON_NOWRAP.contains("white-space: nowrap"));
+
+    let selected_style = mobile_card_style(true, false);
+    assert!(selected_style.contains("box-sizing: border-box"));
+    assert!(selected_style.contains("max-width: 100%"));
+    assert!(selected_style.contains("#dc143c"));
+
+    let unread_style = mobile_card_style(false, true);
+    assert!(unread_style.contains("box-sizing: border-box"));
+    assert!(unread_style.contains("max-width: 100%"));
+
+    let read_style = mobile_card_style(false, false);
+    assert!(read_style.contains("box-sizing: border-box"));
+    assert!(read_style.contains("max-width: 100%"));
+}
+
+#[test]
 fn test_batch_offline_actions_contracts() {
     use lauda_client::domain::sync::{
         ActionType, apply_batch_flag_status, apply_batch_read_status, apply_batch_removal,
