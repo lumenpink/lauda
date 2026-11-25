@@ -26,4 +26,10 @@ Em auditoria via Playwright no viewport mobile `375x812`, o `InboxView` apresent
 ---
 
 ## 4. Laudo de Fechamento e Homologação
-*(A preencher na Fase 8 - Quality Gate)*
+- **Status:** Concluído e Aprovado no Quality Gate (Fase 8).
+- **Implementação:**
+  - Helpers mobile-safe em `domain/view.rs`: `MOBILE_SAFE_FLEX_ROW`, `MOBILE_SAFE_BUTTON_NOWRAP`, `MOBILE_SAFE_ELLIPSIS_TEXT` e `mobile_card_style`.
+  - Ajustes de `flex-wrap: wrap`, `white-space: nowrap` nos botões, `min-width: 0; overflow: hidden; text-overflow: ellipsis` no remetente e `overflow-wrap: anywhere` no assunto em `inbox_view.rs`, `message_view.rs`, `compose_view.rs` e `calendar_view.rs`.
+- **Validação:** 28/28 testes aprovados em `client_test.rs`, `cargo fmt --check` e `cargo clippy --all-targets -- -D warnings` aprovados sem alertas.
+- **Data:** 2026-11-25
+- **Fechamento:** Fase 9 concluída com sucesso.
