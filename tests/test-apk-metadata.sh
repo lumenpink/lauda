@@ -120,4 +120,11 @@ if grep -q "Trigger Pratilera Store Update" "$CI_WORKFLOW"; then
 fi
 echo "✅ Publicação de APK via Generic Packages validada com sucesso!"
 
+echo "-> Validando ausência de fallback silencioso em scripts/package-all.sh..."
+if grep -q "mantendo APK existente" "$REPO_ROOT/scripts/package-all.sh"; then
+    echo "ERRO: scripts/package-all.sh não deve manter APK antigo silenciosamente quando NDK/SDK faltar."
+    exit 1
+fi
+echo "✅ Fail-fast de ambiente Android validado em scripts/package-all.sh!"
+
 echo "🎉 Todos os testes de metadados do APK passaram!"
