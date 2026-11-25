@@ -1171,6 +1171,65 @@ fn test_mobile_responsive_layout_mutation_coverage() {
 }
 
 #[test]
+fn test_reconcile_ui_messages_preserving_pending_contract() {
+    use lauda_client::domain::sync::{
+        ActionType, QueuedAction, reconcile_ui_messages_preserving_pending,
+    };
+    use lauda_types::MessageEnvelope;
+
+    let server_msgs = vec![
+        MessageEnvelope {
+            uid: 10,
+            is_read: false,
+            is_flagged: false,
+            ..Default::default()
+        },
+        MessageEnvelope {
+            uid: 20,
+            is_read: false,
+            is_flagged: false,
+            ..Default::default()
+        },
+    ];
+
+    let pending = vec![
+        QueuedAction {
+            id: "INBOX_10_1".to_string(),
+            uid: 10,
+            mailbox: "INBOX".to_string(),
+            action: ActionType::MarkRead { read: true },
+            created_at_unix: 100,
+        },
+        QueuedAction {
+            id: "INBOX_10_2".to_string(),
+            uid: 10,
+            mailbox: "INBOX".to_string(),
+            action: ActionType::MarkFlagged { flagged: true },
+            created_at_unix: 101,
+        },
+        QueuedAction {
+            id: "INBOX_20_3".to_string(),
+            uid: 20,
+            mailbox: "INBOX".to_string(),
+            action: ActionType::Delete,
+            created_at_unix: 102,
+        },
+    ];
+
+    let reconciled =
+        reconcile_ui_messages_preserving_pending("INBOX", "INBOX", &[], &server_msgs, &pending)
+            .expect("deve produzir lista reconciliada");
+
+    assert_eq!(reconciled.len(), 1);
+    assert_eq!(reconciled[0].uid, 10);
+    assert!(
+        reconciled[0].is_read,
+        "Acao pendente MarkRead deve ser preservada sobre resposta atrasada do servidor"
+    );
+    assert!(reconciled[0].is_flagged);
+}
+
+#[test]
 fn test_batch_offline_actions_contracts() {
     use lauda_client::domain::sync::{
         ActionType, apply_batch_flag_status, apply_batch_read_status, apply_batch_removal,
