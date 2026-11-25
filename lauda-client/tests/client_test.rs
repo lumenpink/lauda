@@ -1153,6 +1153,24 @@ fn test_mobile_responsive_layout_contracts() {
 }
 
 #[test]
+fn test_mobile_responsive_layout_mutation_coverage() {
+    use lauda_client::domain::view::{MOBILE_SAFE_ELLIPSIS_TEXT, mobile_card_style};
+
+    let sel = mobile_card_style(true, false);
+    let sel_unread = mobile_card_style(true, true);
+    let unread = mobile_card_style(false, true);
+    let read = mobile_card_style(false, false);
+
+    assert_eq!(sel, sel_unread, "Selecionado prevalece sobre nao lido");
+    assert_ne!(sel, unread);
+    assert_ne!(unread, read);
+    assert!(sel.contains("overflow: hidden"));
+    assert!(unread.contains("overflow: hidden"));
+    assert!(read.contains("overflow: hidden"));
+    assert!(MOBILE_SAFE_ELLIPSIS_TEXT.contains("overflow: hidden"));
+}
+
+#[test]
 fn test_batch_offline_actions_contracts() {
     use lauda_client::domain::sync::{
         ActionType, apply_batch_flag_status, apply_batch_read_status, apply_batch_removal,
