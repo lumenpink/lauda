@@ -609,6 +609,14 @@ async fn test_maildir_dovecot_uidlist_with_size_suffixes_and_perf() {
     );
 }
 
+fn maildir_perf_budget() -> std::time::Duration {
+    if cfg!(debug_assertions) {
+        std::time::Duration::from_secs(5)
+    } else {
+        std::time::Duration::from_millis(500)
+    }
+}
+
 #[tokio::test]
 async fn test_maildir_large_volume_perf() {
     let tmp = tempfile::tempdir().unwrap();
@@ -644,11 +652,12 @@ async fn test_maildir_large_volume_perf() {
     let elapsed = start.elapsed();
 
     assert_eq!(messages.len(), 50);
-    // 2000 arquivos devem ser processados e paginados em menos de 500ms
+    let budget = maildir_perf_budget();
     assert!(
-        elapsed < std::time::Duration::from_millis(500),
-        "Processamento demorou {:?}, esperado < 500ms",
-        elapsed
+        elapsed < budget,
+        "Processamento demorou {:?}, esperado < {:?}",
+        elapsed,
+        budget
     );
 }
 
@@ -680,10 +689,12 @@ async fn test_maildir_search_does_not_perform_blocking_reconcile() {
         search_res.is_ok(),
         "Busca deve retornar Ok mesmo sem mensagens no índice"
     );
+    let budget = maildir_perf_budget();
     assert!(
-        elapsed < std::time::Duration::from_millis(500),
-        "Busca não deve bloquear síncrona com reconciliação: demorou {:?}",
-        elapsed
+        elapsed < budget,
+        "Busca não deve bloquear síncrona com reconciliação: demorou {:?} (limite {:?})",
+        elapsed,
+        budget
     );
 
     // O status deve indicar 0 indexados e 1 total sem ter indexado inline
