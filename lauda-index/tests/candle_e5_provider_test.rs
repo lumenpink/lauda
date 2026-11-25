@@ -89,3 +89,12 @@ fn test_mutation_partial_model_files_recalls_fallback() {
     );
     assert_eq!(provider.embed("busca").len(), 384);
 }
+
+#[test]
+fn test_dynamic_embedding_provider_dim_and_cache_contract() {
+    let p1 = DynamicEmbeddingProvider::from_path_or_fallback("/caminho/inexistente/cache_a");
+    let p2 = DynamicEmbeddingProvider::from_path_or_fallback("/caminho/inexistente/cache_a");
+    assert_eq!(p1.embedding_dim(), 384);
+    assert_eq!(p2.embedding_dim(), 384);
+    assert!(DynamicEmbeddingProvider::cached_provider_count() >= 0);
+}

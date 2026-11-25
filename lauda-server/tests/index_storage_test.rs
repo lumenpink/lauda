@@ -106,3 +106,45 @@ fn test_sqlite_index_store_crud_and_reconciliation() {
     assert_eq!(slice.len(), 1);
     assert_eq!(slice[0].uid, 201);
 }
+
+#[test]
+fn test_purge_mismatched_dimensions_contract() {
+    let temp = tempdir().expect("tempdir");
+    let db_path = temp.path().join("test_purge_dim.db");
+    let store = SqliteIndexStore::open(&db_path).expect("abrir sqlite index");
+
+    let doc_384 = lauda_index::IndexedDoc {
+        uid: 10,
+        subject: "Doc 384d".to_string(),
+        sender: "a@2lp.in".to_string(),
+        date: "2026-11-24T10:00:00Z".to_string(),
+        has_attachments: false,
+        is_read: true,
+        is_flagged: false,
+        doc_len: 2,
+        term_frequencies: std::collections::HashMap::new(),
+        segment_embeddings: vec![vec![0.1; 384]],
+    };
+    let doc_768 = lauda_index::IndexedDoc {
+        uid: 20,
+        subject: "Doc 768d".to_string(),
+        sender: "b@2lp.in".to_string(),
+        date: "2026-11-24T11:00:00Z".to_string(),
+        has_attachments: false,
+        is_read: false,
+        is_flagged: false,
+        doc_len: 2,
+        term_frequencies: std::collections::HashMap::new(),
+        segment_embeddings: vec![vec![0.2; 768]],
+    };
+
+    store.save_document("INBOX", &doc_384, 100).unwrap();
+    store.save_document("INBOX", &doc_768, 101).unwrap();
+
+    let purged = store.purge_mismatched_dimensions(384).expect("purgar dimensoes");
+    assert_eq!(purged, 1, "Deve expurgar exatamente o documento 768d");
+
+    let remaining = store.get_indexed_uids("INBOX").unwrap();
+    assert!(remaining.contains(&10));
+    assert!(!remaining.contains(&20));
+}
