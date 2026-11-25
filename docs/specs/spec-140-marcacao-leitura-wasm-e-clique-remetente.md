@@ -38,4 +38,11 @@ pub fn reconcile_ui_messages_preserving_pending(
 ---
 
 ## 5. Laudo de Fechamento e Homologação
-*(A preencher na Fase 8 - Quality Gate)*
+- **Status:** Concluído e Aprovado no Quality Gate (Fase 8).
+- **Implementação:**
+  - `reconcile_ui_messages_preserving_pending` em `lauda-client/src/domain/sync.rs` preservando `MarkRead`, `MarkFlagged`, `Delete` e `Move` pendentes.
+  - Flush da fila IndexedDB (`list_actions_idb`) movido para antes de `list_messages` no loop de sincronização WASM em `lauda-client/src/ui/mod.rs`.
+  - Alvo `onclick` com `e.stop_propagation()` restrito ao marcador de status (`●`/`○`/`[✓]`) em `lauda-client/src/ui/inbox_view.rs`.
+- **Validação:** 30/30 testes aprovados em `client_test.rs`, `cargo fmt --check` e `cargo clippy --all-targets -- -D warnings` aprovados sem alertas.
+- **Data:** 2026-11-25
+- **Fechamento:** Fase 9 concluída com sucesso.
