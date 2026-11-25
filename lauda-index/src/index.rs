@@ -22,6 +22,11 @@ pub trait EmbeddingProvider: Send + Sync {
     fn embed_passage(&self, passage: &str) -> Vec<f32> {
         self.embed(passage)
     }
+
+    /// Dimensão vetorial gerada por este provedor (ex: 384 para e5-small, 768 para e5-base).
+    fn embedding_dim(&self) -> usize {
+        384
+    }
 }
 
 /// Envoltório que aplica as instruções assimétricas de prefixo padrão do modelo E5.
@@ -73,14 +78,34 @@ impl std::fmt::Debug for DynamicEmbeddingProvider {
     }
 }
 
+static PROVIDER_CACHE: std::sync::LazyLock<
+    std::sync::RwLock<HashMap<std::path::PathBuf, DynamicEmbeddingProvider>>,
+> = std::sync::LazyLock::new(|| std::sync::RwLock::new(HashMap::new()));
+
 impl DynamicEmbeddingProvider {
     /// Inicializa a variante neural com um provedor neural de inferência.
     pub fn new_neural(provider: std::sync::Arc<dyn EmbeddingProvider>) -> Self {
         Self::Neural(provider)
     }
 
+    /// Retorna quantos provedores neurais estão cacheados em memória no processo atual.
+    pub fn cached_provider_count() -> usize {
+        PROVIDER_CACHE
+            .read()
+            .map(|guard| guard.len())
+            .unwrap_or(0)
+    }
+
     pub fn from_path_or_fallback<P: AsRef<Path>>(path: P) -> Self {
         let p = path.as_ref();
+        let cache_key = std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+
+        if let Ok(guard) = PROVIDER_CACHE.read()
+            && let Some(cached) = guard.get(&cache_key)
+        {
+            return cached.clone();
+        }
+
         let (weights, tokenizer) = if p.is_dir() {
             (p.join("model.safetensors"), p.join("tokenizer.json"))
         } else {
@@ -92,7 +117,13 @@ impl DynamicEmbeddingProvider {
             #[cfg(feature = "candle")]
             {
                 match crate::candle_provider::CandleEmbeddingProvider::load(p) {
-                    Ok(provider) => Self::Neural(std::sync::Arc::new(provider)),
+                    Ok(provider) => {
+                        let instance = Self::Neural(std::sync::Arc::new(provider));
+                        if let Ok(mut guard) = PROVIDER_CACHE.write() {
+                            guard.insert(cache_key, instance.clone());
+                        }
+                        instance
+                    }
                     Err(_) => Self::Fallback(SimpleCpuEmbeddingProvider),
                 }
             }
@@ -111,6 +142,14 @@ impl DynamicEmbeddingProvider {
 
     pub fn is_neural(&self) -> bool {
         matches!(self, Self::Neural(_))
+    }
+
+    /// Retorna a dimensão vetorial do provedor ativo.
+    pub fn embedding_dim(&self) -> usize {
+        match self {
+            Self::Fallback(p) => p.embedding_dim(),
+            Self::Neural(p) => p.embedding_dim(),
+        }
     }
 }
 

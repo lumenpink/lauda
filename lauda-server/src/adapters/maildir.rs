@@ -323,6 +323,21 @@ impl MaildirBackend {
                 interval_secs
             );
 
+            let model_path = std::env::var("LAUDA_MODEL_PATH")
+                .unwrap_or_else(|_| "models/multilingual-e5-small".to_string());
+            let startup_provider =
+                lauda_index::DynamicEmbeddingProvider::from_path_or_fallback(&model_path);
+            if let Some(ref store) = self.sqlite_index
+                && let Ok(purged) = store.purge_mismatched_dimensions(startup_provider.embedding_dim())
+                && purged > 0
+            {
+                tracing::info!(
+                    "Expurgados {} documentos com dimensão divergente (esperado: {}d); reindexação agendada",
+                    purged,
+                    startup_provider.embedding_dim()
+                );
+            }
+
             loop {
                 let mailboxes = vec!["INBOX".to_string()];
                 for mailbox in &mailboxes {

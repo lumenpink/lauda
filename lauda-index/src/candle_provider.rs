@@ -207,4 +207,8 @@ impl EmbeddingProvider for CandleEmbeddingProvider {
     fn embed(&self, text: &str) -> Vec<f32> {
         self.infer(text).unwrap_or_else(|_| vec![0.0f32; self.dim])
     }
+
+    fn embedding_dim(&self) -> usize {
+        self.dim
+    }
 }

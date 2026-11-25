@@ -270,6 +270,64 @@ impl SqliteIndexStore {
         Self::init_schema_on_conn(&self.write_conn)
     }
 
+    /// Remove documentos indexados cuja dimensão vetorial divirja de `expected_dim`,
+    /// limpando os índices `FlatVectorIndex` incompatíveis em RAM para reindexação automática.
+    pub fn purge_mismatched_dimensions(&self, expected_dim: usize) -> Result<usize, rusqlite::Error> {
+        let mut to_purge: Vec<(String, u32)> = Vec::new();
+        {
+            let conn = self.write_conn.lock().unwrap();
+            let mut stmt = conn.prepare(
+                "SELECT mailbox, uid, embeddings_blob FROM indexed_documents WHERE embeddings_blob IS NOT NULL",
+            )?;
+            let rows = stmt.query_map([], |row| {
+                let mailbox: String = row.get(0)?;
+                let uid: u32 = row.get(1)?;
+                let blob: Vec<u8> = row.get(2)?;
+                Ok((mailbox, uid, blob))
+            })?;
+
+            for r in rows.flatten() {
+                let (mailbox, uid, blob) = r;
+                if blob.is_empty() {
+                    continue;
+                }
+                let segments = decode_segment_embeddings(&blob);
+                if let Some(rep_vec) = extract_representative_vector(&segments)
+                    && rep_vec.len() != expected_dim
+                {
+                    to_purge.push((mailbox, uid));
+                }
+            }
+        }
+
+        if to_purge.is_empty() {
+            return Ok(0);
+        }
+
+        let purged_count = to_purge.len();
+        {
+            let mut conn = self.write_conn.lock().unwrap();
+            let tx = conn.transaction()?;
+            for (mailbox, uid) in &to_purge {
+                tx.execute(
+                    "DELETE FROM indexed_documents WHERE mailbox = ?1 AND uid = ?2",
+                    rusqlite::params![mailbox, uid],
+                )?;
+                tx.execute(
+                    "DELETE FROM inverted_index WHERE mailbox = ?1 AND uid = ?2",
+                    rusqlite::params![mailbox, uid],
+                )?;
+            }
+            tx.commit()?;
+        }
+
+        if let Ok(mut lock) = self.vector_indexes.write() {
+            lock.retain(|_, idx| idx.dim() == expected_dim);
+        }
+
+        Ok(purged_count)
+    }
+
     /// Salva ou atualiza um documento indexado no SQLite.
     pub fn save_document(
         &self,
