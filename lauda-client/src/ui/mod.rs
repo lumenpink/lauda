@@ -270,6 +270,41 @@ pub fn App() -> Element {
                         }
                     }
 
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        if let Ok(pending_actions) =
+                            crate::domain::cache::LocalMessageCache::list_actions_idb().await
+                        {
+                            for act in pending_actions {
+                                let res = match act.action {
+                                    crate::domain::sync::ActionType::MarkRead { read } => {
+                                        client.mark_read(&token, &act.mailbox, act.uid, read).await
+                                    }
+                                    crate::domain::sync::ActionType::MarkFlagged { flagged } => {
+                                        client
+                                            .mark_flagged(&token, &act.mailbox, act.uid, flagged)
+                                            .await
+                                    }
+                                    crate::domain::sync::ActionType::Move { ref dest_box } => {
+                                        client
+                                            .move_message(&token, act.uid, &act.mailbox, dest_box)
+                                            .await
+                                    }
+                                    crate::domain::sync::ActionType::Delete => {
+                                        client.delete_message(&token, &act.mailbox, act.uid).await
+                                    }
+                                };
+                                if res.is_ok() {
+                                    let _ =
+                                        crate::domain::cache::LocalMessageCache::remove_action_idb(
+                                            &act.id,
+                                        )
+                                        .await;
+                                }
+                            }
+                        }
+                    }
+
                     // 3. Revalidação das caixas e mensagens com o servidor
                     let active_box = current_mailbox.read().clone();
                     match client.list_mailboxes(&token).await {
@@ -307,13 +342,21 @@ pub fn App() -> Element {
                         #[cfg(not(target_arch = "wasm32"))]
                         let _ = cache.save_envelopes(&active_box, &server_msgs);
                         let cur_box = current_mailbox.read().clone();
+                        #[cfg(not(target_arch = "wasm32"))]
+                        let pending_for_reconcile = actions.list().unwrap_or_default();
+                        #[cfg(target_arch = "wasm32")]
+                        let pending_for_reconcile =
+                            crate::domain::cache::LocalMessageCache::list_actions_idb()
+                                .await
+                                .unwrap_or_default();
                         let fresh_opt = {
                             let cur_msgs = messages.read();
-                            crate::domain::sync::reconcile_ui_messages(
+                            crate::domain::sync::reconcile_ui_messages_preserving_pending(
                                 &cur_box,
                                 &active_box,
                                 &cur_msgs,
                                 &server_msgs,
+                                &pending_for_reconcile,
                             )
                         };
                         if let Some(fresh) = fresh_opt {
@@ -409,37 +452,6 @@ pub fn App() -> Element {
 
                     #[cfg(target_arch = "wasm32")]
                     {
-                        if let Ok(pending_actions) =
-                            crate::domain::cache::LocalMessageCache::list_actions_idb().await
-                        {
-                            for act in pending_actions {
-                                let res = match act.action {
-                                    crate::domain::sync::ActionType::MarkRead { read } => {
-                                        client.mark_read(&token, &act.mailbox, act.uid, read).await
-                                    }
-                                    crate::domain::sync::ActionType::MarkFlagged { flagged } => {
-                                        client
-                                            .mark_flagged(&token, &act.mailbox, act.uid, flagged)
-                                            .await
-                                    }
-                                    crate::domain::sync::ActionType::Move { ref dest_box } => {
-                                        client
-                                            .move_message(&token, act.uid, &act.mailbox, dest_box)
-                                            .await
-                                    }
-                                    crate::domain::sync::ActionType::Delete => {
-                                        client.delete_message(&token, &act.mailbox, act.uid).await
-                                    }
-                                };
-                                if res.is_ok() {
-                                    let _ =
-                                        crate::domain::cache::LocalMessageCache::remove_action_idb(
-                                            &act.id,
-                                        )
-                                        .await;
-                                }
-                            }
-                        }
                         crate::domain::time::async_sleep(std::time::Duration::from_secs(10)).await;
                     }
                     if session.read().token.is_none() {

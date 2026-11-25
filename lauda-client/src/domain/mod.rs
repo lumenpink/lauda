@@ -29,7 +29,7 @@ pub use sync::{
     apply_batch_read_status, apply_batch_removal, apply_optimistic_removal, calculate_next_backoff,
     create_batch_queued_actions, create_queued_action, detect_new_unread_messages,
     prefetch_missing_bodies, prefetch_missing_bodies_with_progress, reconcile_ui_messages,
-    sync_all_cycle, sync_all_cycle_with_progress,
+    reconcile_ui_messages_preserving_pending, sync_all_cycle, sync_all_cycle_with_progress,
 };
 pub use time::{async_sleep, current_unix_timestamp};
 pub use update::{UpdateManifest, UpdateStatus, check_update, fetch_remote_manifest};

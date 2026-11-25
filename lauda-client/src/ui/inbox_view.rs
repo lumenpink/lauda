@@ -1117,31 +1117,35 @@ pub fn InboxView(
                                     div {
                                         style: "display: flex; justify-content: space-between; align-items: flex-start; gap: 0.4rem; flex-wrap: wrap; max-width: 100%;",
                                         div {
-                                            style: "display: flex; align-items: center; gap: 0.5rem; cursor: pointer; min-width: 0; flex: 1 1 140px; max-width: 100%;",
-                                            onclick: move |e| {
-                                                e.stop_propagation();
-                                                if e.modifiers().shift() {
-                                                    if let Some(last_uid) = *last_interacted_uid.read() {
-                                                        crate::domain::view::select_range(
-                                                            &msgs_bullet,
-                                                            last_uid,
-                                                            uid,
-                                                            &mut selected_uids.write(),
-                                                        );
+                                            style: "display: flex; align-items: center; gap: 0.5rem; min-width: 0; flex: 1 1 140px; max-width: 100%;",
+                                            span {
+                                                style: "display: inline-flex; align-items: center; cursor: pointer; flex-shrink: 0; padding: 0.15rem 0.25rem 0.15rem 0;",
+                                                title: "Selecionar mensagem",
+                                                onclick: move |e| {
+                                                    e.stop_propagation();
+                                                    if e.modifiers().shift() {
+                                                        if let Some(last_uid) = *last_interacted_uid.read() {
+                                                            crate::domain::view::select_range(
+                                                                &msgs_bullet,
+                                                                last_uid,
+                                                                uid,
+                                                                &mut selected_uids.write(),
+                                                            );
+                                                        } else {
+                                                            crate::domain::view::toggle_selection(&mut selected_uids.write(), uid);
+                                                        }
                                                     } else {
                                                         crate::domain::view::toggle_selection(&mut selected_uids.write(), uid);
                                                     }
+                                                    last_interacted_uid.set(Some(uid));
+                                                },
+                                                if is_selected {
+                                                    span { style: "color: #dc143c; font-size: 1.1rem; font-weight: bold;", "[✓]" }
+                                                } else if unread {
+                                                    span { style: "color: #dc143c; font-size: 1.1rem;", "●" }
                                                 } else {
-                                                    crate::domain::view::toggle_selection(&mut selected_uids.write(), uid);
+                                                    span { style: "color: #999; font-size: 1.1rem;", "○" }
                                                 }
-                                                last_interacted_uid.set(Some(uid));
-                                            },
-                                            if is_selected {
-                                                span { style: "color: #dc143c; font-size: 1.1rem; font-weight: bold; flex-shrink: 0;", "[✓]" }
-                                            } else if unread {
-                                                span { style: "color: #dc143c; font-size: 1.1rem; flex-shrink: 0;", "●" }
-                                            } else {
-                                                span { style: "color: #999; font-size: 1.1rem; flex-shrink: 0;", "○" }
                                             }
                                             span { style: crate::domain::view::MOBILE_SAFE_ELLIPSIS_TEXT, "{sender}" }
                                         }

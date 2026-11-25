@@ -1230,6 +1230,56 @@ fn test_reconcile_ui_messages_preserving_pending_contract() {
 }
 
 #[test]
+fn test_reconcile_ui_messages_preserving_pending_mutation_coverage() {
+    use lauda_client::domain::sync::{
+        ActionType, QueuedAction, reconcile_ui_messages_preserving_pending,
+    };
+    use lauda_types::MessageEnvelope;
+
+    let server_msgs = vec![MessageEnvelope {
+        uid: 50,
+        is_read: false,
+        ..Default::default()
+    }];
+    let other_box_action = vec![QueuedAction {
+        id: "Sent_50_1".to_string(),
+        uid: 50,
+        mailbox: "Sent".to_string(),
+        action: ActionType::MarkRead { read: true },
+        created_at_unix: 100,
+    }];
+
+    // Acao de outra caixa ("Sent") nao deve afetar "INBOX"
+    let res = reconcile_ui_messages_preserving_pending(
+        "INBOX",
+        "INBOX",
+        &[],
+        &server_msgs,
+        &other_box_action,
+    )
+    .unwrap();
+    assert!(!res[0].is_read);
+
+    // Caixa divergente retorna None
+    assert!(
+        reconcile_ui_messages_preserving_pending(
+            "INBOX",
+            "Archive",
+            &[],
+            &server_msgs,
+            &other_box_action,
+        )
+        .is_none()
+    );
+
+    // Lista do servidor vazia retorna None
+    assert!(
+        reconcile_ui_messages_preserving_pending("INBOX", "INBOX", &[], &[], &other_box_action)
+            .is_none()
+    );
+}
+
+#[test]
 fn test_batch_offline_actions_contracts() {
     use lauda_client::domain::sync::{
         ActionType, apply_batch_flag_status, apply_batch_read_status, apply_batch_removal,

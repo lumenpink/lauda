@@ -62,11 +62,52 @@ pub fn reconcile_ui_messages(
     current_view_messages: &[MessageEnvelope],
     cached_messages: &[MessageEnvelope],
 ) -> Option<Vec<MessageEnvelope>> {
-    if current_box != synced_box {
+    reconcile_ui_messages_preserving_pending(
+        current_box,
+        synced_box,
+        current_view_messages,
+        cached_messages,
+        &[],
+    )
+}
+
+/// Reconcilia mensagens da UI com a lista remota/cache preservando mutações locais ainda
+/// pendentes na fila offline (`MarkRead`, `MarkFlagged`, `Delete`, `Move`).
+pub fn reconcile_ui_messages_preserving_pending(
+    current_box: &str,
+    synced_box: &str,
+    current_view_messages: &[MessageEnvelope],
+    cached_messages: &[MessageEnvelope],
+    pending_actions: &[QueuedAction],
+) -> Option<Vec<MessageEnvelope>> {
+    if current_box != synced_box || cached_messages.is_empty() {
         return None;
     }
-    if !cached_messages.is_empty() && current_view_messages != cached_messages {
-        Some(cached_messages.to_vec())
+
+    let mut merged = cached_messages.to_vec();
+    for act in pending_actions {
+        if act.mailbox != current_box {
+            continue;
+        }
+        match &act.action {
+            ActionType::MarkRead { read } => {
+                if let Some(m) = merged.iter_mut().find(|m| m.uid == act.uid) {
+                    m.is_read = *read;
+                }
+            }
+            ActionType::MarkFlagged { flagged } => {
+                if let Some(m) = merged.iter_mut().find(|m| m.uid == act.uid) {
+                    m.is_flagged = *flagged;
+                }
+            }
+            ActionType::Delete | ActionType::Move { .. } => {
+                merged.retain(|m| m.uid != act.uid);
+            }
+        }
+    }
+
+    if current_view_messages != merged.as_slice() {
+        Some(merged)
     } else {
         None
     }
