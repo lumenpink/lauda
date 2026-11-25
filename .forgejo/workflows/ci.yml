@@ -241,10 +241,16 @@ jobs:
         env:
           GAMBI_2LP_IN_TOKEN: ${{ secrets.REGISTRY_TOKEN || secrets.GAMBI_2LP_IN_TOKEN || secrets.FORGEJO_TOKEN }}
         run: |
+          UPLOADED=0
           for apk in target/dist/apk/*.apk site/*.apk; do
             [ -f "$apk" ] || continue
             cccp package upload "$apk"
+            UPLOADED=$((UPLOADED + 1))
           done
+          if [ "$UPLOADED" -eq 0 ]; then
+            echo "❌ ERRO CRÍTICO: Nenhum APK Android encontrado para upload nos Generic Packages." >&2
+            exit 1
+          fi
 
   deploy-server:
     name: "Container — Build Container — Build & Sovereign CD (obizero) Autonomous CD (obizero)"

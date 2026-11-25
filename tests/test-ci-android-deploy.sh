@@ -55,7 +55,7 @@ check_present "$PUBLISH_SCRIPT" 'LLVM_STRIP="?\$\{ANDROID_NDK_HOME\}' "LLVM_STRI
 # 5. Execução estrita do empacotamento na CI (#65)
 check_not_present "$WORKFLOW" '\./scripts/package-all\.sh --apk \|\| true' "Execucao estrita de package-all.sh --apk sem mascaramento || true"
 check_not_present "$PACKAGE_SCRIPT" 'publish-nightly\.sh"\s*\|\|\s*echo' "Execucao estrita de publish-nightly.sh sem mascaramento || echo"
-check_present "$WORKFLOW" 'Nenhum APK Android encontrado para upload no Cloudflare R2' "Fail-fast no upload R2 quando APK estiver ausente"
+check_present "$WORKFLOW" 'Nenhum APK Android encontrado para upload nos Generic Packages' "Fail-fast no upload quando APK estiver ausente"
 
 # 6. Resolução de caminhos target/dist/apk e assinatura segura (#82)
 SPEC_82="${ROOT_DIR}/docs/specs/82_corrigir_localizacao_de_apks_e_assinatura_no_deploy_android.md"
@@ -92,13 +92,13 @@ else
     echo "  [PASS] Mutação 2: sensibilidade a mascaramento || true validada."
 fi
 
-# Mutação 3: Ausência de fail-fast de APK no upload R2
-sed -i '/Nenhum APK Android encontrado para upload no Cloudflare R2/d' "$TEMP_WORKFLOW"
-if grep -q "Nenhum APK Android encontrado para upload no Cloudflare R2" "$TEMP_WORKFLOW"; then
+# Mutação 3: Ausência de fail-fast de APK no upload
+sed -i '/Nenhum APK Android encontrado para upload nos Generic Packages/d' "$TEMP_WORKFLOW"
+if grep -q "Nenhum APK Android encontrado para upload nos Generic Packages" "$TEMP_WORKFLOW"; then
     echo "  [FAIL] Mutação 3 falhou: omissão do fail-fast não foi detectada!"
     FAILED=1
 else
-    echo "  [PASS] Mutação 3: sensibilidade à omissão do fail-fast R2 validada."
+    echo "  [PASS] Mutação 3: sensibilidade à omissão do fail-fast validada."
 fi
 
 # Mutação 4: Reintrodução de encadeamento frágil
