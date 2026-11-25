@@ -67,4 +67,5 @@ impl SqliteIndexStore {
   - Método `purge_mismatched_dimensions(expected_dim)` em `lauda-server/src/adapters/sqlite_index.rs` integrado na inicialização do worker em `lauda-server/src/adapters/maildir.rs`.
 - **Validação:** 7/7 testes em `candle_e5_provider_test`, 3/3 testes em `index_storage_test`, `cargo fmt --check` e `cargo clippy --all-targets -- -D warnings` aprovados sem alertas.
 - **Data:** 2026-11-24
+- **Fechamento:** Fase 9 concluída com sucesso.
 
