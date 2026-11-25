@@ -336,7 +336,7 @@ pub fn CalendarView(mut screen: Signal<Screen>, session: Signal<SessionConfig>) 
                 }
 
                 div {
-                    style: "display: flex; gap: 0.5rem; width: 100%;",
+                    style: "display: flex; gap: 0.5rem; width: 100%; flex-wrap: wrap;",
 
                     input {
                         style: "flex: 1; border: 2px solid #0a0a0a; padding: 0.6rem 0.8rem; font-size: 0.95rem; outline: none; background: #fdfdfd;",

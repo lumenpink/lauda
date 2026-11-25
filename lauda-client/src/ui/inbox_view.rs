@@ -466,9 +466,9 @@ pub fn InboxView(
                         }
                     }
                     div {
-                        style: "display: flex; gap: 0.5rem;",
+                        style: crate::domain::view::MOBILE_SAFE_FLEX_ROW,
                         button {
-                            style: "background: #dc143c; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                            style: "background: #dc143c; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a; white-space: nowrap;",
                             onclick: move |_| screen.set(Screen::Compose {
                                 reply_to: None,
                                 reply_cc: None,
@@ -478,27 +478,27 @@ pub fn InboxView(
                             "+ NOVA MENSAGEM"
                         }
                         button {
-                            style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                            style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a; white-space: nowrap;",
                             onclick: move |_| screen.set(Screen::Calendar),
                             "📅 AGENDA"
                         }
                         button {
-                            style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                            style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a; white-space: nowrap;",
                             onclick: move |_| screen.set(Screen::Contacts),
                             "👥 CONTATOS"
                         }
                         button {
-                            style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                            style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a; white-space: nowrap;",
                             onclick: move |_| screen.set(Screen::Rules { initial_rule: None }),
                             "⚙ REGRAS"
                         }
                         button {
-                            style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer;",
+                            style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; white-space: nowrap;",
                             onclick: handle_refresh,
                             if *is_refreshing.read() { "..." } else { "🔄" }
                         }
                         button {
-                            style: "background: #fff; color: #8b0000; border: 1px solid #8b0000; padding: 0.4rem 0.8rem; font-size: 0.85rem; cursor: pointer;",
+                            style: "background: #fff; color: #8b0000; border: 1px solid #8b0000; padding: 0.4rem 0.8rem; font-size: 0.85rem; cursor: pointer; white-space: nowrap;",
                             onclick: handle_logout,
                             "SAIR"
                         }
@@ -605,7 +605,7 @@ pub fn InboxView(
                                 div {
                                     style: "display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;",
                                     button {
-                                        style: "background: #dc143c; color: #fff; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                                        style: "background: #dc143c; color: #fff; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a; white-space: nowrap;",
                                         onclick: move |_| {
                                             let uids: Vec<u32> = selected_uids.read().iter().copied().collect();
                                             let box_name = current_mailbox.read().clone();
@@ -642,7 +642,7 @@ pub fn InboxView(
                                         "🗑 EXCLUIR"
                                     }
                                     button {
-                                        style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                                        style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a; white-space: nowrap;",
                                         onclick: move |_| {
                                             let uids: Vec<u32> = selected_uids.read().iter().copied().collect();
                                             let box_name = current_mailbox.read().clone();
@@ -681,7 +681,7 @@ pub fn InboxView(
                                         "📦 ARQUIVAR"
                                     }
                                     button {
-                                        style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                                        style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a; white-space: nowrap;",
                                         onclick: move |_| {
                                             let uids: Vec<u32> = selected_uids.read().iter().copied().collect();
                                             let box_name = current_mailbox.read().clone();
@@ -733,7 +733,7 @@ pub fn InboxView(
                                         "✉ LIDA/NÃO LIDA"
                                     }
                                     button {
-                                        style: "background: #fff; color: #dc143c; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                                        style: "background: #fff; color: #dc143c; border: 2px solid #0a0a0a; padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a; white-space: nowrap;",
                                         onclick: move |_| {
                                             let uids: Vec<u32> = selected_uids.read().iter().copied().collect();
                                             let box_name = current_mailbox.read().clone();
@@ -937,13 +937,7 @@ pub fn InboxView(
                             rsx! {
                                 div {
                                     key: "{uid}",
-                                    style: if is_selected {
-                                        "border: 2px solid #dc143c; background: #fff5f5; padding: 1rem; box-shadow: 4px 4px 0 #0a0a0a; cursor: pointer; display: flex; flex-direction: column; gap: 0.3rem;"
-                                    } else if unread {
-                                        "border: 2px solid #0a0a0a; background: #fff; padding: 1rem; box-shadow: 4px 4px 0 #dc143c; cursor: pointer; display: flex; flex-direction: column; gap: 0.3rem;"
-                                    } else {
-                                        "border: 1px solid #0a0a0a; background: #faf9f6; padding: 1rem; cursor: pointer; display: flex; flex-direction: column; gap: 0.3rem;"
-                                    },
+                                    style: crate::domain::view::mobile_card_style(is_selected, unread),
                                     oncontextmenu: move |e| {
                                         e.prevent_default();
                                         crate::domain::view::toggle_selection(&mut selected_uids.write(), uid);
@@ -1121,9 +1115,9 @@ pub fn InboxView(
                                         }
                                     },
                                     div {
-                                        style: "display: flex; justify-content: space-between; align-items: center;",
+                                        style: "display: flex; justify-content: space-between; align-items: flex-start; gap: 0.4rem; flex-wrap: wrap; max-width: 100%;",
                                         div {
-                                            style: "display: flex; align-items: center; gap: 0.5rem; cursor: pointer;",
+                                            style: "display: flex; align-items: center; gap: 0.5rem; cursor: pointer; min-width: 0; flex: 1 1 140px; max-width: 100%;",
                                             onclick: move |e| {
                                                 e.stop_propagation();
                                                 if e.modifiers().shift() {
@@ -1143,13 +1137,13 @@ pub fn InboxView(
                                                 last_interacted_uid.set(Some(uid));
                                             },
                                             if is_selected {
-                                                span { style: "color: #dc143c; font-size: 1.1rem; font-weight: bold;", "[✓]" }
+                                                span { style: "color: #dc143c; font-size: 1.1rem; font-weight: bold; flex-shrink: 0;", "[✓]" }
                                             } else if unread {
-                                                span { style: "color: #dc143c; font-size: 1.1rem;", "●" }
+                                                span { style: "color: #dc143c; font-size: 1.1rem; flex-shrink: 0;", "●" }
                                             } else {
-                                                span { style: "color: #999; font-size: 1.1rem;", "○" }
+                                                span { style: "color: #999; font-size: 1.1rem; flex-shrink: 0;", "○" }
                                             }
-                                            span { style: "font-weight: bold; font-size: 0.95rem; color: #0a0a0a;", "{sender}" }
+                                            span { style: crate::domain::view::MOBILE_SAFE_ELLIPSIS_TEXT, "{sender}" }
                                         }
                                         div {
                                             style: "display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;",
@@ -1181,11 +1175,11 @@ pub fn InboxView(
                                             if *loading_uid.read() == Some(uid) {
                                                 span { style: "color: #dc143c; font-size: 0.8rem; font-weight: bold; animation: pulse 1s infinite;", "CARREGANDO..." }
                                             }
-                                            span { style: "font-size: 0.8rem; color: #666; margin-left: 0.3rem;", "{date}" }
+                                            span { style: "font-size: 0.8rem; color: #666; margin-left: 0.3rem; white-space: nowrap; flex-shrink: 0;", "{date}" }
                                         }
                                     }
                                     div {
-                                        style: "font-size: 1.05rem; font-weight: {font_weight}; color: #0a0a0a; margin-top: 0.2rem;",
+                                        style: "font-size: 1.05rem; font-weight: {font_weight}; color: #0a0a0a; margin-top: 0.2rem; overflow-wrap: anywhere; word-break: break-word;",
                                         "{subject}"
                                     }
                                 }

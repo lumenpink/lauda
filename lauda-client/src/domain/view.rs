@@ -750,3 +750,23 @@ pub fn select_all(messages: &[MessageEnvelope], selected: &mut std::collections:
 pub fn clear_selection(selected: &mut std::collections::HashSet<u32>) {
     selected.clear();
 }
+
+/// Container flex horizontal seguro para telas pequenas (quebra linha automaticamente).
+pub const MOBILE_SAFE_FLEX_ROW: &str = "display: flex; gap: 0.5rem; flex-wrap: wrap;";
+
+/// Estilo para rótulos de botões que nunca devem quebrar texto internamente.
+pub const MOBILE_SAFE_BUTTON_NOWRAP: &str = "white-space: nowrap;";
+
+/// Estilo para texto de remetente em cards flex sem estourar a largura da viewport.
+pub const MOBILE_SAFE_ELLIPSIS_TEXT: &str = "font-weight: bold; font-size: 0.95rem; color: #0a0a0a; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;";
+
+/// Retorna o estilo inline do card de mensagem respeitando seleção, leitura e limites de largura mobile.
+pub fn mobile_card_style(is_selected: bool, is_unread: bool) -> &'static str {
+    if is_selected {
+        "border: 2px solid #dc143c; background: #fff5f5; padding: 1rem; box-shadow: 4px 4px 0 #0a0a0a; cursor: pointer; display: flex; flex-direction: column; gap: 0.3rem; box-sizing: border-box; max-width: 100%; overflow: hidden;"
+    } else if is_unread {
+        "border: 2px solid #0a0a0a; background: #fff; padding: 1rem; box-shadow: 4px 4px 0 #dc143c; cursor: pointer; display: flex; flex-direction: column; gap: 0.3rem; box-sizing: border-box; max-width: 100%; overflow: hidden;"
+    } else {
+        "border: 1px solid #0a0a0a; background: #faf9f6; padding: 1rem; cursor: pointer; display: flex; flex-direction: column; gap: 0.3rem; box-sizing: border-box; max-width: 100%; overflow: hidden;"
+    }
+}

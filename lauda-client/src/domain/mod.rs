@@ -34,8 +34,10 @@ pub use sync::{
 pub use time::{async_sleep, current_unix_timestamp};
 pub use update::{UpdateManifest, UpdateStatus, check_update, fetch_remote_manifest};
 pub use view::{
-    MIN_SEARCH_QUERY_LEN, ShortcutAction, ViewMode, clear_selection, fast_filter_envelopes,
+    MIN_SEARCH_QUERY_LEN, MOBILE_SAFE_BUTTON_NOWRAP, MOBILE_SAFE_ELLIPSIS_TEXT,
+    MOBILE_SAFE_FLEX_ROW, ShortcutAction, ViewMode, clear_selection, fast_filter_envelopes,
     filter_aliases, filter_identities, find_neighbor_uids, format_search_hint, is_search_active,
-    parse_identity, parse_markdown_to_html, parse_shortcut, resolve_navigation_envelopes,
-    select_all, select_range, should_show_search_hint, toggle_selection,
+    mobile_card_style, parse_identity, parse_markdown_to_html, parse_shortcut,
+    resolve_navigation_envelopes, select_all, select_range, should_show_search_hint,
+    toggle_selection,
 };

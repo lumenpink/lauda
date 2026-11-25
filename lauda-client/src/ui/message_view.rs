@@ -835,7 +835,7 @@ pub fn MessageView(
                         "PRÓXIMO ▶"
                     }
                     button {
-                        style: "background: #dc143c; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;",
+                        style: "background: #dc143c; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a; white-space: nowrap;",
                         onclick: {
                             let s_rep = sender_for_reply.clone();
                             let sub_rep = subject_for_reply.clone();
@@ -850,7 +850,7 @@ pub fn MessageView(
                         "RESPONDER"
                     }
                     button {
-                        style: "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer;",
+                        style: "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer; white-space: nowrap;",
                         onclick: {
                             let s_rep = sender_for_reply.clone();
                             let cc_rep = cc_for_reply.clone();
@@ -866,7 +866,7 @@ pub fn MessageView(
                         "RESP. TODOS"
                     }
                     button {
-                        style: "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer;",
+                        style: "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer; white-space: nowrap;",
                         onclick: {
                             let sub_fwd = subject_for_forward.clone();
                             let b_fwd = forward_body.clone();
@@ -880,17 +880,17 @@ pub fn MessageView(
                         "ENCAMINHAR"
                     }
                     button {
-                        style: "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer;",
+                        style: "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer; white-space: nowrap;",
                         onclick: handle_toggle_flag,
                         if envelope.is_flagged { "★ FAVORITO" } else { "☆ MARCAR" }
                     }
                     button {
-                        style: "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer;",
+                        style: "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer; white-space: nowrap;",
                         onclick: handle_archive,
                         "📦 ARQUIVAR"
                     }
                     button {
-                        style: "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer;",
+                        style: "background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; padding: 0.4rem 0.8rem; font-size: 0.85rem; font-weight: bold; cursor: pointer; white-space: nowrap;",
                         onclick: handle_toggle_read,
                         if envelope.is_read { "MARCAR NÃO LIDA" } else { "MARCAR LIDA" }
                     }

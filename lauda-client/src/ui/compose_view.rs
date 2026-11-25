@@ -151,7 +151,7 @@ pub fn ComposeView(
 
             // Barra de Navegação do Compositor
             div {
-                style: "display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0a0a0a; padding-bottom: 0.8rem;",
+                style: "display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.6rem; border-bottom: 2px solid #0a0a0a; padding-bottom: 0.8rem;",
                 div {
                     span {
                         style: "background: #dc143c; color: #fff; padding: 0.2rem 0.5rem; font-weight: bold; font-size: 0.8rem;",
@@ -163,14 +163,14 @@ pub fn ComposeView(
                     }
                 }
                 div {
-                    style: "display: flex; gap: 0.5rem;",
+                    style: "display: flex; gap: 0.5rem; flex-wrap: wrap;",
                     button {
-                        style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer;",
+                        style: "background: #fff; color: #0a0a0a; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; white-space: nowrap;",
                         onclick: move |_| screen.set(Screen::Inbox),
                         "← CANCELAR"
                     }
                     button {
-                        style: if *is_sending.read() { "background: #666; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: not-allowed;" } else { "background: #dc143c; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a;" },
+                        style: if *is_sending.read() { "background: #666; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: not-allowed; white-space: nowrap;" } else { "background: #dc143c; color: #fff; border: 2px solid #0a0a0a; padding: 0.4rem 0.8rem; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #0a0a0a; white-space: nowrap;" },
                         disabled: *is_sending.read(),
                         onclick: handle_send,
                         if *is_sending.read() { "ENVIANDO..." } else { "ENVIAR ✉" }
