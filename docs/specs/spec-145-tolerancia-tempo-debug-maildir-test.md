@@ -28,4 +28,8 @@ Ambos os testes impunham um limite estrito de tempo real (`< 500ms`) mesmo em bu
 ---
 
 ## 4. Laudo de Fechamento e Homologação
-*(A preencher na Fase 8 - Quality Gate)*
+- **Status:** Concluído e Aprovado no Quality Gate (Fase 8).
+- **Implementação:** Adicionado helper `maildir_perf_budget()` (`5s` em `debug_assertions`, `500ms` em `release`) aplicado em `test_maildir_large_volume_perf` e `test_maildir_search_does_not_perform_blocking_reconcile` em `lauda-server/tests/maildir_test.rs`.
+- **Validação:** 11/11 testes aprovados em `maildir_test.rs`, `cargo fmt --check` e `cargo clippy --all-targets -- -D warnings` aprovados sem alertas.
+- **Data:** 2026-11-25
+- **Fechamento:** Fase 9 concluída com sucesso.
