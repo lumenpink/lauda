@@ -60,4 +60,11 @@ impl SqliteIndexStore {
 ---
 
 ## 5. Laudo de Fechamento e Homologação
-*(A preencher na Fase 8 - Quality Gate)*
+- **Status:** Concluído e Aprovado no Quality Gate (Fase 8).
+- **Implementação:**
+  - Cache singleton thread-safe (`PROVIDER_CACHE: LazyLock<RwLock<HashMap<PathBuf, DynamicEmbeddingProvider>>>`) em `lauda-index/src/index.rs`.
+  - Exposição de `embedding_dim()` em `EmbeddingProvider`, `CandleEmbeddingProvider` e `DynamicEmbeddingProvider`.
+  - Método `purge_mismatched_dimensions(expected_dim)` em `lauda-server/src/adapters/sqlite_index.rs` integrado na inicialização do worker em `lauda-server/src/adapters/maildir.rs`.
+- **Validação:** 7/7 testes em `candle_e5_provider_test`, 3/3 testes em `index_storage_test`, `cargo fmt --check` e `cargo clippy --all-targets -- -D warnings` aprovados sem alertas.
+- **Data:** 2026-11-24
+
