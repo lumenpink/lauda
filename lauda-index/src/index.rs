@@ -90,10 +90,7 @@ impl DynamicEmbeddingProvider {
 
     /// Retorna quantos provedores neurais estão cacheados em memória no processo atual.
     pub fn cached_provider_count() -> usize {
-        PROVIDER_CACHE
-            .read()
-            .map(|guard| guard.len())
-            .unwrap_or(0)
+        PROVIDER_CACHE.read().map(|guard| guard.len()).unwrap_or(0)
     }
 
     pub fn from_path_or_fallback<P: AsRef<Path>>(path: P) -> Self {

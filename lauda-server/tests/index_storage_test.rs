@@ -162,7 +162,9 @@ fn test_purge_mismatched_dimensions_contract() {
         store.save_document("INBOX", doc, 100).unwrap();
     }
 
-    let purged = store.purge_mismatched_dimensions(384).expect("purgar dimensoes");
+    let purged = store
+        .purge_mismatched_dimensions(384)
+        .expect("purgar dimensoes");
     assert_eq!(purged, 1, "Deve expurgar exatamente o documento 768d");
 
     let remaining = store.get_indexed_uids("INBOX").unwrap();

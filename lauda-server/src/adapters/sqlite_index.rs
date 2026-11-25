@@ -272,7 +272,10 @@ impl SqliteIndexStore {
 
     /// Remove documentos indexados cuja dimensão vetorial divirja de `expected_dim`,
     /// limpando os índices `FlatVectorIndex` incompatíveis em RAM para reindexação automática.
-    pub fn purge_mismatched_dimensions(&self, expected_dim: usize) -> Result<usize, rusqlite::Error> {
+    pub fn purge_mismatched_dimensions(
+        &self,
+        expected_dim: usize,
+    ) -> Result<usize, rusqlite::Error> {
         let mut to_purge: Vec<(String, u32)> = Vec::new();
         {
             let conn = self.write_conn.lock().unwrap();

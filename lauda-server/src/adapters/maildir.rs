@@ -328,7 +328,8 @@ impl MaildirBackend {
             let startup_provider =
                 lauda_index::DynamicEmbeddingProvider::from_path_or_fallback(&model_path);
             if let Some(ref store) = self.sqlite_index
-                && let Ok(purged) = store.purge_mismatched_dimensions(startup_provider.embedding_dim())
+                && let Ok(purged) =
+                    store.purge_mismatched_dimensions(startup_provider.embedding_dim())
                 && purged > 0
             {
                 tracing::info!(
