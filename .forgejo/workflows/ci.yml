@@ -95,11 +95,12 @@ jobs:
             apksigner verify --print-certs site/lauda-latest.apk || true
           fi
 
-      - name: "Publish Site Bundle to Forgejo Generic Packages"
-        env:
-          GAMBI_2LP_IN_TOKEN: ${{ secrets.REGISTRY_TOKEN || secrets.GAMBI_2LP_IN_TOKEN || secrets.FORGEJO_TOKEN }}
-        run: |
-          cccp package upload site
+      - name: "Upload Site Bundle Artifact"
+        uses: https://github.com/actions/upload-artifact@v4
+        with:
+          name: lauda-site-bundle
+          path: site/
+          retention-days: 1
 
   deploy-banca:
     name: "Build & Publish Lauda Multiarch to Banca"
@@ -199,7 +200,19 @@ jobs:
           sha256sum * > SHA256SUMS
           cd "$GITHUB_WORKSPACE"
 
-      - name: "Publish Artifacts to Forgejo Generic Packages"
+      - name: "Download Site Bundle Artifact"
+        uses: https://github.com/actions/download-artifact@v4
+        with:
+          name: lauda-site-bundle
+          path: site
+
+      - name: "Download APK Artifacts"
+        uses: https://github.com/actions/download-artifact@v4
+        with:
+          name: lauda-apks
+          path: target/dist/apk
+
+      - name: "Publish All Artifacts Atomically to Forgejo Generic Packages"
         env:
           GAMBI_2LP_IN_TOKEN: ${{ secrets.REGISTRY_TOKEN || secrets.GAMBI_2LP_IN_TOKEN || secrets.FORGEJO_TOKEN }}
         run: |
@@ -208,6 +221,19 @@ jobs:
             [ -f "$PKG" ] || continue
             cccp package upload "$PKG" --version "$VERSION"
           done
+          UPLOADED=0
+          for apk in target/dist/apk/*.apk site/*.apk; do
+            [ -f "$apk" ] || continue
+            cccp package upload "$apk" --version "$VERSION"
+            UPLOADED=$((UPLOADED + 1))
+          done
+          if [ "$UPLOADED" -eq 0 ]; then
+            echo "❌ ERRO CRÍTICO: Nenhum APK Android encontrado para upload nos Generic Packages." >&2
+            exit 1
+          fi
+          if [ -d site ]; then
+            cccp package upload site --version "$VERSION"
+          fi
 
   deploy-apk:
     name: "Build Android APK & Sync Pratilera"
@@ -237,20 +263,24 @@ jobs:
             done
           fi
 
-      - name: "Publish Signed APKs to Forgejo Generic Packages"
-        env:
-          GAMBI_2LP_IN_TOKEN: ${{ secrets.REGISTRY_TOKEN || secrets.GAMBI_2LP_IN_TOKEN || secrets.FORGEJO_TOKEN }}
+      - name: "Validate Generated APKs & Upload Artifact"
         run: |
-          UPLOADED=0
+          FOUND=0
           for apk in target/dist/apk/*.apk site/*.apk; do
             [ -f "$apk" ] || continue
-            cccp package upload "$apk"
-            UPLOADED=$((UPLOADED + 1))
+            FOUND=$((FOUND + 1))
           done
-          if [ "$UPLOADED" -eq 0 ]; then
-            echo "❌ ERRO CRÍTICO: Nenhum APK Android encontrado para upload nos Generic Packages." >&2
+          if [ "$FOUND" -eq 0 ]; then
+            echo "❌ ERRO CRÍTICO: Nenhum APK Android gerado em target/dist/apk/ ou site/." >&2
             exit 1
           fi
+
+      - name: "Upload APK Artifacts"
+        uses: https://github.com/actions/upload-artifact@v4
+        with:
+          name: lauda-apks
+          path: target/dist/apk/*.apk
+          retention-days: 1
 
   deploy-server:
     name: "Container — Build Container — Build & Sovereign CD (obizero) Autonomous CD (obizero)"
