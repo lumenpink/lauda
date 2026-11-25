@@ -129,7 +129,8 @@ if [ "$DO_BUILD_APK" = true ]; then
         echo "-> Compilando Android APK nativo (aarch64)..."
         "$SCRIPT_DIR/publish-nightly.sh"
     else
-        echo "-> Ambiente Android NDK/SDK não disponível diretamente; mantendo APK existente em $DIST_DIR/apk/lauda-latest.apk"
+        echo "❌ ERRO CRÍTICO: Ambiente Android NDK/SDK indisponível (dx, target aarch64-linux-android ou NDK em $NDK_CHECK_DIR ausente)." >&2
+        exit 1
     fi
     "$REPO_ROOT/tests/test-apk-metadata.sh"
 fi
