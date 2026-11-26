@@ -6,7 +6,7 @@ fn mock_manifest(version: &str, min_compatible_version: &str) -> UpdateManifest 
     UpdateManifest {
         version: version.to_string(),
         min_compatible_version: min_compatible_version.to_string(),
-        apk_url: "https://bucket.2lp.in/lauda.apk".to_string(),
+        apk_url: "https://bucket.2lp.in/pratilera/lauda.apk".to_string(),
         release_notes: "Release notes de teste".to_string(),
         published_at: "2026-11-18T00:00:00Z".to_string(),
     }

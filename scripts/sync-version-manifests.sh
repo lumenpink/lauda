@@ -34,7 +34,7 @@ cat <<EOF > "$SITE_DIR/version.json"
 {
   "version": "$CANONICAL_VERSION",
   "min_compatible_version": "0.1.0",
-  "apk_url": "https://bucket.2lp.in/lauda.apk",
+  "apk_url": "https://bucket.2lp.in/pratilera/lauda.apk",
   "package_id": "in.twolp.lauda",
   "release_notes": "Build do Lauda Smolclient ($CANONICAL_VERSION).",
   "published_at": "$PUBLISHED_AT"

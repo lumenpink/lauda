@@ -26,8 +26,8 @@ if [ ! -f "$VERSION_FILE" ]; then
     exit 1
 fi
 if [ -f "$VERSION_JSON" ]; then
-    if ! grep -q "https://bucket.2lp.in/lauda.apk" "$VERSION_JSON"; then
-        echo "ERRO: site/version.json deve apontar para https://bucket.2lp.in/lauda.apk"
+    if ! grep -q "https://bucket.2lp.in/pratilera/lauda.apk" "$VERSION_JSON"; then
+        echo "ERRO: site/version.json deve apontar para https://bucket.2lp.in/pratilera/lauda.apk"
         exit 1
     fi
 fi
