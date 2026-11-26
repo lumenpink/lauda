@@ -96,7 +96,7 @@ jobs:
           fi
 
       - name: "Upload Site Bundle Artifact"
-        uses: https://github.com/actions/upload-artifact@v4
+        uses: https://github.com/actions/upload-artifact@v3
         with:
           name: lauda-site-bundle
           path: site/
@@ -201,13 +201,13 @@ jobs:
           cd "$GITHUB_WORKSPACE"
 
       - name: "Download Site Bundle Artifact"
-        uses: https://github.com/actions/download-artifact@v4
+        uses: https://github.com/actions/download-artifact@v3
         with:
           name: lauda-site-bundle
           path: site
 
       - name: "Download APK Artifacts"
-        uses: https://github.com/actions/download-artifact@v4
+        uses: https://github.com/actions/download-artifact@v3
         with:
           name: lauda-apks
           path: target/dist/apk
@@ -276,7 +276,7 @@ jobs:
           fi
 
       - name: "Upload APK Artifacts"
-        uses: https://github.com/actions/upload-artifact@v4
+        uses: https://github.com/actions/upload-artifact@v3
         with:
           name: lauda-apks
           path: target/dist/apk/*.apk
